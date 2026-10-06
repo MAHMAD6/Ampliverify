@@ -78,8 +78,9 @@ describe('tenancy and RBAC', () => {
 
       const bobsList = await svc.projects.listAccessible(bob.owner.id);
       expect(bobsList.map((p) => p.id)).not.toContain(project.id);
+      await prisma.domain.create({ data: { projectId: project.id, host: 'alice.example', canonicalUrl: 'https://alice.example/' } });
       const alicesList = await svc.projects.listAccessible(alice.owner.id);
-      expect(alicesList.map((p) => p.id)).toContain(project.id);
+      expect(alicesList.find((p) => p.id === project.id)).toMatchObject({ primaryDomain: 'alice.example' });
     });
 
     it('a user with no assignments sees nothing', async () => {

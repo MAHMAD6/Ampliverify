@@ -1,0 +1,8 @@
+.logo { display: inline-flex; align-items: center; gap: 10px; }
+.text { display: flex; flex-direction: column; line-height: 1; }
+.word { font-weight: 800; letter-spacing: -0.3px; }
+.ampli { color: #0b3d22; }
+.ampliDark { color: #fff; }
+.verify { color: #22a447; }
+.tag { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; color: #4d6b58; margin-top: 4px; }
+.tagDark { font-size: 9px; font-weight: 700; letter-spacing: 1.6px; color: #b9c8dc; margin-top: 4px; }

@@ -8,3 +8,5 @@ coverage/
 *.log
 .DS_Store
 apps/api/storage/
+.next/
+next-env.d.ts

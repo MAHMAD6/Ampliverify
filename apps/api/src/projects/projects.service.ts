@@ -38,11 +38,15 @@ export class ProjectsService {
   async listAccessible(userId: string) {
     const access = await this.rbac.projectAccessFilter(userId, 'project.read');
     if (!access) return [];
-    return this.prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where: { AND: [access, { deletedAt: null }] },
-      select: PROJECT_FIELDS,
+      select: {
+        ...PROJECT_FIELDS,
+        domains: { select: { host: true }, orderBy: { createdAt: 'asc' }, take: 1 },
+      },
       orderBy: { createdAt: 'desc' },
     });
+    return projects.map(({ domains, ...project }) => ({ ...project, primaryDomain: domains[0]?.host ?? null }));
   }
 
   async getAccessible(userId: string, projectId: string) {
