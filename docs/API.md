@@ -35,6 +35,7 @@ Every endpoint applies the publication rule: `status = PUBLISHED AND published_a
 | GET | `/public/careers`, `/public/careers/:slug` | Detail includes `description` |
 | GET | `/public/categories?type=BLOG\|GUIDE\|HELP` | |
 | GET | `/public/integrations` | Active integration providers |
+| GET | `/public/geo-platforms` | Active AI search platforms (GEO registry) |
 
 ## Current user / tenant
 

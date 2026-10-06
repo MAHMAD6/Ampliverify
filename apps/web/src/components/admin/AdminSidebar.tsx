@@ -27,6 +27,11 @@ import {
   Wallet,
   ArrowLeftRight,
   Home,
+  Tags,
+  UserPen,
+  PlayCircle,
+  CalendarDays,
+  Layers,
 } from 'lucide-react';
 import { ADMIN_NAV } from '@/lib/nav';
 import { Logo } from '../brand/Logo';
@@ -57,6 +62,11 @@ const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   security: Shield,
   settings: Settings,
   gauge: Gauge,
+  categories: Tags,
+  authors: UserPen,
+  videos: PlayCircle,
+  events: CalendarDays,
+  'case-studies': Layers,
 };
 
 export function AdminSidebar() {

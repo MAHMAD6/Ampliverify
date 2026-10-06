@@ -62,6 +62,13 @@ describe('public content (publication rules)', () => {
     expect(job.description).toBeNull();
   });
 
+  it('geo platforms list only active registry entries', async () => {
+    const key = uniq('geo');
+    await prisma.geoPlatform.createMany({ data: [{ key, name: 'Active platform' }, { key: `${key}-off`, name: 'Inactive', isActive: false }] });
+    const keys = (await content.listGeoPlatforms()).map((p) => p.key).filter((k) => k.startsWith(key));
+    expect(keys).toEqual([key]);
+  });
+
   it('pricing lists only active public plans with active prices', async () => {
     const code = uniq('plan');
     const plan = await prisma.plan.create({ data: { code, name: 'Pro', status: 'ACTIVE', isPublic: true } });
