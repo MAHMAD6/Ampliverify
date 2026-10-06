@@ -14,7 +14,7 @@ export async function KeywordPage({ tabKey }: { tabKey: TabKey }) {
         actions={tab.key !== 'lists' ? <KeywordHeaderActions /> : undefined}
       />
       <TabNav tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: t.href }))} active={tab.key} />
-      <KeywordResearch key={tab.key} tab={tab} hasProject={!!selectedProject} />
+      <KeywordResearch key={tab.key} tab={tab} projectId={selectedProject?.id ?? null} />
     </>
   );
 }

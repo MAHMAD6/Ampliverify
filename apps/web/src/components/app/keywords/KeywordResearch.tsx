@@ -23,6 +23,20 @@ import { Button, DataTable, EmptyState, Field, IconCircle, Input, Metric, Notice
 import ui from '@/components/ui/ui.module.css';
 import p from '../pages.module.css';
 import { LANGUAGES, LOCATIONS, type FilterDef, type MetricIcon, type TabConfig } from './config';
+import { KeywordDetailsPanel, KeywordResultsTable } from './KeywordResults';
+import { getKeywordDetail, searchKeywords, type SearchResult } from './source';
+import type { KeywordDetail } from './types';
+
+const DEFAULT_PAGE_SIZE = 10;
+
+/** Explorer metrics reflect the selected keyword once its details are loaded. */
+function metricValue(label: string, detail: KeywordDetail | null) {
+  if (!detail) return undefined;
+  if (/Monthly Searches/.test(label)) return detail.volume?.toLocaleString('en-US');
+  if (/Difficulty/.test(label)) return detail.difficulty ?? undefined;
+  if (/CPC/.test(label)) return detail.cpc === null ? undefined : `$${detail.cpc.toFixed(2)}`;
+  return undefined;
+}
 
 const METRIC_ICONS: Record<MetricIcon, { icon: React.ReactNode; tone: 'green' | 'amber' | 'purple' | 'blue' }> = {
   bars: { icon: <BarChart3 size={26} />, tone: 'green' },
@@ -70,17 +84,39 @@ function FilterGroup({ def }: { def: FilterDef }) {
  * Research workspace for one tab. No keyword-data provider is connected yet,
  * so a search never invents results: it explains why nothing is returned.
  */
-export function KeywordResearch({ tab, hasProject }: { tab: TabConfig; hasProject: boolean }) {
+export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId: string | null }) {
+  const hasProject = !!projectId;
   const [query, setQuery] = useState('');
   const [searched, setSearched] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(!!tab.drawer);
   const [filtersKey, setFiltersKey] = useState(0);
 
+  const [data, setData] = useState<SearchResult>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [detail, setDetail] = useState<KeywordDetail | null>(null);
+
+  const load = async (term: string, nextPage: number, size = pageSize) => {
+    setPage(nextPage);
+    setData(projectId ? await searchKeywords(projectId, { term, tab: tab.key, page: nextPage, pageSize: size }) : null);
+  };
+
   const runSearch = (value = query) => {
     if (!value.trim()) return;
     setQuery(value);
     setSearched(value.trim());
+    setSelected(null);
+    setDetail(null);
+    void load(value.trim(), 1);
   };
+
+  const select = async (keyword: string) => {
+    setSelected(keyword);
+    setDrawerOpen(true);
+    setDetail(projectId ? await getKeywordDetail(projectId, keyword) : null);
+  };
+  const hasResults = !!data && data.results.length > 0;
 
   const empty = searched ? (
     <EmptyState
@@ -192,7 +228,7 @@ export function KeywordResearch({ tab, hasProject }: { tab: TabConfig; hasProjec
       {tab.metrics && (
         <Grid cols={tab.metrics.length === 3 ? 3 : 4} style={{ margin: '16px 0' }}>
           {tab.metrics.map((m) => (
-            <Metric key={m.label} label={m.label} info={m.info} icon={METRIC_ICONS[m.icon].icon} tone={METRIC_ICONS[m.icon].tone} />
+            <Metric key={m.label} label={m.label} info={m.info} icon={METRIC_ICONS[m.icon].icon} tone={METRIC_ICONS[m.icon].tone} value={metricValue(m.label, detail)} />
           ))}
         </Grid>
       )}
@@ -216,7 +252,7 @@ export function KeywordResearch({ tab, hasProject }: { tab: TabConfig; hasProjec
         )}
 
         <Panel
-          title={tab.tableTitle}
+          title={hasResults ? `${tab.tableTitle} (${data!.total.toLocaleString('en-US')})` : tab.tableTitle}
           bodyless
           actions={
             <Button variant="secondary" size="sm" icon={<Settings2 size={16} />} disabled={!searched}>
@@ -224,7 +260,24 @@ export function KeywordResearch({ tab, hasProject }: { tab: TabConfig; hasProjec
             </Button>
           }
         >
-          <DataTable selectable columns={tab.columns} empty={empty} />
+          {hasResults ? (
+            <KeywordResultsTable
+              results={data!.results}
+              total={data!.total}
+              page={page}
+              pageSize={pageSize}
+              selected={selected}
+              onSelect={select}
+              onPage={(n) => searched && void load(searched, n)}
+              variant={tab.key === 'related' ? 'related' : 'ideas'}
+              onPageSize={(n) => {
+                setPageSize(n);
+                if (searched) void load(searched, 1, n);
+              }}
+            />
+          ) : (
+            <DataTable selectable columns={tab.columns} empty={empty} />
+          )}
         </Panel>
 
         {tab.drawer && drawerOpen && (
@@ -236,6 +289,7 @@ export function KeywordResearch({ tab, hasProject }: { tab: TabConfig; hasProjec
               </button>
             }
           >
+            {detail ? <KeywordDetailsPanel detail={detail} onClose={() => setDrawerOpen(false)} /> : <>
             <EmptyState compact icon={<FileSearch size={26} />} title="No keyword selected" description="Select a keyword from the results table to view detailed insights, related terms, SERP analysis, and content opportunities." />
             <h4 style={{ fontSize: 16, marginTop: 4 }}>What you’ll see</h4>
             <div className={p.drawerList}>
@@ -257,6 +311,7 @@ export function KeywordResearch({ tab, hasProject }: { tab: TabConfig; hasProjec
                 </div>
               ))}
             </div>
+            </>}
           </Panel>
         )}
       </div>

@@ -1,5 +1,5 @@
 import { ArrowUpRight } from 'lucide-react';
-import { Badge, Button, EmptyState, KeyValue, Notice, Panel, SettingRow, Stack } from '@/components/ui';
+import { Badge, Button, ButtonLink, EmptyState, KeyValue, Notice, Panel, SettingRow, Stack } from '@/components/ui';
 import { apiList } from '@/lib/api';
 import type { IntegrationProvider } from '@/lib/types';
 
@@ -15,6 +15,17 @@ export default async function IntegrationsSettingsPage() {
       <Stack>
         <Panel title="Connected Integrations" description="Manage services that are currently connected to this workspace.">
           <EmptyState compact icon={<ArrowUpRight size={24} />} title="No integrations connected" description="Connected services will appear here after you authorize them." />
+        </Panel>
+        <Panel title="Website / CMS" description="Connect your website to publish optimized content from the On-Page SEO Editor.">
+          <SettingRow
+            title="Connect Your Website"
+            description="WordPress today; Webflow, Shopify and a custom API are coming soon."
+            control={
+              <ButtonLink href="/app/integrations/cms" variant="outline">
+                Set Up Connection
+              </ButtonLink>
+            }
+          />
         </Panel>
         <Panel title="Available Integrations" description="Integrations become available here as they are supported in production.">
           {providers.length === 0 ? (

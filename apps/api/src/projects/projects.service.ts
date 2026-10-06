@@ -52,7 +52,12 @@ export class ProjectsService {
   async getAccessible(userId: string, projectId: string) {
     const project = await this.getOrThrow(projectId);
     await this.rbac.assertPermission(userId, 'project.read', this.scopeOf(project));
-    return project;
+    const domain = await this.prisma.domain.findFirst({
+      where: { projectId: project.id },
+      orderBy: { createdAt: 'asc' },
+      select: { host: true },
+    });
+    return { ...project, primaryDomain: domain?.host ?? null };
   }
 
   async create(actorId: string, dto: CreateProjectDto, requestMeta?: RequestMeta) {

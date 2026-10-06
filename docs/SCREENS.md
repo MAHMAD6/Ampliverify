@@ -37,9 +37,10 @@ The navigation order is locked to `docs/design/user-app/sidebar-navigation.png`.
 |---|---|---|---|
 | My Projects | `/app/projects` (`?tab=&q=&sort=&view=&page=&size=`) | user-app/my-projects (populated + empty, chat images 2026-10-06) | **Live**: list, status tabs and counts, search, sort, list/grid, pagination; pause/resume/archive via `PATCH /user/projects/:id`. Module status, page and prompt columns show "—" until those APIs exist. |
 | Add Project | `/app/projects/new` | none supplied | **Live**: `POST /user/projects` (server action) |
-| Project detail | `/app/projects/[id]` | none supplied | **Live**: `GET /user/projects/:id` |
+| Project Overview | `/app/projects/[id]` | chat images 2026-10-06 (screen + annotated spec) | **Live**: project facts, primary domain, status dropdown and Manage Project menu (pause/resume/archive). Visiting selects the project for project-scoped modules. Module status, activity, opportunities and usage show "Not analyzed" / "—". |
+| Project Reports tab | `/app/projects/[id]/reports` | chat image 2026-10-06 | Project header live; reports list, activity and insights are empty states; generate disabled; Scheduled Reports "Coming Soon" |
 | AI Search (GEO) | `/app/geo` | user-app/ai-search-geo-monitoring | Project picker live; prompts, providers, checks and credits are empty states |
-| Keyword Research: Explorer / Related / Questions / Competitors / SERP / Lists | `/app/keywords`, `/app/keywords/{related,questions,competitors,serp,lists}` | user-app/keyword-research*, -questions, -competitor, -serp | Empty states; a search explains that keyword data is not available (or asks for a project). Related and Lists have no dedicated design. |
+| Keyword Research: Explorer / Related / Questions / Competitors / SERP / Lists | `/app/keywords`, `/app/keywords/{related,questions,competitors,serp,lists}` | user-app/keyword-research*, -questions, -competitor, -serp; Explorer populated + Related (empty + populated) chat images | Empty states today. The populated states (results table with intent/KD badges, relevance bars, trend sparklines, pagination with page size; Keyword Details panel with metrics, intent, 12-month trend, SERP overview, related topics) render from `components/app/keywords/source.ts`, which returns "unavailable" until the keyword API exists. Lists has no dedicated design. |
 | Optimization Center | `/app/optimization` (`?category=`) | chat image 2026-10-06 | Empty states (recommendations come from the audit API) |
 | On-Page SEO Editor | `/app/editor` | chat image 2026-10-06 | Works locally: outline, sections, reorder, markdown formatting, undo/redo, preview, HTML view, autosaved **draft on this device** (per project). Save/AI/analysis disabled (editor API not built). |
 | Billing & Plan | `/app/billing` | user-support/01 | Empty states; View Plans → `/pricing` |
@@ -52,7 +53,12 @@ The navigation order is locked to `docs/design/user-app/sidebar-navigation.png`.
 | Settings → Data & Privacy | `/app/settings/data-privacy` | user-settings/Data_Privacy*.png | Read-only (needs tables not in the guide; see INPUTS.md) |
 | Search | `/app/search?q=` | none supplied | Searches the user's projects |
 
-Awaiting design (neutral page with title and empty state): Dashboard `/app`, On-Page SEO Audit `/app/audit`, Content Strategy `/app/content-strategy`, Reports `/app/reports`, Usage & Credits `/app/usage`, Settings → Workspace / Project Defaults / AI & GEO Preferences.
+| Report History | `/app/reports` | chat image 2026-10-06 | Filters (project list live); table empty; Generate → selected project's Reports tab |
+| Report view | `/app/reports/[id]` | chat image 2026-10-06 | Template ready; resolves to 404 until the reports API exists |
+| Settings → Project Defaults | `/app/settings/project-defaults` | chat image 2026-10-06 | Empty states; Configure disabled |
+| Connect Your Website (CMS) | `/app/integrations/cms` (linked from Settings → Integrations) | chat image 2026-10-06 | WordPress flow UI (platform choice, application-password form, page picker, summary). Connect/Test/Disconnect disabled; credentials never leave the browser. |
+
+Awaiting design (neutral page with title and empty state): Dashboard `/app`, On-Page SEO Audit `/app/audit`, Content Strategy `/app/content-strategy`, Usage & Credits `/app/usage`, Settings → Workspace / AI & GEO Preferences.
 
 ## Super Admin (`/admin`)
 

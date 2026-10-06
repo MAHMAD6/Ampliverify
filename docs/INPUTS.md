@@ -43,6 +43,16 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 33 | Settings → Notifications, hi-res (chat image) | — | — | **Shared in chat only.** Same screen as #12 `Notifications.png`. |
 | 34 | On-Page SEO Editor (chat image) | — | — | **Shared in chat only.** Implemented at `/app/editor`. Please re-upload. |
 | 35 | Optimization Center (chat image) | — | — | **Shared in chat only.** Implemented at `/app/optimization`. Please re-upload. |
+| 36 | Keyword Research — Explorer populated with Keyword Details (chat image) | — | — | **Chat only.** Drives the results table + details panel. Please re-upload. |
+| 37 | Settings → Project Defaults (chat image) | — | — | **Chat only.** `/app/settings/project-defaults`. |
+| 38 | Project Overview (chat image) | — | — | **Chat only.** `/app/projects/[id]`. |
+| 39 | Project Overview — annotated spec, 12 callouts (chat image) | — | — | **Chat only.** Used as the behavior spec for #38. |
+| 40 | Connect Your Website / CMS Connection (chat image) | — | — | **Chat only.** `/app/integrations/cms`. Its sidebar shows a different Settings sub-menu (Profile, Team, Integrations, Notifications, Billing, API & Developers); the 8-item Settings menu from #12 is kept. |
+| 41 | Keyword Research — Related Keywords, populated (chat image) | — | — | **Chat only.** `/app/keywords/related`. |
+| 42 | Keyword Research — Related Keywords, empty (chat image) | — | — | **Chat only.** |
+| 43 | Report History (chat image) | — | — | **Chat only.** `/app/reports`. |
+| 44 | Project → Reports tab (chat image) | — | — | **Chat only.** `/app/projects/[id]/reports`. |
+| 45 | Report view, "[Report Title]" template (chat image) | — | — | **Chat only.** `/app/reports/[id]`. |
 
 ## Not yet supplied / known gaps
 

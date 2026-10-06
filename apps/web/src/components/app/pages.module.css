@@ -42,7 +42,7 @@
 .chip { border: 0; background: var(--blue-50); color: var(--blue); border-radius: 999px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
 .chip:hover { background: var(--blue-100); }
 .researchLayout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; align-items: start; }
-.researchLayoutDrawer { grid-template-columns: 260px minmax(0, 1fr) 340px; }
+.researchLayoutDrawer { grid-template-columns: 260px minmax(0, 1fr) minmax(0, 360px); }
 .filterHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .filterHead h3 { font-size: 18px; }
 .filterGroup { border-top: 1px solid var(--line); padding: 12px 0; }
