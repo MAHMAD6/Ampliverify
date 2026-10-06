@@ -31,35 +31,60 @@ Developer notes printed inside the mockups (e.g. "Production rule: …") are imp
 
 ## User app (`/app`)
 
-The navigation order is locked to `docs/design/user-app/sidebar-navigation.png`.
+Navigation follows the locked spec in `docs/design/navigation-batch1/`: sidebar order, page map, Settings submenu, breadcrumbs, URL pattern and button/link behavior. Page-map routes are served under the `/app` prefix, which stands in for `app.ampliverify.com`. Renamed routes redirect permanently (see `apps/web/next.config.ts`):
+- `/app/optimization` → `/app/optimize`
+- `/app/content-strategy` → `/app/content`
+- `/app/settings/data-privacy` → `/app/settings/privacy`
+
+`/app` redirects to `/app/dashboard`. Secondary pages show a breadcrumb trail that starts with a home icon.
+
+**Page states** (`docs/design/user-app-batch2a/`) render through one component, `components/ui/StateView.tsx`:
+
+| State | How it is triggered |
+|---|---|
+| Empty | The data is absent. |
+| Loading | Per-module `loading.tsx`. |
+| Error with Try Again | Per-module `error.tsx`. |
+| Processing / Success | Shown during and after real actions (today: creating a project). |
+| Permission Restricted | The API answers 403. |
+| Plan Restricted / Low Credits | Components are ready. They are shown only once the entitlement and credit APIs report those conditions, so nothing is simulated. |
 
 | Screen | Route | Design | Data |
 |---|---|---|---|
-| My Projects | `/app/projects` (`?tab=&q=&sort=&view=&page=&size=`) | user-app/my-projects (populated + empty, chat images 2026-10-06) | **Live**: list, status tabs and counts, search, sort, list/grid, pagination; pause/resume/archive via `PATCH /user/projects/:id`. Module status, page and prompt columns show "—" until those APIs exist. |
-| Add Project | `/app/projects/new` | none supplied | **Live**: `POST /user/projects` (server action) |
-| Project Overview | `/app/projects/[id]` | chat images 2026-10-06 (screen + annotated spec) | **Live**: project facts, primary domain, status dropdown and Manage Project menu (pause/resume/archive). Visiting selects the project for project-scoped modules. Module status, activity, opportunities and usage show "Not analyzed" / "—". |
-| Project Reports tab | `/app/projects/[id]/reports` | chat image 2026-10-06 | Project header live; reports list, activity and insights are empty states; generate disabled; Scheduled Reports "Coming Soon" |
-| AI Search (GEO) | `/app/geo` | user-app/ai-search-geo-monitoring | Project picker live; prompts, providers, checks and credits are empty states |
-| Keyword Research: Explorer / Related / Questions / Competitors / SERP / Lists | `/app/keywords`, `/app/keywords/{related,questions,competitors,serp,lists}` | user-app/keyword-research*, -questions, -competitor, -serp; Explorer populated + Related (empty + populated) chat images | Empty states today. The populated states (results table with intent/KD badges, relevance bars, trend sparklines, pagination with page size; Keyword Details panel with metrics, intent, 12-month trend, SERP overview, related topics) render from `components/app/keywords/source.ts`, which returns "unavailable" until the keyword API exists. Lists has no dedicated design. |
-| Optimization Center | `/app/optimization` (`?category=`) | chat image 2026-10-06 | Empty states (recommendations come from the audit API) |
-| On-Page SEO Editor | `/app/editor` | chat image 2026-10-06 | Works locally: outline, sections, reorder, markdown formatting, undo/redo, preview, HTML view, autosaved **draft on this device** (per project). Save/AI/analysis disabled (editor API not built). |
-| Billing & Plan | `/app/billing` | user-support/01 | Empty states; View Plans → `/pricing` |
-| Notification Center | `/app/notifications` | user-support/02 (lower panel) | Empty state |
-| Help & Support | `/app/help` | user-support/03 | Help search links to `/help`; support request **disabled** (no ticket storage) |
-| Getting Started | `/app/getting-started` | user-support/04 | Progress derived from real data (project created) |
-| Settings → Account | `/app/settings/account` | user-settings/Account.png | Profile from `/user/me`; security actions disabled until Better Auth is wired |
-| Settings → Integrations | `/app/settings/integrations` | user-settings/Integrations.png; catalog redesign (chat image 2026-10-06) | **Live**: AI search platforms from `GET /public/geo-platforms`, website/CMS and analytics providers from `GET /public/integrations` (unknown keys are hidden, missing ones show "Coming Soon"). WordPress Connect → `/app/integrations/cms`; other Connect actions disabled. AI providers and storage are shown as managed by AmpliVerify. |
-| Settings → Notifications | `/app/settings/notifications` | user-settings/Notifications.png (+ hi-res chat image) | Toggles read-only (preferences API not built) |
-| Settings → Billing & Plan | `/app/settings/billing` | chat images 2026-10-06 (Billing & Plan; Credits & Usage + Add Credits modal) | Empty states for plan, credits, payment method and invoices. Add Credits opens the modal: packs list is empty (no credit-pack table) and checkout is disabled. View Plans → `/pricing`. |
-| Settings → Data & Privacy | `/app/settings/data-privacy` | user-settings/Data_Privacy*.png | Read-only (needs tables not in the guide; see INPUTS.md) |
-| Search | `/app/search?q=` | none supplied | Searches the user's projects |
+| Dashboard | `/app/dashboard` (`?period=`) | chat images 2026-10-06 (empty + populated with callouts); batch2a/01 | **Live**: total/active project counts and the Project Performance table, with Open and the row menu (manage, pause/resume, archive, delete confirmation). Delete shows the full warning, but permanent deletion is disabled and the dialog offers Archive instead (the API archives, never deletes). Next Steps completion comes from data, with "Hide completed". Audit/content/GEO counts, usage, activity, insights, opportunities, reports and GEO panels show "—" or empty states. |
+| My Projects | `/app/projects` (`?tab=&q=&sort=&view=&page=&size=`) | user-app/my-projects (populated + empty); batch2a/02 | **Live**: list, status tabs and counts, search, sort, list/grid, pagination; pause/resume/archive via `PATCH /user/projects/:id`; delete confirmation as on the Dashboard. |
+| Add Project | `/app/projects/new` | batch2a/02 states | **Live**: `POST /user/projects`. Processing while saving, Success (View Project / Add Another), Error (Try Again), Permission Restricted on 403. |
+| Project Overview | `/app/projects/[id]` | chat images (screen + annotated spec) | **Live** project facts and status controls; module data "Not analyzed". |
+| Project Reports tab | `/app/projects/[id]/reports` | chat image | Empty states |
+| On-Page SEO Audit | `/app/audit` | batch2a/03 | Start form pre-filled from the selected project's domain. Start Audit is disabled (audit API not built). Audit History is empty. `/audit/[id]` (results) awaits the API. |
+| Optimization Center | `/app/optimize` (`?category=`) | chat image; batch2a/04 | Empty states (recommendations come from audits) |
+| On-Page SEO Editor | `/app/editor` | chat image; batch2a/05 | Works locally (outline, formatting, undo/redo, preview, HTML, per-device draft). Save and AI are disabled. `/editor/[id]` awaits the pages API. |
+| Content Strategy | `/app/content` → `/app/content/{ideas,clusters,plan,briefs,optimized}` | chat image 2026-10-06 (second version); batch2a/06 | Tabs Opportunities (Topic Ideas), Topic Clusters, Content Plan, Drafts (Content Briefs), Optimized Content. Feature cards, empty state with Run SEO Audit, "What happens next?". No project selected → Select a Project. |
+| Keyword Research: Overview | `/app/keywords` | page map (no design) | Tool hub and recent-research empty state |
+| Keyword Explorer / Related / Questions / Competitors / SERP | `/app/keywords/{explorer,related,questions,competitors,serp}` | user-app/keyword-research*, chat images | Empty states; the populated states render from `components/app/keywords/source.ts` once the keyword API exists |
+| Keyword Lists / Saved Keywords / Clusters | `/app/keywords/lists`, `/app/keywords/lists?saved=true`, `/app/keywords/clusters` | page map | Empty tables. Saved Keywords is Keyword Lists filtered by `saved=true`, as the spec decides; there is no separate page. |
+| AI Search (GEO) Overview | `/app/geo` | user-app/ai-search-geo-monitoring | Project picker live; everything else empty |
+| GEO Prompt Tracking / Competitors / Sources & Citations / History | `/app/geo/{prompts,competitors,citations,history}` | page map (standalone pages, spec decision 3) | Project picker plus empty tables |
+| Reports: All / Scheduled / Shared | `/app/reports`, `/app/reports/scheduled`, `/app/reports/shared` | chat image (Report History); page map | Filters live (project list); tables empty |
+| Report view | `/app/reports/[id]` | chat image | Template; 404 until the reports API exists |
+| Usage & Credits | `/app/usage` | chat image 2026-10-06 | Every value "—". Buy More Credits opens the Add Credits dialog (no packs, checkout disabled). Auto top-up and spend cap are disabled. |
+| Credit History | `/app/usage/history` | page map | Empty ledger table |
+| Billing & Plan: Plans | `/app/billing` (`?interval=annual`) | user-settings/Billing_Plan_Plans.webp | **Live** plan cards and Compare Plans table from `GET /public/plans`; "Save up to N%" computed from real prices. Plan changes are disabled (no checkout). No plan is marked current (no subscription API). A plan with no price is "Custom" with Contact Sales. |
+| Billing & Plan: Invoices | `/app/billing/invoices` | page map | Empty invoices; payment method disabled |
+| Notification Center | `/app/notifications` | user-support/02 | Empty state |
+| Help & Support | `/app/help` | user-support/03 | Help search → `/help`; support request disabled |
+| Getting Started | `/app/getting-started` | user-support/04 | Progress derived from real data |
+| Search | `/app/search?q=` | none | Searches the user's projects |
+| Connect Your Website (CMS) | `/app/integrations/cms` | chat image | WordPress flow UI; Connect/Test disabled |
+| Settings → Account | `/app/settings/account` | user-settings/Account.png | Profile from `/user/me`; security actions disabled |
+| Settings → Workspace | `/app/settings/workspace` | user-settings/Workspace.png | **Live** workspace name and ID (`/user/workspaces`, matching the selected project). Timezone/language show "—" because the schema has no such fields. Members, roles, Edit and Invite are empty or disabled. |
+| Settings → Project Defaults | `/app/settings/project-defaults` | chat image | Empty states |
+| Settings → Integrations | `/app/settings/integrations` | catalog redesign (chat image) | **Live** registries (`/public/geo-platforms`, `/public/integrations`) |
+| Settings → Notifications | `/app/settings/notifications` | user-settings/Notifications.png | Read-only toggles |
+| Settings → Billing & Plan | `/app/settings/billing` (`?interval=annual`) | chat images; Billing_Plan_Plans.webp | Plan, credits and Add Credits dialog, then the same live plan catalog as `/app/billing`, then payment method and invoices |
+| Settings → Data & Privacy | `/app/settings/privacy` | user-settings/Data_Privacy*.png | Read-only |
 
-| Report History | `/app/reports` | chat image 2026-10-06 | Filters (project list live); table empty; Generate → selected project's Reports tab |
-| Report view | `/app/reports/[id]` | chat image 2026-10-06 | Template ready; resolves to 404 until the reports API exists |
-| Settings → Project Defaults | `/app/settings/project-defaults` | chat image 2026-10-06 | Empty states; Configure disabled |
-| Connect Your Website (CMS) | `/app/integrations/cms` (linked from Settings → Integrations) | chat image 2026-10-06 | WordPress flow UI (platform choice, application-password form, page picker, summary). Connect/Test/Disconnect disabled; credentials never leave the browser. |
-
-Awaiting design (neutral page with title and empty state): Dashboard `/app`, On-Page SEO Audit `/app/audit`, Content Strategy `/app/content-strategy`, Usage & Credits `/app/usage`, Settings → Workspace / AI & GEO Preferences.
+Awaiting design (neutral page with title and empty state): Settings → AI & GEO Preferences.
 
 ## Super Admin (`/admin`)
 

@@ -59,7 +59,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
       </button>
       <aside className={`${s.sidebar} ${mobileOpen ? s.sidebarOpen : ''}`} aria-label="Primary">
         <div className={s.brand} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Logo href="/app" onDark tagline="workflow" size={42} />
+          <Logo href="/app/dashboard" onDark tagline="workflow" size={42} />
           <button className={`${s.iconBtn} ${s.menuToggle}`} aria-label="Close navigation" onClick={() => setMobileOpen(false)} style={{ color: '#fff' }}>
             <X size={20} />
           </button>
@@ -128,8 +128,8 @@ export function Sidebar({ items }: { items: NavItem[] }) {
               <Lightbulb size={24} />
             </span>
             <div>
-              <b>Upgrade your plan</b>
-              <p>Get more credits, higher limits, and advanced features.</p>
+              <b>Turn insights into growth.</b>
+              <p>Audit. Optimize. Verify. All in one place.</p>
             </div>
           </div>
           <ButtonLink href="/app/billing" block>
@@ -137,7 +137,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
           </ButtonLink>
         </div>
         <div className={s.copyright}>
-          © {new Date().getFullYear()} AmpliVerify Inc.
+          © {new Date().getFullYear()} AmpliVerify.
           <br />
           All rights reserved.
         </div>

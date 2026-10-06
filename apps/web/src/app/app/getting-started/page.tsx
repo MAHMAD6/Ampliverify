@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ButtonLink, Grid, KeyValue, PageHeader, Panel } from '@/components/ui';
 import { getAppContext } from '@/lib/project';
 import p from '@/components/app/pages.module.css';
+import { appCrumbs } from '@/lib/nav';
 
 export const metadata = { title: 'Getting Started' };
 
@@ -24,7 +25,7 @@ export default async function GettingStartedPage() {
       <PageHeader
         title="Getting Started"
         description="Complete AmpliVerify’s core SEO workflow at your own pace."
-        crumbs={[{ label: 'Dashboard', href: '/app' }, { label: 'Getting Started' }]}
+        crumbs={appCrumbs({ label: 'Getting Started' })}
       />
       <Grid cols={2}>
         <Panel title="Get Started with AmpliVerify" description="Complete the core workflow at your own pace." flushHead>

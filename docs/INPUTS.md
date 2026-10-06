@@ -58,15 +58,29 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 48 | Settings → Integrations catalog, top-tab variant (chat image) | — | — | **Chat only.** Supersedes #23's layout at `/app/settings/integrations`. Platform/provider rows come from the registries (GEO keys `google_ai_overview`, `chatgpt`, `perplexity`, `copilot`; integration keys `wordpress`, `google_analytics`, `google_search_console`, `google_ads`, `meta_ads`). Its top-tab settings nav is not used; the 8-item side menu is kept. |
 | 49 | Settings → Notifications (chat image) | — | — | **Chat only.** Same screen as #12 / #33; no change needed. |
 | 50 | Admin Content Management redesign (chat image) | — | — | **Chat only.** `/admin/content`. Adds admin nav items Categories & Tags, Authors, Videos, Webinars & Events, Case Studies. |
+| 51 | `Batch1_Separated_1536x1024.zip` (navigation spec, 9 PNG) | `928bb56fb8f1` | `docs/design/navigation-batch1/` | Committed. **Locked navigation spec**: sidebar order (same as #17), page map with routes, routing decisions, Settings submenu, breadcrumb pattern, URL pattern, button/link behavior. Applied app-wide (see SCREENS.md). |
+| 52 | `Batch2A_Separated_1920x1080.zip` (state boards, 7 PNG) | `cb7d7bf3f3e7` | `docs/design/user-app-batch2a/` | Committed. Approved states (default, empty, loading, processing, success, error, low credits, plan restricted, permission restricted) for Dashboard, My Projects, Audit, Optimization Center, Editor, Content Strategy. Implemented by `StateView` plus per-module `loading.tsx` / `error.tsx`. |
+| 53 | `Batch2A_Separated_3840x2160.zip` | `1ab0609d84ed` | — | Not committed: same boards as #52 at 2× (16 MB). |
+| 54 | Settings → Workspace (PNG) | `2dabc9ba5979` | `docs/design/user-settings/Workspace.png` | Committed. `/app/settings/workspace`. Its footer note ("driven by backend… do not show sample members") is implemented as behavior. |
+| 55 | Billing & Plan, plan picker with Compare Plans (WebP) | `91cc9a9d395f` | `docs/design/user-settings/Billing_Plan_Plans.webp` | Committed. `/app/billing` and inside `/app/settings/billing`. Plans, prices and features come from `/public/plans`; the mockup's prices and limits are not copied. |
+| 56 | Content Strategy, first version (chat image) | — | — | **Chat only.** Superseded by #57. |
+| 57 | Content Strategy, second version (chat image) | — | — | **Chat only.** `/app/content/*`. Its tabs are mapped onto the page map: Opportunities = `/content/ideas`, Drafts = `/content/briefs`. Topic Clusters (`/content/clusters`) and Optimized Content (`/content/optimized`) are design-only tabs. |
+| 58 | Usage & Credits (chat image) | — | — | **Chat only.** `/app/usage`. |
+| 59 | Dashboard, empty (chat image) | — | — | **Chat only.** `/app/dashboard` with no projects. |
+| 60 | Dashboard, populated with interaction callouts (chat image) | — | — | **Chat only.** `/app/dashboard` with projects: row hover, right-aligned menu, delete confirmation with a clear warning. Its third bottom panel is hidden by the modal; it is implemented as "Recent Reports". |
 
 ## Not yet supplied / known gaps
 
 - Admin batch 4 (see #7).
 - Super Admin screens referenced in the navigation but not yet mocked: Command Center, All Users, Admins, Sub-Admins, Roles & Permissions, Access Assignments, Module Controls, Feature Flags, Usage & Costs, System Health, Admin Activity, Security & Access, Settings.
-- User-app screens still without a design: Dashboard, On-Page SEO Audit, Content Strategy, Reports, Usage & Credits, Settings → Workspace / Project Defaults / AI & GEO Preferences.
+- User-app screens still without a design: Settings → AI & GEO Preferences; the page-map sub-pages (Keyword Overview/Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices) and the `[id]` detail pages for audit, optimize and editor.
 - Sign-in / sign-up screens (needed to wire Better Auth into the web app).
 - Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
 - The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.
 - The public Contact page and the user Help & Support page imply contact-form and support-ticket storage. The database guide defines neither, so no tables exist for them yet.
 - The admin Content Management redesign (#50) adds videos, webinars/events and case studies, and the Add Credits modal (#47) implies purchasable credit packs. The guide defines no tables for any of these; the screens show empty states until they are modelled.
 - The Integrations catalog (#48) mentions a marketplace; no marketplace data exists.
+- Schema gaps from this batch:
+  - Workspaces have no default timezone or language (#54).
+  - Plans have no "featured" / "Most Popular" flag (#55), so no plan is highlighted.
+  - There is no hard-delete workflow for projects; the Dashboard delete confirmation (#60) offers Archive instead.

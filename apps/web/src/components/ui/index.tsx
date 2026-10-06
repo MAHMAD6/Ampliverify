@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
-import { Info } from 'lucide-react';
+import { ChevronRight, Home, Info } from 'lucide-react';
 import s from './ui.module.css';
 
 const cx = (...names: (string | false | null | undefined)[]) => names.filter(Boolean).join(' ');
@@ -94,7 +94,8 @@ export function Panel({
 
 /* ── Page header ─────────────────────────────────────────────────────── */
 
-export type Crumb = { label: string; href?: string };
+/** `home` renders the trail's first step as a home icon (navigation-batch1/06). */
+export type Crumb = { label: string; href?: string; home?: boolean };
 
 export function PageHeader({
   title,
@@ -112,12 +113,16 @@ export function PageHeader({
       <div>
         {crumbs && crumbs.length > 0 && (
           <nav className={s.crumbs} aria-label="Breadcrumb">
-            {crumbs.map((c, i) => (
-              <span key={c.label}>
-                {c.href ? <Link href={c.href}>{c.label}</Link> : c.label}
-                {i < crumbs.length - 1 && <span aria-hidden> ›</span>}
-              </span>
-            ))}
+            {crumbs.map((c, i) => {
+              const last = i === crumbs.length - 1;
+              const content = c.home ? <Home size={16} aria-label={c.label} /> : c.label;
+              return (
+                <span key={c.label} className={last ? s.crumbCurrent : undefined}>
+                  {c.href && !last ? <Link href={c.href}>{content}</Link> : content}
+                  {!last && <ChevronRight size={14} aria-hidden className={s.crumbSep} />}
+                </span>
+              );
+            })}
           </nav>
         )}
         <h1 className={s.pageTitle}>{title}</h1>

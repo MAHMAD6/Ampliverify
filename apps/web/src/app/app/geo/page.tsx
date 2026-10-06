@@ -26,9 +26,9 @@ import p from '@/components/app/pages.module.css';
 export const metadata = { title: 'AI Search (GEO) Monitoring' };
 
 const PROJECT_TABS = [
-  { key: 'overview', label: 'Overview', href: '/app', icon: <Home size={20} /> },
+  { key: 'overview', label: 'Overview', href: '/app/projects', icon: <Home size={20} /> },
   { key: 'audit', label: 'SEO Audit', href: '/app/audit', icon: <Search size={20} /> },
-  { key: 'content', label: 'Content Strategy', href: '/app/content-strategy', icon: <FileText size={20} /> },
+  { key: 'content', label: 'Content Strategy', href: '/app/content', icon: <FileText size={20} /> },
   { key: 'geo', label: 'AI Search (GEO)', href: '/app/geo', icon: <Sparkles size={20} /> },
   { key: 'reports', label: 'Reports', href: '/app/reports', icon: <FileBarChart size={20} /> },
   { key: 'settings', label: 'Settings', href: '/app/settings/project-defaults', icon: <Settings size={20} /> },
@@ -222,9 +222,9 @@ export default async function GeoPage() {
           <div className={p.checklist}>
             {[
               { label: 'Select a project', href: '/app/projects', done: selected },
-              { label: 'Add your first tracked prompt', href: '/app/geo' },
-              { label: 'Run your first check', href: '/app/geo' },
-              { label: 'Review visibility insights', href: '/app/geo' },
+              { label: 'Add your first tracked prompt', href: '/app/geo/prompts' },
+              { label: 'Run your first check', href: '/app/geo/history' },
+              { label: 'Review visibility insights', href: '/app/geo/citations' },
             ].map((item, i, all) => {
               const current = all.findIndex((x) => !x.done) === i;
               return (

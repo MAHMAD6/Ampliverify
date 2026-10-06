@@ -13,7 +13,7 @@ const ITEMS = [
   { href: '/app/settings/ai-geo', label: 'AI & GEO Preferences', icon: Sparkles },
   { href: '/app/settings/notifications', label: 'Notifications', icon: Bell },
   { href: '/app/settings/billing', label: 'Billing & Plan', icon: CreditCard },
-  { href: '/app/settings/data-privacy', label: 'Data & Privacy', icon: ShieldCheck },
+  { href: '/app/settings/privacy', label: 'Data & Privacy', icon: ShieldCheck },
 ];
 
 export function SettingsNav() {

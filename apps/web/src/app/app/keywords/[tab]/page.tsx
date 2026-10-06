@@ -2,17 +2,18 @@ import { notFound } from 'next/navigation';
 import { KeywordPage } from '@/components/app/keywords/KeywordPage';
 import { TABS, type TabKey } from '@/components/app/keywords/config';
 
-const SUB_TABS = TABS.filter((t) => t.key !== 'explorer');
+function find(slug: string) {
+  return TABS.find((t) => t.href === `/app/keywords/${slug}`);
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ tab: string }> }) {
-  const slug = (await params).tab;
-  const tab = SUB_TABS.find((t) => t.href.endsWith(`/${slug}`));
+  const tab = find((await params).tab);
   return { title: tab ? `${tab.label} · Keyword Research` : 'Keyword Research' };
 }
 
-export default async function KeywordTabPage({ params }: { params: Promise<{ tab: string }> }) {
-  const slug = (await params).tab;
-  const tab = SUB_TABS.find((t) => t.href.endsWith(`/${slug}`));
+export default async function KeywordTabPage({ params, searchParams }: { params: Promise<{ tab: string }>; searchParams: Promise<{ saved?: string }> }) {
+  const tab = find((await params).tab);
   if (!tab) notFound();
-  return <KeywordPage tabKey={tab.key as TabKey} />;
+  const saved = (await searchParams).saved === 'true';
+  return <KeywordPage tabKey={tab.key as TabKey} saved={saved} />;
 }

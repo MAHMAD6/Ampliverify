@@ -16,7 +16,21 @@ const money = (minor: number, currency: string) => new Intl.NumberFormat('en-US'
  * configured packs the dialog says so, and checkout stays disabled until the
  * purchase API exists.
  */
-export function AddCreditsButton({ packs, balance }: { packs: CreditPack[]; balance: number | null }) {
+export function AddCreditsButton({
+  packs,
+  balance,
+  label = 'Add Credits',
+  variant = 'primary',
+  icon = <Plus size={18} />,
+  size = 'lg',
+}: {
+  packs: CreditPack[];
+  balance: number | null;
+  label?: string;
+  variant?: 'primary' | 'outline';
+  icon?: React.ReactNode;
+  size?: 'md' | 'lg';
+}) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(packs[0]?.id ?? null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -30,8 +44,8 @@ export function AddCreditsButton({ packs, balance }: { packs: CreditPack[]; bala
 
   return (
     <>
-      <Button icon={<Plus size={18} />} size="lg" onClick={() => setOpen(true)}>
-        Add Credits
+      <Button icon={icon} size={size} variant={variant} onClick={() => setOpen(true)}>
+        {label}
       </Button>
       <dialog ref={dialog} className={b.dialog} onClose={() => setOpen(false)} aria-labelledby="add-credits-title">
         <div className={b.dialogHead}>

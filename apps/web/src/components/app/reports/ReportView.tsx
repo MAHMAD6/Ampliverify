@@ -30,6 +30,7 @@ import { Badge, Button, EmptyState, IconCircle, PageHeader, Panel, Select } from
 import { formatDate } from '@/lib/format';
 import { REPORT_TYPES, type Report } from './meta';
 import r from './report.module.css';
+import { appCrumbs } from '@/lib/nav';
 
 const TABS = ['Overview', 'SEO Audit', 'Keyword Opportunities', 'Content Recommendations', 'AI Search (GEO)', 'Competitor Analysis', 'Technical SEO', 'Appendix'];
 const CONTENTS: [string, React.ReactNode][] = [
@@ -73,7 +74,7 @@ export function ReportView({ report }: { report: Report }) {
     <>
       <PageHeader
         title={report.title}
-        crumbs={[{ label: 'Reports', href: '/app/reports' }, { label: 'My Reports', href: '/app/reports' }, { label: report.title }]}
+        crumbs={appCrumbs({ label: 'Reports', href: '/app/reports' }, { label: report.title })}
         description={
           <span style={{ display: 'inline-flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <Badge>{typeLabel}</Badge>

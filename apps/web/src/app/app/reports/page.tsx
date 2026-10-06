@@ -1,6 +1,8 @@
 import { CalendarDays, FileSearch, PlusCircle, Search } from 'lucide-react';
 import { REPORT_STATUSES, REPORT_TYPES } from '@/components/app/reports/meta';
 import { ButtonLink, DataTable, EmptyState, Field, Input, PageHeader, Panel, Select } from '@/components/ui';
+import { ReportsTabs } from '@/components/app/reports/ReportsTabs';
+import { appCrumbs } from '@/lib/nav';
 import { getAppContext } from '@/lib/project';
 
 export const metadata = { title: 'Report History' };
@@ -15,7 +17,8 @@ export default async function ReportHistoryPage() {
   const generateHref = selectedProject ? `/app/projects/${selectedProject.id}/reports` : '/app/projects';
   return (
     <>
-      <PageHeader title="Report History" description="View, download, share, and manage all generated reports." crumbs={[{ label: 'Reports', href: '/app/reports' }, { label: 'Report History' }]} />
+      <PageHeader title="Report History" description="View, download, share, and manage all generated reports." crumbs={appCrumbs({ label: 'Reports', href: '/app/reports' }, { label: 'Report History' })} />
+      <ReportsTabs active="all" />
       <Panel>
         <form style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 2fr) repeat(4, minmax(150px, 1fr))', gap: 14, alignItems: 'end' }} role="search">
           <Input name="q" placeholder="Search reports by title, domain, or project..." icon={<Search size={18} />} aria-label="Search reports" />

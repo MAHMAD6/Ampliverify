@@ -1,43 +1,41 @@
 /**
- * Locked user navigation order (docs/design/user-app/sidebar-navigation.png).
+ * Locked user navigation (docs/design/navigation-batch1: order, page map and
+ * Settings submenu). Routes follow the page map under the `/app` prefix.
  * Icons are resolved by key in the Sidebar component.
  */
 export type NavChild = { label: string; href: string };
 export type NavItem = { key: string; label: string; href: string; children?: NavChild[]; divider?: boolean };
 
 export const APP_NAV: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', href: '/app' },
-  {
-    key: 'projects',
-    label: 'My Projects',
-    href: '/app/projects',
-    children: [
-      { label: 'All Projects', href: '/app/projects' },
-      { label: 'Add Project', href: '/app/projects/new' },
-    ],
-  },
+  { key: 'dashboard', label: 'Dashboard', href: '/app/dashboard' },
+  { key: 'projects', label: 'My Projects', href: '/app/projects' },
   { key: 'audit', label: 'On-Page SEO Audit', href: '/app/audit' },
-  { key: 'optimization', label: 'Optimization Center', href: '/app/optimization' },
+  { key: 'optimization', label: 'Optimization Center', href: '/app/optimize' },
   { key: 'editor', label: 'On-Page SEO Editor', href: '/app/editor' },
-  { key: 'content', label: 'Content Strategy', href: '/app/content-strategy' },
+  { key: 'content', label: 'Content Strategy', href: '/app/content' },
   {
     key: 'keywords',
     label: 'Keyword Research',
     href: '/app/keywords',
     children: [
-      { label: 'Keyword Explorer', href: '/app/keywords' },
-      { label: 'Related Keywords', href: '/app/keywords/related' },
-      { label: 'Questions', href: '/app/keywords/questions' },
-      { label: 'Competitor Keywords', href: '/app/keywords/competitors' },
-      { label: 'SERP Analysis', href: '/app/keywords/serp' },
+      { label: 'Overview', href: '/app/keywords' },
+      { label: 'Keyword Explorer', href: '/app/keywords/explorer' },
       { label: 'Keyword Lists', href: '/app/keywords/lists' },
+      { label: 'Keyword Clusters', href: '/app/keywords/clusters' },
+      { label: 'SERP Analysis', href: '/app/keywords/serp' },
     ],
   },
   {
     key: 'geo',
     label: 'AI Search (GEO)',
     href: '/app/geo',
-    children: [{ label: 'Monitoring', href: '/app/geo' }],
+    children: [
+      { label: 'Overview', href: '/app/geo' },
+      { label: 'Prompt Tracking', href: '/app/geo/prompts' },
+      { label: 'Competitors', href: '/app/geo/competitors' },
+      { label: 'Sources & Citations', href: '/app/geo/citations' },
+      { label: 'History', href: '/app/geo/history' },
+    ],
   },
   { key: 'reports', label: 'Reports', href: '/app/reports' },
   { key: 'usage', label: 'Usage & Credits', href: '/app/usage', divider: true },
@@ -54,10 +52,15 @@ export const APP_NAV: NavItem[] = [
       { label: 'AI & GEO Preferences', href: '/app/settings/ai-geo' },
       { label: 'Notifications', href: '/app/settings/notifications' },
       { label: 'Billing & Plan', href: '/app/settings/billing' },
-      { label: 'Data & Privacy', href: '/app/settings/data-privacy' },
+      { label: 'Data & Privacy', href: '/app/settings/privacy' },
     ],
   },
 ];
+
+/** Breadcrumb trail for user-app secondary pages: Home › section › page. */
+export function appCrumbs(...trail: { label: string; href?: string }[]) {
+  return [{ label: 'Dashboard', href: '/app/dashboard', home: true }, ...trail];
+}
 
 /** Super Admin navigation, from the approved admin shell (docs/design/admin-batch*). */
 export const ADMIN_NAV: { section?: string; items: { key: string; label: string; href: string }[] }[] = [

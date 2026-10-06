@@ -187,7 +187,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <div className={s.capGrid}>
                 {[
                   { icon: <Search size={22} />, tone: 'blue' as const, title: 'Run SEO Audits', text: 'Find and fix on-page issues across your site.', href: '/app/audit' },
-                  { icon: <FileText size={22} />, tone: 'green' as const, title: 'Build Content Strategy', text: 'Discover new opportunities and improve existing content.', href: '/app/content-strategy' },
+                  { icon: <FileText size={22} />, tone: 'green' as const, title: 'Build Content Strategy', text: 'Discover new opportunities and improve existing content.', href: '/app/content' },
                   { icon: <Sparkles size={22} />, tone: 'purple' as const, title: 'Track AI Search (GEO)', text: 'Monitor visibility across supported AI search experiences.', href: '/app/geo' },
                   { icon: <BarChart3 size={22} />, tone: 'amber' as const, title: 'View Reports', text: 'See your project activity and progress.', href: '/app/reports' },
                 ].map((c) => (
@@ -275,7 +275,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                             <ModuleCell action="Run Audit" href="/app/audit" />
                           </td>
                           <td>
-                            <ModuleCell action="Get Started" href="/app/content-strategy" />
+                            <ModuleCell action="Get Started" href="/app/content" />
                           </td>
                           <td>
                             <ModuleCell action="Set Up" href="/app/geo" />
