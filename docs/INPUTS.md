@@ -53,6 +53,11 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 43 | Report History (chat image) | — | — | **Chat only.** `/app/reports`. |
 | 44 | Project → Reports tab (chat image) | — | — | **Chat only.** `/app/projects/[id]/reports`. |
 | 45 | Report view, "[Report Title]" template (chat image) | — | — | **Chat only.** `/app/reports/[id]`. |
+| 46 | Settings → Billing & Plan (chat image) | — | — | **Chat only.** `/app/settings/billing`. The Settings sub-menu item "Billing & Plan" now points here. |
+| 47 | Settings → Billing & Plan with Credits & Usage and Add Credits modal (chat image) | — | — | **Chat only.** Same route; modal in `components/app/billing/AddCreditsDialog.tsx`. |
+| 48 | Settings → Integrations catalog, top-tab variant (chat image) | — | — | **Chat only.** Supersedes #23's layout at `/app/settings/integrations`. Platform/provider rows come from the registries (GEO keys `google_ai_overview`, `chatgpt`, `perplexity`, `copilot`; integration keys `wordpress`, `google_analytics`, `google_search_console`, `google_ads`, `meta_ads`). Its top-tab settings nav is not used; the 8-item side menu is kept. |
+| 49 | Settings → Notifications (chat image) | — | — | **Chat only.** Same screen as #12 / #33; no change needed. |
+| 50 | Admin Content Management redesign (chat image) | — | — | **Chat only.** `/admin/content`. Adds admin nav items Categories & Tags, Authors, Videos, Webinars & Events, Case Studies. |
 
 ## Not yet supplied / known gaps
 
@@ -63,3 +68,5 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 - Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
 - The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.
 - The public Contact page and the user Help & Support page imply contact-form and support-ticket storage. The database guide defines neither, so no tables exist for them yet.
+- The admin Content Management redesign (#50) adds videos, webinars/events and case studies, and the Add Credits modal (#47) implies purchasable credit packs. The guide defines no tables for any of these; the screens show empty states until they are modelled.
+- The Integrations catalog (#48) mentions a marketplace; no marketplace data exists.

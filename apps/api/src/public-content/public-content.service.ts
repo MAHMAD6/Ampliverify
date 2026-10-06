@@ -212,6 +212,15 @@ export class PublicContentService {
     });
   }
 
+  /** AI search platforms enabled in the backend registry (guide §9: never hard-coded in the UI). */
+  listGeoPlatforms() {
+    return this.prisma.geoPlatform.findMany({
+      where: { isActive: true },
+      select: { key: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   private notFound() {
     return new NotFoundException({ code: 'CONTENT_NOT_FOUND', message: 'Content not found.' });
   }

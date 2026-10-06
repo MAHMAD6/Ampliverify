@@ -48,8 +48,9 @@ The navigation order is locked to `docs/design/user-app/sidebar-navigation.png`.
 | Help & Support | `/app/help` | user-support/03 | Help search links to `/help`; support request **disabled** (no ticket storage) |
 | Getting Started | `/app/getting-started` | user-support/04 | Progress derived from real data (project created) |
 | Settings → Account | `/app/settings/account` | user-settings/Account.png | Profile from `/user/me`; security actions disabled until Better Auth is wired |
-| Settings → Integrations | `/app/settings/integrations` | user-settings/Integrations.png | **Live** provider registry; Connect disabled |
+| Settings → Integrations | `/app/settings/integrations` | user-settings/Integrations.png; catalog redesign (chat image 2026-10-06) | **Live**: AI search platforms from `GET /public/geo-platforms`, website/CMS and analytics providers from `GET /public/integrations` (unknown keys are hidden, missing ones show "Coming Soon"). WordPress Connect → `/app/integrations/cms`; other Connect actions disabled. AI providers and storage are shown as managed by AmpliVerify. |
 | Settings → Notifications | `/app/settings/notifications` | user-settings/Notifications.png (+ hi-res chat image) | Toggles read-only (preferences API not built) |
+| Settings → Billing & Plan | `/app/settings/billing` | chat images 2026-10-06 (Billing & Plan; Credits & Usage + Add Credits modal) | Empty states for plan, credits, payment method and invoices. Add Credits opens the modal: packs list is empty (no credit-pack table) and checkout is disabled. View Plans → `/pricing`. |
 | Settings → Data & Privacy | `/app/settings/data-privacy` | user-settings/Data_Privacy*.png | Read-only (needs tables not in the guide; see INPUTS.md) |
 | Search | `/app/search?q=` | none supplied | Searches the user's projects |
 
@@ -64,7 +65,8 @@ Awaiting design (neutral page with title and empty state): Dashboard `/app`, On-
 
 | Screen | Route | Design | Data |
 |---|---|---|---|
-| Content Overview | `/admin/content` | admin-batch1/01 | Empty states |
+| Content Management | `/admin/content` | admin-batch1/01; redesign (chat image 2026-10-06) | Empty states: six content counters show "—", module cards link to each content area, quick actions link to the editors, recent activity says "No activity yet". |
+| Categories & Tags, Authors, Videos, Webinars & Events, Case Studies | `/admin/{categories,authors,videos,events,case-studies}` | nav from the Content Management redesign; no page designs | Neutral pending pages. Videos, webinars/events and case studies have no tables in the guide. |
 | Blog Posts | `/admin/blog` | admin-batch1/02 | Empty states |
 | Blog editor | `/admin/blog/new` (`?type=guide` for resources) | admin-batch1/03 | Title→slug, markdown toolbar work; Save/Publish disabled (admin CMS API not built) |
 | Resources | `/admin/resources` | admin-batch1/04 | Empty states (resources are `guides`) |

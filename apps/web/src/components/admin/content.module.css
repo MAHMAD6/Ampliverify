@@ -1,0 +1,20 @@
+.stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { display: flex; gap: 12px; align-items: center; padding: 14px; }
+.stat span { display: block; font-size: 13px; color: var(--heading); }
+.stat strong { display: block; font-size: 22px; color: var(--ink); }
+.stat small { font-size: 13px; color: var(--muted); }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+.module { display: flex; flex-direction: column; gap: 12px; }
+.moduleHead { display: flex; gap: 12px; align-items: center; }
+.moduleHead strong { flex: 1; font-size: 16px; color: var(--heading); }
+.module p { font-size: 14px; color: var(--muted); flex: 1; }
+.quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.quick > a { min-width: 0; padding-inline: 8px; font-size: 13px; white-space: normal; text-align: center; }
+.activity { display: flex; gap: 12px; align-items: center; padding: 8px 0; }
+.activity strong { display: block; font-size: 14px; color: var(--heading); }
+.activity span { font-size: 13px; color: var(--muted); }
+.banner { display: flex; gap: 18px; align-items: center; margin-top: 20px; background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: var(--radius); padding: 18px 22px; flex-wrap: wrap; }
+.banner h3 { font-size: 18px; }
+.banner p { font-size: 14px; color: var(--muted); max-width: 640px; }
+.banner > :last-child { margin-left: auto; }
+@media (max-width: 1400px) { .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .layout { grid-template-columns: 1fr; } }

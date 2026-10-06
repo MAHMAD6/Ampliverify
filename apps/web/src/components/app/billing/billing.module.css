@@ -1,0 +1,44 @@
+.planCard { display: flex; gap: 18px; align-items: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; flex-wrap: wrap; }
+.planCard h3 { font-size: 15px; }
+.planCard strong { display: block; font-size: 22px; color: var(--ink); margin: 2px 0; }
+.planCard p { font-size: 14px; color: var(--muted); }
+.planActions { margin-left: auto; display: grid; gap: 8px; justify-items: center; }
+.planActions a:last-child { color: var(--blue); text-decoration: underline; font-size: 14px; }
+.section { border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+.sectionHead { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.sectionHead h3 { font-size: 20px; }
+.sectionHead p { font-size: 14px; color: var(--muted); }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.tile span { font-size: 14px; color: var(--heading); display: inline-flex; gap: 6px; align-items: center; }
+.tile strong { display: block; font-size: 24px; color: var(--ink); margin: 6px 0 2px; }
+.tile small { font-size: 13px; color: var(--muted); }
+.boxed { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-alt); }
+.dialog { border: 0; border-radius: 16px; padding: 0; width: min(820px, calc(100vw - 32px)); box-shadow: 0 30px 80px rgba(5, 15, 38, 0.35); }
+.dialog::backdrop { background: rgba(5, 15, 38, 0.45); }
+.dialogHead { display: flex; gap: 14px; align-items: flex-start; padding: 20px 22px 10px; }
+.dialogHead h2 { font-size: 22px; }
+.dialogHead p { font-size: 13px; color: var(--muted); max-width: 420px; }
+.dbIcon { width: 48px; height: 48px; border-radius: 50%; background: var(--blue-50); color: var(--blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.close { margin-left: auto; border: 1px solid var(--line); background: #fff; border-radius: 6px; width: 30px; height: 30px; cursor: pointer; color: var(--muted); }
+.dialogBody { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 16px; padding: 10px 22px 22px; }
+.dialogBody h3 { font-size: 15px; margin-bottom: 10px; }
+.packs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 18px; }
+.pack { position: relative; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 16px 8px 12px; display: grid; justify-items: center; gap: 2px; cursor: pointer; }
+.pack strong { font-size: 20px; color: var(--ink); }
+.pack span { font-size: 13px; color: var(--heading); }
+.pack b { font-size: 16px; color: var(--ink); margin-top: 8px; }
+.pack small { font-size: 11px; color: var(--muted); }
+.packOn { border: 2px solid var(--blue); }
+.best { position: absolute; top: -12px; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 16px 0; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.label { display: block; font-size: 14px; font-weight: 600; color: var(--heading); margin-bottom: 6px; }
+.label small { font-weight: 400; color: var(--muted); }
+.summary { background: var(--surface-alt); border-radius: 12px; padding: 14px; display: grid; gap: 8px; align-content: start; }
+.summary > div { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.summary b { color: var(--ink); }
+.total { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.total b { color: var(--blue); }
+.secure { display: flex; gap: 6px; font-size: 11px; color: var(--muted); line-height: 1.4; }
+@media (max-width: 900px) { .tiles, .packs { grid-template-columns: 1fr 1fr; } .dialogBody { grid-template-columns: 1fr; } }

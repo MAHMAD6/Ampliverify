@@ -71,6 +71,11 @@ export class PublicContentController {
     return this.content.listPlans();
   }
 
+  @Get('geo-platforms')
+  geoPlatforms() {
+    return this.content.listGeoPlatforms();
+  }
+
   @Get('integrations')
   integrations() {
     return this.content.listIntegrations();
