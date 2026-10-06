@@ -22,10 +22,17 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 13 | `AmpliVerify_Settings_3_Pages_Readable_3072x2048.zip` | `8f1fc3788472` | — | Not committed: same three screens as #12 at 2× resolution (3.4 MB). Re-add if the hi-res versions are needed. |
 | 14 | `AmpliVerify_Backend_Batch1_Foundation.zip` (NestJS + TypeORM) | `077870cf2fef` | `docs/reference/backend-batch1-original/` (as supplied); ported into `apps/api/` | Committed for provenance. **Ported to Prisma** in `apps/api`; see "Backend Batch 1 port" in `docs/DATA_MODEL.md` for what changed and the bugs fixed. |
 | 15 | `AAPW.xlsx` | `79411895b9af` | — | **Deliberately excluded.** Contains an admin login and passwords. Never committed, copied or used. Credentials are supplied via environment / the auth provider only. Rotate any of those passwords that are in real use, since they have been shared in a chat upload. |
+| 16 | Settings → Data & Privacy (WebP render) | `6754bd20a69d` | `docs/design/user-settings/Data_Privacy_alt.webp` | Committed. Same screen as #12's `Data_Privacy.png`, different render. |
+| 17 | User-app sidebar navigation, numbered 1–12 (PNG, 276×1024) | `bb293246b225` | `docs/design/user-app/sidebar-navigation.png` | Committed. Treated as the **locked user navigation order**: Dashboard, My Projects, On-Page SEO Audit, Optimization Center, On-Page SEO Editor, Content Strategy, Keyword Research ▾, AI Search (GEO) ▾, Reports, Usage & Credits, Billing & Plan, Settings ▾. The Settings mockups (#12, #16) still show an older order and logo. |
+| 18 | Embroidered logo, "SEO Engineering" (WebP) | `40bac6472a00` | `assets/brand/merch/embroidered-logo-seo-engineering.webp` | Committed. Brand reference: "SEO Engineering" tagline lockup. |
+| 19 | Cap mockup, "SEO Engineering" (WebP) | `938386dede0c` | `assets/brand/merch/cap-seo-engineering.webp` | Committed. Brand / merchandise reference. |
+| 20 | Jacket mockup, "SEO Engineering" + `www.ampliverify.com` (WebP) | `c773a7464940` | `assets/brand/merch/jacket-seo-engineering.webp` | Committed. Brand reference. Confirms the public domain `ampliverify.com`. |
 
 ## Not yet supplied / known gaps
 
 - Admin batch 4 (see #7).
 - Super Admin screens referenced in the navigation but not yet mocked: Command Center, All Users, Admins, Sub-Admins, Roles & Permissions, Access Assignments, Module Controls, Feature Flags, Usage & Costs, System Health, Admin Activity, Security & Access, Settings.
 - User-app SEO module screens (projects, audits, editor, keywords, AI Search / GEO, reports).
+- Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
+- The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.
 - The public Contact page and the user Help & Support page imply contact-form and support-ticket storage. The database guide defines neither, so no tables exist for them yet.
