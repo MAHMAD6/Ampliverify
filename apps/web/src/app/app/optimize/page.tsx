@@ -3,6 +3,7 @@ import { BarChart3, CalendarDays, CircleAlert, CircleCheck, Download, ExternalLi
 import { Button, ButtonLink, Card, DataTable, EmptyState, Grid, IconCircle, Input, PageHeader, Panel, Select } from '@/components/ui';
 import { getAppContext } from '@/lib/project';
 import p from '@/components/app/pages.module.css';
+import { appCrumbs } from '@/lib/nav';
 
 export const metadata = { title: 'Optimization Center' };
 
@@ -17,11 +18,11 @@ export default async function OptimizationCenterPage({ searchParams }: { searchP
   const { selectedProject } = await getAppContext();
   const requested = (await searchParams).category;
   const category = CATEGORIES.find((c) => c === requested) ?? 'All';
-  const crumbs = [
+  const crumbs = appCrumbs(
     { label: 'My Projects', href: '/app/projects' },
     ...(selectedProject ? [{ label: selectedProject.name, href: `/app/projects/${selectedProject.id}` }] : []),
     { label: 'Optimization Center' },
-  ];
+  );
 
   return (
     <>
@@ -68,7 +69,7 @@ export default async function OptimizationCenterPage({ searchParams }: { searchP
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
         {CATEGORIES.map((c) => (
-          <ButtonLink key={c} href={c === 'All' ? '/app/optimization' : `/app/optimization?category=${encodeURIComponent(c)}`} variant={c === category ? 'primary' : 'secondary'}>
+          <ButtonLink key={c} href={c === 'All' ? '/app/optimize' : `/app/optimize?category=${encodeURIComponent(c)}`} variant={c === category ? 'primary' : 'secondary'}>
             {c}
           </ButtonLink>
         ))}

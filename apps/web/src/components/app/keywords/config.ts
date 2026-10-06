@@ -3,7 +3,7 @@
  * Keyword Explorer / Questions / Competitor Keywords / SERP Analysis designs.
  * Related Keywords and Keyword Lists follow the same pattern (no dedicated design yet).
  */
-export type TabKey = 'explorer' | 'related' | 'questions' | 'competitors' | 'serp' | 'lists';
+export type TabKey = 'explorer' | 'related' | 'questions' | 'competitors' | 'serp' | 'lists' | 'clusters';
 export type MetricIcon = 'bars' | 'donut' | 'dollar' | 'target' | 'columns';
 export type FilterDef =
   | { kind: 'checks'; title: string; options: string[] }
@@ -42,7 +42,7 @@ export const TABS: TabConfig[] = [
   {
     key: 'explorer',
     label: 'Keyword Explorer',
-    href: '/app/keywords',
+    href: '/app/keywords/explorer',
     inputLabel: 'Enter a keyword or topic',
     placeholder: 'Enter a keyword or topic (e.g. dog food, pet care, dog training)',
     examples: ['dog food', 'puppy training', 'pet insurance', 'organic dog food', 'best cat litter'],
@@ -158,7 +158,19 @@ export const TABS: TabConfig[] = [
     emptyTitle: 'No keyword lists yet',
     emptyText: 'Save keywords from any research tab to build lists you can reuse in content planning.',
   },
+  {
+    key: 'clusters',
+    label: 'Keyword Clusters',
+    href: '/app/keywords/clusters',
+    tableTitle: 'Keyword Clusters',
+    columns: ['Cluster', 'Keywords', 'Total Volume', 'Avg. KD', 'Created', 'Actions'],
+    emptyTitle: 'No keyword clusters yet',
+    emptyText: 'Clusters group related keywords by topic so you can plan one page per cluster. They are built from the keywords you research and save.',
+  },
 ];
+
+/** Tabs rendered as saved-collection tables rather than a research form. */
+export const COLLECTION_TABS: TabKey[] = ['lists', 'clusters'];
 
 export const LOCATIONS = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'India'];
 export const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian'];

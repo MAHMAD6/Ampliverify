@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { CircleHelp, Search } from 'lucide-react';
 import { Button, ButtonLink, EmptyState, Field, Grid, Input, KeyValue, Notice, PageHeader, Panel, Select, Textarea } from '@/components/ui';
+import { appCrumbs } from '@/lib/nav';
 
 export const metadata = { title: 'Help & Support' };
 
@@ -15,7 +16,7 @@ const SHORTCUTS = [
 export default function HelpSupportPage() {
   return (
     <>
-      <PageHeader title="Help & Support" description="Find product guidance or contact support when you need assistance." crumbs={[{ label: 'Help & Support' }]} />
+      <PageHeader title="Help & Support" description="Find product guidance or contact support when you need assistance." crumbs={appCrumbs({ label: 'Help & Support' })} />
       <Grid cols={2}>
         <Panel title="Find an Answer" description="Search product guidance before opening a support request." flushHead>
           <form action="/help">

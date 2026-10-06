@@ -19,10 +19,10 @@ import {
   Target,
   X,
 } from 'lucide-react';
-import { Button, DataTable, EmptyState, Field, IconCircle, Input, Metric, Notice, Panel, Select, Grid } from '@/components/ui';
+import { Button, ButtonLink, DataTable, EmptyState, Field, IconCircle, Input, Metric, Notice, Panel, Select, Grid } from '@/components/ui';
 import ui from '@/components/ui/ui.module.css';
 import p from '../pages.module.css';
-import { LANGUAGES, LOCATIONS, type FilterDef, type MetricIcon, type TabConfig } from './config';
+import { COLLECTION_TABS, LANGUAGES, LOCATIONS, type FilterDef, type MetricIcon, type TabConfig } from './config';
 import { KeywordDetailsPanel, KeywordResultsTable } from './KeywordResults';
 import { getKeywordDetail, searchKeywords, type SearchResult } from './source';
 import type { KeywordDetail } from './types';
@@ -151,15 +151,15 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
     />
   );
 
-  if (tab.key === 'lists') {
+  if (COLLECTION_TABS.includes(tab.key)) {
     return (
       <Panel
         title={tab.tableTitle}
-        description="Lists are saved per project."
+        description={tab.key === 'clusters' ? 'Clusters are saved per project.' : 'Lists are saved per project.'}
         bodyless
         actions={
           <Button icon={<Plus size={16} />} disabled title={hasProject ? 'Save keywords from a research tab first' : 'Select a project first'}>
-            New List
+            {tab.key === 'clusters' ? 'New Cluster' : 'New List'}
           </Button>
         }
       >
@@ -327,9 +327,9 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
 export function KeywordHeaderActions() {
   return (
     <>
-      <Button variant="secondary" icon={<BookmarkPlus size={18} />} disabled title="Saved keywords appear here once you save some">
+      <ButtonLink href="/app/keywords/lists?saved=true" variant="secondary" icon={<BookmarkPlus size={18} />}>
         Saved Keywords
-      </Button>
+      </ButtonLink>
       <Button variant="secondary" icon={<Download size={18} />} disabled title="Nothing to export yet">
         Export
       </Button>

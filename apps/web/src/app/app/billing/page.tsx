@@ -1,54 +1,62 @@
-import { Receipt } from 'lucide-react';
-import { Button, ButtonLink, EmptyState, Grid, KeyValue, Metric, Notice, PageHeader, Panel } from '@/components/ui';
+import Link from 'next/link';
+import { ArrowLeftRight, Coins, FileText, ShieldCheck, Tags } from 'lucide-react';
+import { PageHeader, Panel } from '@/components/ui';
+import { StateView } from '@/components/ui/StateView';
+import { BillingTabs } from '@/components/app/billing/BillingTabs';
+import { PlanCatalog, priceFor, type Interval } from '@/components/app/billing/PlanCatalog';
+import { apiList } from '@/lib/api';
+import type { PublicPlan } from '@/lib/types';
+import s from '@/components/app/billing/plans.module.css';
 
 export const metadata = { title: 'Billing & Plan' };
 
-/**
- * Plan, subscription, payment, invoice and credit data come from the billing
- * provider via the API. Those endpoints are not built yet, so every value
- * reads "Not available" and provider actions are disabled.
- */
-export default function BillingPage() {
+/** Plans (`/billing` in the navigation page map; design user-settings/Billing_Plan_Plans.webp). */
+export default async function BillingPlansPage({ searchParams }: { searchParams: Promise<{ interval?: string }> }) {
+  const plans = await apiList<PublicPlan>('/public/plans');
+  const interval: Interval = (await searchParams).interval === 'annual' && plans.some((p) => priceFor(p, 'ANNUAL')) ? 'ANNUAL' : 'MONTHLY';
+
   return (
     <>
-      <PageHeader title="Billing & Plan" description="Manage your subscription, payment details, invoices, and eligible credit purchases." crumbs={[{ label: 'Billing & Plan' }]} />
-      <Grid cols={4} style={{ marginBottom: 18 }}>
-        <Metric label="Current Plan" note="No plan data loaded" />
-        <Metric label="Subscription Status" note="No subscription data loaded" />
-        <Metric label="Billing Interval" note="Not available yet" />
-        <Metric label="Available Credits" note="From your usage ledger" />
-      </Grid>
-      <Grid cols={2}>
-        <Panel title="Plan & Subscription" description="Manage the current subscription and plan selection." flushHead>
-          <KeyValue label="Plan" />
-          <KeyValue label="Status" />
-          <KeyValue label="Renewal / period end" />
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <ButtonLink href="/pricing">View Plans</ButtonLink>
-            <Button variant="secondary" disabled>
-              Manage Subscription
-            </Button>
-          </div>
+      <PageHeader title="Billing & Plan" description="Choose the plan that fits your SEO goals. Upgrade, downgrade, or manage your subscription." />
+      <BillingTabs active="plans" />
+      {plans.length === 0 ? (
+        <Panel>
+          <StateView kind="empty" icon={<Tags size={36} />} title="Plans are being finalized" description="Published plans and prices will appear here." />
         </Panel>
-        <Panel title="Payment Method" description="Payment details are managed securely by our payment provider." flushHead>
-          <KeyValue label="Default payment method" />
-          <KeyValue label="Billing email" />
-          <Button variant="secondary" disabled style={{ marginTop: 16 }}>
-            Manage Payment Method
-          </Button>
-        </Panel>
-        <Panel title="Invoices" description="Recent billing documents." flushHead>
-          <EmptyState compact icon={<Receipt size={22} />} title="No invoices available" description="Invoices will appear after billable activity exists." />
-        </Panel>
-        <Panel title="Buy Credits" description="Optional add-on credits, when enabled for your plan." flushHead>
-          <KeyValue label="Credit purchases" value="Not available on your plan" />
-          <Button variant="secondary" disabled style={{ marginTop: 16 }}>
-            View Credit Options
-          </Button>
-        </Panel>
-      </Grid>
-      <div style={{ marginTop: 16 }}>
-        <Notice tone="neutral">Amounts, invoices and payment details are shown exactly as recorded by our payment provider.</Notice>
+      ) : (
+        <PlanCatalog plans={plans} interval={interval} basePath="/app/billing" />
+      )}
+      <div className={s.facts}>
+        <div className={s.fact}>
+          <Coins size={22} />
+          <span>
+            <b>AI Credits</b>
+            <small>Credits are used for AI analysis, content generation, GEO tracking and other premium features.</small>
+          </span>
+        </div>
+        <div className={s.fact}>
+          <ArrowLeftRight size={22} />
+          <span>
+            <b>Change Your Plan</b>
+            <small>Upgrade or downgrade from this page once billing is enabled for your workspace.</small>
+          </span>
+        </div>
+        <div className={s.fact}>
+          <ShieldCheck size={22} />
+          <span>
+            <b>Secure Payments</b>
+            <small>Payments are handled by our payment provider; card details are never stored by AmpliVerify.</small>
+          </span>
+        </div>
+        <div className={s.fact}>
+          <FileText size={22} />
+          <span>
+            <b>Invoices</b>
+            <small>
+              View and download your invoices in <Link href="/app/billing/invoices" style={{ color: 'var(--blue)' }}>Invoices</Link>.
+            </small>
+          </span>
+        </div>
       </div>
     </>
   );

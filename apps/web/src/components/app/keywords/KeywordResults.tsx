@@ -285,7 +285,7 @@ export function KeywordDetailsPanel({ detail, onClose }: { detail: KeywordDetail
         </div>
       )}
       {tab === 'Questions' && <p style={{ fontSize: 14, color: 'var(--muted)' }}>Open the Questions tab to research questions for “{detail.keyword}”.</p>}
-      <ButtonLink href="/app/content-strategy" block icon={<Plus size={18} />}>
+      <ButtonLink href="/app/content" block icon={<Plus size={18} />}>
         Create Content Strategy
       </ButtonLink>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>

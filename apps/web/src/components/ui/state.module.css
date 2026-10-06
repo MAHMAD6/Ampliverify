@@ -1,0 +1,45 @@
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 56px 24px;
+  border-radius: var(--radius);
+}
+.compact { padding: 28px 16px; }
+.icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin-bottom: 6px;
+  background: var(--blue-50);
+  color: var(--blue);
+}
+.icon:empty { display: none; }
+.title { font-size: 20px; font-weight: 700; color: var(--ink); max-width: 560px; }
+.text { font-size: 15px; color: var(--muted); max-width: 560px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+
+.bar { width: min(420px, 100%); height: 8px; border-radius: 999px; background: #e7ebf5; overflow: hidden; margin-top: 10px; }
+.bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--purple), var(--blue)); }
+.steps { list-style: none; width: min(420px, 100%); margin-top: 10px; display: grid; gap: 6px; text-align: left; font-size: 14px; color: var(--text); }
+.steps li { display: flex; justify-content: space-between; gap: 12px; }
+.steps li::before { content: ''; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; border: 2px solid var(--blue); flex: none; }
+.steps li span { flex: 1; }
+
+.loading .icon { background: transparent; }
+.processing .icon { background: var(--purple-50); color: var(--purple); }
+.success .icon { background: var(--green-50); color: var(--green); }
+.error .icon { background: var(--red-50); color: var(--red); }
+.lowCredits { background: var(--amber-50); }
+.lowCredits .icon { background: #fff; color: var(--amber); }
+.planRestricted { background: #fdf0f6; }
+.planRestricted .icon { background: #fff; color: #db2777; }
+.permissionRestricted .icon { background: var(--purple-50); color: var(--purple); }
+
+.spin { animation: spin 1.1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }

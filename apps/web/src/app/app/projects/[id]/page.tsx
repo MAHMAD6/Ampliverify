@@ -52,13 +52,13 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
 
   const actions = [
     { icon: <Search size={22} />, tone: 'blue' as const, title: 'Run SEO Audit', text: 'Analyze a specific page for SEO issues and opportunities.', cta: 'Run Audit', href: '/app/audit' },
-    { icon: <FileText size={22} />, tone: 'green' as const, title: 'Create Content Strategy', text: 'Analyze your domain to create and optimize content.', cta: 'Generate Strategy', href: '/app/content-strategy' },
+    { icon: <FileText size={22} />, tone: 'green' as const, title: 'Create Content Strategy', text: 'Analyze your domain to create and optimize content.', cta: 'Generate Strategy', href: '/app/content' },
     { icon: <Sparkles size={22} />, tone: 'purple' as const, title: 'Track AI Search (GEO)', text: 'Monitor your visibility in AI search experiences.', cta: 'Set Up Tracking', href: '/app/geo' },
     { icon: <Layers size={22} />, tone: 'blue' as const, title: 'View Reports', text: 'See insights, progress, and recommendations for this project.', cta: 'View Reports', href: `/app/projects/${project.id}/reports` },
   ];
   const modules = [
     { icon: <Search size={22} />, tone: 'blue' as const, title: 'SEO Audit', state: 'Not analyzed', rows: ['Last Analyzed', 'Pages Analyzed'], cta: 'Run SEO Audit', href: '/app/audit' },
-    { icon: <FileText size={22} />, tone: 'green' as const, title: 'Content Strategy', state: 'Not analyzed', rows: ['Last Generated', 'Recommendations'], cta: 'Create Strategy', href: '/app/content-strategy' },
+    { icon: <FileText size={22} />, tone: 'green' as const, title: 'Content Strategy', state: 'Not analyzed', rows: ['Last Generated', 'Recommendations'], cta: 'Create Strategy', href: '/app/content' },
     { icon: <Sparkles size={22} />, tone: 'purple' as const, title: 'AI Search (GEO)', state: 'Not configured', rows: ['Last Updated', 'Prompts Tracked'], cta: 'Set Up Tracking', href: '/app/geo' },
   ];
 
@@ -167,7 +167,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
           <Panel title={<span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><ListChecks size={20} color="var(--blue)" /> Next Steps</span>} flushHead>
             {[
               ['Run an SEO Audit for a key page.', '/app/audit'],
-              ['Generate a content strategy for your domain.', '/app/content-strategy'],
+              ['Generate a content strategy for your domain.', '/app/content'],
               ['Set up AI Search (GEO) tracking.', '/app/geo'],
               ['Review your reports and take action.', `/app/projects/${project.id}/reports`],
             ].map(([text, href], i) => (

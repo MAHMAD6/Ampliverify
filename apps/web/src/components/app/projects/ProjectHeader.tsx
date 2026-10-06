@@ -10,7 +10,7 @@ export function projectTabs(projectId: string) {
   return [
     { key: 'overview', label: 'Overview', icon: <Home size={20} />, href: `/app/projects/${projectId}` },
     { key: 'audit', label: 'SEO Audit', icon: <Search size={20} />, href: '/app/audit' },
-    { key: 'content', label: 'Content Strategy', icon: <FileText size={20} />, href: '/app/content-strategy' },
+    { key: 'content', label: 'Content Strategy', icon: <FileText size={20} />, href: '/app/content' },
     { key: 'geo', label: 'AI Search (GEO)', icon: <Sparkles size={20} />, href: '/app/geo' },
     { key: 'reports', label: 'Reports', icon: <BarChart3 size={20} />, href: `/app/projects/${projectId}/reports` },
     { key: 'settings', label: 'Settings', icon: <Settings size={20} />, href: '/app/settings/project-defaults' },

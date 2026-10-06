@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { BarChart3, BookOpen, Crown, CreditCard, Database, ExternalLink, FileText, Info } from 'lucide-react';
 import { AddCreditsButton } from '@/components/app/billing/AddCreditsDialog';
 import { Button, ButtonLink, EmptyState, Grid, IconCircle } from '@/components/ui';
+import { PlanCatalog, priceFor, type Interval } from '@/components/app/billing/PlanCatalog';
+import { apiList } from '@/lib/api';
+import type { PublicPlan } from '@/lib/types';
 import b from '@/components/app/billing/billing.module.css';
 
 export const metadata = { title: 'Billing & Plan · Settings' };
@@ -11,7 +14,9 @@ export const metadata = { title: 'Billing & Plan · Settings' };
  * payment method and invoices come from the billing API, which is not built
  * yet, so each area shows its empty state ("No active plan", "—").
  */
-export default function SettingsBillingPage() {
+export default async function SettingsBillingPage({ searchParams }: { searchParams: Promise<{ interval?: string }> }) {
+  const plans = await apiList<PublicPlan>('/public/plans');
+  const interval: Interval = (await searchParams).interval === 'annual' && plans.some((p) => priceFor(p, 'ANNUAL')) ? 'ANNUAL' : 'MONTHLY';
   return (
     <>
       <h2>Billing &amp; Plan</h2>
@@ -27,10 +32,10 @@ export default function SettingsBillingPage() {
             <p>Your plan details will appear here once a subscription is active.</p>
           </div>
           <div className={b.planActions}>
-            <ButtonLink href="/pricing" size="lg">
+            <ButtonLink href="/app/billing" size="lg">
               View Plans
             </ButtonLink>
-            <Link href="/pricing">Compare Plans</Link>
+            <Link href="/app/billing">Compare Plans</Link>
           </div>
         </div>
 
@@ -74,18 +79,13 @@ export default function SettingsBillingPage() {
         <section>
           <h3 style={{ fontSize: 20 }}>Plan Features</h3>
           <p style={{ color: 'var(--muted)', marginBottom: 12 }}>View the key features included in each plan and find the right plan for your needs.</p>
-          <div className={b.boxed}>
-            <EmptyState
-              icon={<FileText size={26} />}
-              title="No plan selected"
-              description="Select a plan to see the included features, limits, and benefits."
-              action={
-                <ButtonLink href="/pricing" variant="outline">
-                  View Plans
-                </ButtonLink>
-              }
-            />
-          </div>
+          {plans.length > 0 ? (
+            <PlanCatalog plans={plans} interval={interval} basePath="/app/settings/billing" />
+          ) : (
+            <div className={b.boxed}>
+              <EmptyState icon={<FileText size={26} />} title="Plans are being finalized" description="Published plans and their features will appear here." />
+            </div>
+          )}
         </section>
 
         <Grid cols={2}>
@@ -120,7 +120,7 @@ export default function SettingsBillingPage() {
                 title="No invoices yet"
                 description="Your invoices will appear here once you subscribe to a paid plan or purchase credits."
                 action={
-                  <ButtonLink href="/app/billing" variant="outline">
+                  <ButtonLink href="/app/billing/invoices" variant="outline">
                     View Invoices
                   </ButtonLink>
                 }
