@@ -154,9 +154,14 @@ export const TABS: TabConfig[] = [
     label: 'Keyword Lists',
     href: '/app/keywords/lists',
     tableTitle: 'Keyword Lists',
-    columns: ['List', 'Keywords', 'Created', 'Actions'],
-    emptyTitle: 'No keyword lists yet',
-    emptyText: 'Save keywords from any research tab to build lists you can reuse in content planning.',
+    columns: ['List Name', 'Keywords', 'Created', 'Updated', 'Actions'],
+    emptyTitle: 'Organize your keywords',
+    emptyText: 'Create keyword lists to save and organize your research for future use.',
+    features: [
+      { icon: 'search', title: 'Save keywords', text: 'Add keywords to custom lists.' },
+      { icon: 'list', title: 'Organize by topic', text: 'Group keywords by project or content theme.' },
+      { icon: 'chart', title: 'Track and export', text: 'Keep research organized and export it for planning.' },
+    ],
   },
   {
     key: 'clusters',
@@ -171,6 +176,9 @@ export const TABS: TabConfig[] = [
 
 /** Tabs rendered as saved-collection tables rather than a research form. */
 export const COLLECTION_TABS: TabKey[] = ['lists', 'clusters'];
+
+/** Tabs shown in the Keyword Research tab bar (readability-enhanced set, docs/design/keyword-research-v2). Clusters is reached from the sidebar. */
+export const BAR_TABS: TabKey[] = ['explorer', 'related', 'questions', 'competitors', 'serp', 'lists'];
 
 export const LOCATIONS = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'India'];
 export const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Portuguese', 'Italian'];

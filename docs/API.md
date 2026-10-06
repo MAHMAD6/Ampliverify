@@ -68,5 +68,7 @@ Every endpoint applies the publication rule: `status = PUBLISHED AND published_a
 | POST | `/admin/access-assignments` | `admin.access.manage` at the target scope. The grantor must hold every permission of the role there. No self-assignment. The target must be an active member. |
 | POST | `/admin/access-assignments/:id/revoke` | Same as above. No self-revocation. |
 | GET | `/admin/audit-logs?limit=` | global `audit.read` |
+| GET | `/admin/module-controls` | global `system.read` |
+| GET | `/admin/feature-flags` | global `system.read` |
 
 List endpoints cap `limit` at 500 (default 100). Full cursor pagination comes in a later batch.

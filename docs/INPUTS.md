@@ -78,13 +78,26 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 68–70 | `ampliverify_batch1-admin.zip`, `…batch2-admin.zip`, `…batch3-admin.zip` (re-uploads) | `8e9cd60cd324`, `f09f792d19a8`, `ab6d03a854d1` | — | Not committed: byte-identical to #4, #5, #6 (already implemented). |
 | 71 | `ampliverify_batch4-admin.zip` (re-upload) | `ab6d03a854d1` | — | Not committed: **still byte-identical to batch 3 (#6)**, like #7. The real admin batch 4 has not arrived. |
 | 72 | `AmpliVerify_Database_Architecture_Implementation_Guide.pdf` (re-upload) | `704ca3a282d8` | — | Not committed: identical to #3. |
+| 73–75 | `ampliverify_admin_final_batch1-3` zips (Admin Activity, Security & Access, Audit Logs, General/Notifications/Security/Appearance settings, Plan detail, Subscription detail, Invoice detail, Feature flag detail, Event detail) | — | `docs/design/admin-final-batch{1,2,3}/` | Committed. See SCREENS → Super Admin. |
+| 76 | Admin redesign images (chat, 2026-10-06): Media Library, Module Controls, Plans, Resources, Roles, Settings General/Notifications/Security/Appearance, Security & Access, Admin/Sub-Admin Detail, Sub-Admins, Subscriptions, System Health, System Overview diagram, Create Blog Post, Usage & Costs, Access Assignments, Admin Activity, All Users, Audit Logs, Billing & Invoices, Blog Posts (×2), Careers, Command Center, Content Overview, Credits, Feature Flags, Feature Entitlements, Create Job Opening | — | not archived (chat images) | Implemented; these win over the zip batches where they overlap. They drove `GET /admin/module-controls`, `GET /admin/feature-flags` and permission `system.read`. |
+| 77 | `Ahmad_credentials.csv` | — | — | **Not opened, used or committed** (same rule as AAPW.xlsx, #8). |
+| 78 | Public site v2 images (chat): Home ×2, Features ×2, How It Works ×2, Pricing, Resources, Guide article, About, Careers, Contact, Help, Legal, Sign Up, Billing & Plan | — | `docs/design/public-website-v2/images/` | Committed. Green redesign of the whole public site. |
+| 79 | `AmpliVerify-Website.zip` (full v2 site HTML) | — | `docs/design/public-website-v2/html/` | Committed (HTML only; the bundled PDF is not). |
+| 80 | Public batch 1 (auth) and batch 2 (system pages) zips | — | `docs/design/public-auth/`, `docs/design/public-system-pages/` | Committed. Login, forgot/reset password, email verification, privacy, terms, cookies, 404, 500, maintenance. |
+| 81 | Keyword research readability zips (2 resolutions) | — | `docs/design/keyword-research-v2/` (1672 set) | Committed. Six screens incl. Keyword Lists. |
+| 82 | Settings 1536/3072 zips, user_support zip, public remaining batch1-3 zips (re-uploads), logo and mark images | — | — | Not committed: duplicates of designs already archived. |
+| 83 | On-Page SEO Audit redesign (chat image) | — | not archived | Implemented at `/app/audit`. |
+| 84 | Settings → Billing & Plan redesign (chat image) | — | not archived | Implemented; the topbar "Credits: 320" pill is mock data and not shown. |
+| 85 | `careers_application_batch.zip` | — | `docs/design/public-careers-application/` | Committed. Job Detail + Application, Application Success. |
+| 86 | `Ampliverify_Pages_Remaining.mhtml`, `Database-Design.mhtml` (ChatGPT exports) | — | — | **Not committed** (contain account details). Read as reference only. GEO guidance adopted: keep "last checked" separate from the reporting range; show no trends before two checks; opportunities must be actionable. |
+| 87 | `Video-Editor.txt` | — | — | Unrelated to AmpliVerify; not used. |
 
 ## Not yet supplied / known gaps
 
 - Admin batch 4 (see #7).
-- Super Admin screens referenced in the navigation but not yet mocked: Command Center, All Users, Admins, Sub-Admins, Roles & Permissions, Access Assignments, Module Controls, Feature Flags, Usage & Costs, System Health, Admin Activity, Security & Access, Settings.
 - User-app screens still without a design: the page-map sub-pages (Keyword Overview/Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices) and the `[id]` detail pages for audit, optimize and editor.
-- Sign-in / sign-up screens (needed to wire Better Auth into the web app).
+- Better Auth is not yet wired into the web app, so the sign-in screens (#80) cannot submit.
+- Job applications (#85) need a public submit endpoint with résumé upload, validation and malware scanning before the form can be enabled.
 - Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
 - The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.
 - The public Contact page and the user Help & Support page imply contact-form and support-ticket storage. The database guide defines neither, so no tables exist for them yet.

@@ -130,7 +130,7 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
     />
   ) : (
     <EmptyState
-      icon={<FileSearch size={30} />}
+      icon={COLLECTION_TABS.includes(tab.key) ? <ListChecks size={30} /> : <FileSearch size={30} />}
       title={tab.emptyTitle}
       description={tab.emptyText}
       action={
@@ -158,12 +158,15 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
         description={tab.key === 'clusters' ? 'Clusters are saved per project.' : 'Lists are saved per project.'}
         bodyless
         actions={
-          <Button icon={<Plus size={16} />} disabled title={hasProject ? 'Save keywords from a research tab first' : 'Select a project first'}>
-            {tab.key === 'clusters' ? 'New Cluster' : 'New List'}
-          </Button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <Input placeholder={tab.key === 'clusters' ? 'Search clusters...' : 'Search lists...'} icon={<Search size={16} />} aria-label="Search" disabled />
+            <Button icon={<Plus size={16} />} disabled title={hasProject ? 'Save keywords from a research tab first' : 'Select a project first'}>
+              {tab.key === 'clusters' ? 'Create New Cluster' : 'Create New List'}
+            </Button>
+          </div>
         }
       >
-        <DataTable columns={tab.columns} empty={<EmptyState icon={<ListChecks size={30} />} title={tab.emptyTitle} description={tab.emptyText} />} />
+        <DataTable columns={tab.columns} empty={empty} />
       </Panel>
     );
   }

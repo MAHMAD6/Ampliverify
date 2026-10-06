@@ -2,7 +2,7 @@ import { PageHeader, TabNav } from '@/components/ui';
 import { appCrumbs } from '@/lib/nav';
 import { getAppContext } from '@/lib/project';
 import { KeywordHeaderActions, KeywordResearch } from './KeywordResearch';
-import { COLLECTION_TABS, TABS, type TabKey } from './config';
+import { BAR_TABS, COLLECTION_TABS, TABS, type TabKey } from './config';
 
 /**
  * One Keyword Research tool. `saved` is the page map's Saved Keywords
@@ -24,9 +24,7 @@ export async function KeywordPage({ tabKey, saved = false }: { tabKey: TabKey; s
         crumbs={appCrumbs({ label: 'Keyword Research', href: '/app/keywords' }, { label: saved && tabKey === 'lists' ? 'Saved Keywords' : base.label })}
         actions={!COLLECTION_TABS.includes(tab.key) ? <KeywordHeaderActions /> : undefined}
       />
-      {!COLLECTION_TABS.includes(tab.key) && (
-        <TabNav tabs={TABS.filter((t) => !COLLECTION_TABS.includes(t.key)).map((t) => ({ key: t.key, label: t.label, href: t.href }))} active={tab.key} />
-      )}
+      {BAR_TABS.includes(tab.key) && <TabNav tabs={TABS.filter((t) => BAR_TABS.includes(t.key)).map((t) => ({ key: t.key, label: t.label, href: t.href }))} active={tab.key} />}
       <KeywordResearch key={`${tab.key}:${saved}`} tab={tab} projectId={selectedProject?.id ?? null} />
     </>
   );

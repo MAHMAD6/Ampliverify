@@ -1,6 +1,13 @@
 import Image from 'next/image';
-import { Globe, LayoutPanelLeft, Palette, Stamp } from 'lucide-react';
+import { Eye, Globe, LayoutPanelLeft, Palette, Stamp } from 'lucide-react';
 import { SettingsCard, SettingsShell } from '@/components/admin/AdminSettings';
+import { Button } from '@/components/ui';
+
+const change = (
+  <Button size="sm" variant="secondary" disabled title="The approved brand assets are locked">
+    Change
+  </Button>
+);
 
 export const metadata = { title: 'Appearance · Settings' };
 
@@ -19,14 +26,37 @@ export default function AppearanceSettingsPage() {
         title="Branding"
         description="Product identity shown across supported interfaces."
         rows={[
-          { label: 'Platform logo', value: <Image src="/brand/mark-transparent.png" alt="Approved AmpliVerify mark" width={26} height={26} /> },
-          { label: 'Favicon', value: 'Approved asset' },
+          {
+            label: 'Platform logo',
+            value: (
+              <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
+                <Image src="/brand/mark-transparent.png" alt="Approved AmpliVerify mark" width={26} height={26} /> {change}
+              </span>
+            ),
+          },
+          {
+            label: 'Favicon',
+            value: (
+              <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
+                Approved asset {change}
+              </span>
+            ),
+          },
           { label: 'Brand name', value: 'AmpliVerify' },
           { label: 'Tagline', value: 'SEO Engineering' },
         ]}
       />
       <SettingsCard icon={<LayoutPanelLeft size={24} />} tone="purple" title="Layout & Navigation" description="Supported shell preferences." rows={[{ label: 'Default sidebar state', select: true }, { label: 'Show module icons', toggle: true }, { label: 'Compact navigation', toggle: true }]} />
       <SettingsCard icon={<Globe size={24} />} tone="amber" title="Login & Public Pages" description="Branding on authentication and public experiences." rows={[{ label: 'Show logo on login', toggle: true }, { label: 'Show product name', toggle: true }, { label: 'Show tagline', toggle: true }]} />
+      <SettingsCard icon={<Eye size={24} />} tone="blue" title="Preview" description="How the approved branding appears in the app header." wide>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--navy-900)', color: '#fff' }}>
+          <Image src="/brand/mark-transparent.png" alt="" width={32} height={32} />
+          <span>
+            <b style={{ display: 'block', letterSpacing: 0.5 }}>AMPLIVERIFY</b>
+            <small style={{ opacity: 0.75, letterSpacing: 1 }}>SEO ENGINEERING</small>
+          </span>
+        </div>
+      </SettingsCard>
     </SettingsShell>
   );
 }
