@@ -3,6 +3,7 @@ import { ArrowRight, CalendarDays, ChevronRight, FilePlus2, FileText, Folder, Li
 import { ButtonLink, PageHeader } from '@/components/ui';
 import { StateView } from '@/components/ui/StateView';
 import { getAppContext } from '@/lib/project';
+import { ContentSetup, ProjectContext } from '@/components/app/ModuleSetup';
 import s from './content.module.css';
 
 export type ContentTab = 'ideas' | 'clusters' | 'plan' | 'briefs' | 'optimized';
@@ -67,6 +68,7 @@ export async function ContentStrategy({ tab }: { tab: ContentTab }) {
 
   return (
     <>
+      {selectedProject && <ProjectContext project={selectedProject} />}
       <PageHeader title="Content Strategy" description="Get AI-powered content recommendations to improve your SEO and AI search visibility." />
 
       <nav className={s.tabs} aria-label="Content Strategy">
@@ -92,6 +94,8 @@ export async function ContentStrategy({ tab }: { tab: ContentTab }) {
           ))}
         </div>
       )}
+
+      {tab === 'ideas' && selectedProject && <ContentSetup project={selectedProject} />}
 
       <section className={s.body}>
         {selectedProject ? (

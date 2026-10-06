@@ -15,6 +15,7 @@ export default function Page() {
       emptyTitle="No tracked prompts yet"
       emptyText="Add the questions your audience asks AI assistants to start monitoring visibility. Each check consumes GEO credits based on the selected platforms."
       action="Add Prompt"
+      setup
     />
   );
 }

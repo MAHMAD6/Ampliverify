@@ -53,18 +53,19 @@ Navigation follows the locked spec in `docs/design/navigation-batch1/`: sidebar 
 |---|---|---|---|
 | Dashboard | `/app/dashboard` (`?period=`) | chat images 2026-10-06 (empty + populated with callouts); batch2a/01 | **Live**: total/active project counts and the Project Performance table, with Open and the row menu (manage, pause/resume, archive, delete confirmation). Delete shows the full warning, but permanent deletion is disabled and the dialog offers Archive instead (the API archives, never deletes). Next Steps completion comes from data, with "Hide completed". Audit/content/GEO counts, usage, activity, insights, opportunities, reports and GEO panels show "—" or empty states. |
 | My Projects | `/app/projects` (`?tab=&q=&sort=&view=&page=&size=`) | user-app/my-projects (populated + empty); batch2a/02 | **Live**: list, status tabs and counts, search, sort, list/grid, pagination; pause/resume/archive via `PATCH /user/projects/:id`; delete confirmation as on the Dashboard. |
-| Add Project | `/app/projects/new` | batch2a/02 states | **Live**: `POST /user/projects`. Processing while saving, Success (View Project / Add Another), Error (Try Again), Permission Restricted on 403. |
+| Add Project (wizard) | `/app/projects/new` | user-app/add-project.webp; batch2a/02 states | **Live** 4-step wizard: Project Details (name, domain with live validation, primary goal) → Website Setup → Analysis Setup → Review & Create, plus a live Project Summary. Creates via `POST /user/projects` with domain and goal. Integrations are connected after creation, and analysis tools say "Not available yet" rather than collecting ignored choices. Processing / Success / Error / Permission states. |
 | Project Overview | `/app/projects/[id]` | chat images (screen + annotated spec) | **Live** project facts and status controls; module data "Not analyzed". |
 | Project Reports tab | `/app/projects/[id]/reports` | chat image | Empty states |
-| On-Page SEO Audit | `/app/audit` | batch2a/03 | Start form pre-filled from the selected project's domain. Start Audit is disabled (audit API not built). Audit History is empty. `/audit/[id]` (results) awaits the API. |
+| On-Page SEO Audit | `/app/audit` | batch2a/03; setup panel from add-project.webp | With a project: "Back to Projects / project" line and the Page URL panel. Run Audit is disabled (audit API not built). Audit History is empty. `/audit/[id]` awaits the API. |
 | Optimization Center | `/app/optimize` (`?category=`) | chat image; batch2a/04 | Empty states (recommendations come from audits) |
 | On-Page SEO Editor | `/app/editor` | chat image; batch2a/05 | Works locally (outline, formatting, undo/redo, preview, HTML, per-device draft). Save and AI are disabled. `/editor/[id]` awaits the pages API. |
-| Content Strategy | `/app/content` → `/app/content/{ideas,clusters,plan,briefs,optimized}` | chat image 2026-10-06 (second version); batch2a/06 | Tabs Opportunities (Topic Ideas), Topic Clusters, Content Plan, Drafts (Content Briefs), Optimized Content. Feature cards, empty state with Run SEO Audit, "What happens next?". No project selected → Select a Project. |
+| Content Strategy | `/app/content` → `/app/content/{ideas,clusters,plan,briefs,optimized}` | chat image 2026-10-06 (second version); batch2a/06 | Tabs Opportunities (Topic Ideas), Topic Clusters, Content Plan, Drafts (Content Briefs), Optimized Content. Feature cards, empty state with Run SEO Audit, "What happens next?". No project selected → Select a Project. With a project, Opportunities also shows the Website Domain panel (project domain, Generate Strategy disabled). |
 | Keyword Research: Overview | `/app/keywords` | page map (no design) | Tool hub and recent-research empty state |
-| Keyword Explorer / Related / Questions / Competitors / SERP | `/app/keywords/{explorer,related,questions,competitors,serp}` | user-app/keyword-research*, chat images | Empty states; the populated states render from `components/app/keywords/source.ts` once the keyword API exists |
+| Keyword Explorer / Related / Questions / Competitors / SERP | `/app/keywords/{explorer,related,questions,competitors,serp}` | user-app/keyword-research* (incl. -v2), chat images | Empty states; the populated states render from `components/app/keywords/source.ts` once the keyword API exists |
 | Keyword Lists / Saved Keywords / Clusters | `/app/keywords/lists`, `/app/keywords/lists?saved=true`, `/app/keywords/clusters` | page map | Empty tables. Saved Keywords is Keyword Lists filtered by `saved=true`, as the spec decides; there is no separate page. |
 | AI Search (GEO) Overview | `/app/geo` | user-app/ai-search-geo-monitoring | Project picker live; everything else empty |
-| GEO Prompt Tracking / Competitors / Sources & Citations / History | `/app/geo/{prompts,competitors,citations,history}` | page map (standalone pages, spec decision 3) | Project picker plus empty tables |
+| GEO Prompt Tracking / Competitors / Sources & Citations / History | `/app/geo/{prompts,competitors,citations,history}` | page map (standalone pages, spec decision 3); setup panel from add-project.webp | Project picker plus empty tables. Prompt Tracking also shows the Tracked Domain / Tracked Prompts panel (Save & Continue disabled). |
+| GEO Prompt Detail | `/app/geo/prompts/[id]` (`?tab=`) | user-app/geo-prompt-detail.webp | Template with six tabs, metrics, trend, platform results (from the prompt's platforms), citations and opportunities; Run Check, Edit, Duplicate and Pause are disabled. Resolves to 404 until the GEO prompts API exists. The design's crumb says "History"; the route lives under Prompt Tracking, so the crumb does too. |
 | Reports: All / Scheduled / Shared | `/app/reports`, `/app/reports/scheduled`, `/app/reports/shared` | chat image (Report History); page map | Filters live (project list); tables empty |
 | Report view | `/app/reports/[id]` | chat image | Template; 404 until the reports API exists |
 | Usage & Credits | `/app/usage` | chat image 2026-10-06 | Every value "—". Buy More Credits opens the Add Credits dialog (no packs, checkout disabled). Auto top-up and spend cap are disabled. |
@@ -76,7 +77,7 @@ Navigation follows the locked spec in `docs/design/navigation-batch1/`: sidebar 
 | Getting Started | `/app/getting-started` | user-support/04 | Progress derived from real data |
 | Search | `/app/search?q=` | none | Searches the user's projects |
 | Connect Your Website (CMS) | `/app/integrations/cms` | chat image | WordPress flow UI; Connect/Test disabled |
-| Settings → Account | `/app/settings/account` | user-settings/Account.png | Profile from `/user/me`; security actions disabled |
+| Settings → Account | `/app/settings/account` | user-settings/Account.png, Account_v2.png | Profile from `/user/me`; security actions disabled |
 | Settings → Workspace | `/app/settings/workspace` | user-settings/Workspace.png | **Live** workspace name and ID (`/user/workspaces`, matching the selected project). Timezone/language show "—" because the schema has no such fields. Members, roles, Edit and Invite are empty or disabled. |
 | Settings → Project Defaults | `/app/settings/project-defaults` | chat image | Empty states |
 | Settings → Integrations | `/app/settings/integrations` | catalog redesign (chat image) | **Live** registries (`/public/geo-platforms`, `/public/integrations`) |
@@ -84,7 +85,7 @@ Navigation follows the locked spec in `docs/design/navigation-batch1/`: sidebar 
 | Settings → Billing & Plan | `/app/settings/billing` (`?interval=annual`) | chat images; Billing_Plan_Plans.webp | Plan, credits and Add Credits dialog, then the same live plan catalog as `/app/billing`, then payment method and invoices |
 | Settings → Data & Privacy | `/app/settings/privacy` | user-settings/Data_Privacy*.png | Read-only |
 
-Awaiting design (neutral page with title and empty state): Settings → AI & GEO Preferences.
+| Settings → AI & GEO Preferences | `/app/settings/ai-geo` | user-settings/AI_GEO_Preferences.webp | Platforms from the GEO registry with a select-platforms popover; location/language, frequency, citations, competitors, analysis and credit controls are all interactive. There is no preferences API, so Save is disabled and the page says changes are not stored. |
 
 ## Super Admin (`/admin`)
 

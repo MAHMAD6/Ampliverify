@@ -24,7 +24,9 @@ export async function KeywordPage({ tabKey, saved = false }: { tabKey: TabKey; s
         crumbs={appCrumbs({ label: 'Keyword Research', href: '/app/keywords' }, { label: saved && tabKey === 'lists' ? 'Saved Keywords' : base.label })}
         actions={!COLLECTION_TABS.includes(tab.key) ? <KeywordHeaderActions /> : undefined}
       />
-      <TabNav tabs={TABS.map((t) => ({ key: t.key, label: t.label, href: t.href }))} active={tab.key} />
+      {!COLLECTION_TABS.includes(tab.key) && (
+        <TabNav tabs={TABS.filter((t) => !COLLECTION_TABS.includes(t.key)).map((t) => ({ key: t.key, label: t.label, href: t.href }))} active={tab.key} />
+      )}
       <KeywordResearch key={`${tab.key}:${saved}`} tab={tab} projectId={selectedProject?.id ?? null} />
     </>
   );

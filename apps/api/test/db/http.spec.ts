@@ -148,6 +148,27 @@ describe('HTTP API', () => {
       .send({ workspaceId, name: 'x', organizationId: workspaceId })
       .expect(400);
     expect(extra.body.error.code).toBe('VALIDATION_FAILED');
+
+    const withDomain = await api()
+      .post('/api/v1/user/projects')
+      .set('authorization', alice.bearer)
+      .send({ workspaceId, name: 'Shop', domain: 'https://www.Shop.Example.com/home', primaryGoal: 'GEO' })
+      .expect(201);
+    expect(withDomain.body.data).toMatchObject({ name: 'Shop', primaryGoal: 'GEO', primaryDomain: 'shop.example.com' });
+    const listed = await api().get('/api/v1/user/projects').set('authorization', alice.bearer).expect(200);
+    expect(listed.body.data.find((p: { id: string }) => p.id === withDomain.body.data.id).primaryDomain).toBe('shop.example.com');
+
+    const badDomain = await api()
+      .post('/api/v1/user/projects')
+      .set('authorization', alice.bearer)
+      .send({ workspaceId, name: 'Bad', domain: 'not a domain' })
+      .expect(400);
+    expect(badDomain.body.error.code).toBe('INVALID_DOMAIN');
+    await api()
+      .post('/api/v1/user/projects')
+      .set('authorization', alice.bearer)
+      .send({ workspaceId, name: 'Bad goal', primaryGoal: 'EVERYTHING' })
+      .expect(400);
   });
 
   it('admin routes require global permissions', async () => {

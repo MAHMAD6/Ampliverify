@@ -68,12 +68,17 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 58 | Usage & Credits (chat image) | — | — | **Chat only.** `/app/usage`. |
 | 59 | Dashboard, empty (chat image) | — | — | **Chat only.** `/app/dashboard` with no projects. |
 | 60 | Dashboard, populated with interaction callouts (chat image) | — | — | **Chat only.** `/app/dashboard` with projects: row hover, right-aligned menu, delete confirmation with a clear warning. Its third bottom panel is hidden by the modal; it is implemented as "Recent Reports". |
+| 61 | Keyword Research — Explorer, updated (WebP) | `360f8064dfa9` | `docs/design/user-app/keyword-research-v2.webp` | Committed. The tab bar now shows only the five research tools; Lists and Clusters are separate pages (page map). |
+| 62 | Settings → Account, updated (PNG) | `3a61bbe7a1b6` | `docs/design/user-settings/Account_v2.png` | Committed. Already matched by `/app/settings/account`. |
+| 63 | Add Project wizard + module setup panels (WebP) | `3e06c7b8d7db` | `docs/design/user-app/add-project.webp` | Committed. `/app/projects/new` (4-step wizard). Drove `projects.primary_goal` and the optional `domain` on project creation. Setup panels on Audit, Content Strategy and Prompt Tracking. |
+| 64 | Settings → AI & GEO Preferences (WebP) | `ef2a5b4641e1` | `docs/design/user-settings/AI_GEO_Preferences.webp` | Committed. `/app/settings/ai-geo`. Its top-tab settings nav and older sidebar are not used (spec #51 decision 2). Brand logos are replaced by neutral letter marks. |
+| 65 | AI Search (GEO) — Prompt Detail (WebP) | `02737d8d5228` | `docs/design/user-app/geo-prompt-detail.webp` | Committed. `/app/geo/prompts/[id]` (template until the GEO API exists). |
 
 ## Not yet supplied / known gaps
 
 - Admin batch 4 (see #7).
 - Super Admin screens referenced in the navigation but not yet mocked: Command Center, All Users, Admins, Sub-Admins, Roles & Permissions, Access Assignments, Module Controls, Feature Flags, Usage & Costs, System Health, Admin Activity, Security & Access, Settings.
-- User-app screens still without a design: Settings → AI & GEO Preferences; the page-map sub-pages (Keyword Overview/Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices) and the `[id]` detail pages for audit, optimize and editor.
+- User-app screens still without a design: the page-map sub-pages (Keyword Overview/Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices) and the `[id]` detail pages for audit, optimize and editor.
 - Sign-in / sign-up screens (needed to wire Better Auth into the web app).
 - Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
 - The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.
@@ -84,3 +89,4 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
   - Workspaces have no default timezone or language (#54).
   - Plans have no "featured" / "Most Popular" flag (#55), so no plan is highlighted.
   - There is no hard-delete workflow for projects; the Dashboard delete confirmation (#60) offers Archive instead.
+- No API yet for AI & GEO preferences (#64), so the form cannot be saved.

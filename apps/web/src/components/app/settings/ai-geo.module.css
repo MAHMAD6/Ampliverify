@@ -1,0 +1,57 @@
+.titleRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+.titleRow h2 { display: flex; align-items: center; gap: 8px; }
+.info { color: var(--blue); }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.section { display: flex; gap: 14px; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; background: #fff; min-width: 0; }
+.icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: var(--blue-50); color: var(--blue); flex: none; }
+.sectionBody { flex: 1; min-width: 0; display: grid; gap: 10px; align-content: start; }
+.sectionHead { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.sectionHead > div:first-child { flex: 1 1 220px; min-width: 0; }
+.sectionHead h3 { font-size: 16px; color: var(--ink); display: flex; gap: 6px; align-items: center; }
+.sectionHead p { font-size: 13px; color: var(--muted); }
+
+.pickerWrap { position: relative; display: flex; gap: 8px; align-items: center; flex: none; }
+.count { font-size: 12px; color: var(--muted); background: var(--surface-alt); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+.picker { position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; width: 300px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 8px; }
+.pickerHead { display: flex; justify-content: space-between; align-items: center; }
+.pickerHead b { font-size: 15px; color: var(--ink); }
+.pickerHead button { background: none; border: 0; color: var(--muted); cursor: pointer; }
+.picker > p { font-size: 13px; color: var(--muted); }
+.pickItem { display: flex; gap: 10px; align-items: center; font-size: 14px; color: var(--heading); padding: 4px 0; cursor: pointer; }
+.pickItem input { accent-color: var(--blue); width: 16px; height: 16px; }
+.pickerActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.mono { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--blue-50); color: var(--blue); font-size: 12px; font-weight: 800; }
+.empty { display: grid; justify-items: center; gap: 2px; text-align: center; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); font-size: 13px; color: var(--muted); }
+.empty b { color: var(--ink); font-size: 14px; }
+.chips { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips li { display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px 4px 4px; font-size: 13px; color: var(--heading); }
+.chips button { background: none; border: 0; color: var(--muted); cursor: pointer; display: inline-flex; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.field { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.field > span, .field legend { font-size: 13px; font-weight: 600; color: var(--heading); padding: 0; margin-bottom: 4px; }
+.field small { font-size: 12px; color: var(--muted); }
+.radios { display: grid; gap: 8px; }
+.radio { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.radio input { margin-top: 4px; accent-color: var(--blue); width: 16px; height: 16px; }
+.radio b { font-size: 14px; color: var(--ink); font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.radio small { display: block; font-size: 13px; color: var(--muted); }
+.badge { font-style: normal; font-size: 11px; font-weight: 600; color: var(--green); background: var(--green-50); border-radius: 6px; padding: 1px 6px; }
+.toggleRow { display: flex; gap: 12px; align-items: flex-start; }
+.toggleRow b { display: block; font-size: 14px; color: var(--ink); font-weight: 600; }
+.toggleRow small { font-size: 12px; color: var(--muted); }
+.checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: 13px; color: var(--text); }
+.checks label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.checks input { accent-color: var(--blue); }
+.defaults { display: flex; gap: 12px; align-items: center; background: var(--surface-alt); border-radius: var(--radius-sm); padding: 10px 12px; }
+.defaults > svg { color: var(--muted); flex: none; }
+.defaults span { flex: 1; min-width: 0; }
+.defaults b { display: block; font-size: 14px; color: var(--ink); }
+.defaults small { font-size: 12px; color: var(--muted); }
+.review { font-size: 13px; font-weight: 600; color: var(--blue); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 6px 12px; white-space: nowrap; }
+
+.footer { display: flex; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.unsaved { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+
+@media (max-width: 1200px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) { .two, .checks { grid-template-columns: minmax(0, 1fr); } .titleRow { flex-direction: column; } }

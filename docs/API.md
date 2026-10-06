@@ -52,7 +52,7 @@ Every endpoint applies the publication rule: `status = PUBLISHED AND published_a
 | Method | Route | Permission |
 |---|---|---|
 | GET | `/user/projects` | Returns only projects covered by `project.read`; each includes `primaryDomain` |
-| POST | `/user/projects` | `project.create` at workspace scope |
+| POST | `/user/projects` | `project.create` at workspace scope. Body: `workspaceId`, `name`, optional `domain` (normalized to a bare host, stored as the first `domains` row in the same transaction; invalid → 400 `INVALID_DOMAIN`), optional `primaryGoal` (`SEO`/`CONTENT`/`GEO`/`ALL`). |
 | GET | `/user/projects/:id` | `project.read` |
 | PATCH | `/user/projects/:id` | `project.update` (status `ARCHIVED` instead of hard delete) |
 

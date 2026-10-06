@@ -122,6 +122,16 @@ enum ProjectStatus {
   @@map("project_status")
 }
 
+/// What the project is mainly for (Add Project wizard, step 1).
+enum ProjectGoal {
+  SEO
+  CONTENT
+  GEO
+  ALL
+
+  @@map("project_goal")
+}
+
 enum VerificationStatus {
   PENDING
   VERIFIED
@@ -736,6 +746,7 @@ model Project {
   name           String
   slug           String        @db.Citext
   status         ProjectStatus @default(ACTIVE)
+  primaryGoal    ProjectGoal?  @map("primary_goal")
   createdBy      String        @map("created_by") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
