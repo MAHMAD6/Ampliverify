@@ -83,6 +83,7 @@ Permissions, system roles and the feature registry are seeded **by migration**, 
 | `job_openings.department, compensation_text, summary, show_on_careers_page, application_deadline, require_resume, require_cover_letter, seo_title, meta_description, closed_at` | Job Opening Editor fields. |
 | `blog_posts/guides/help_articles.seo_title, meta_description, excerpt`; `blog_posts.featured_media_id` | Blog editor. |
 | `report_schedules.report_type`, `reports.schedule_id` | A schedule must know which report type to generate. |
+| `projects.primary_goal` (enum `project_goal`: SEO, CONTENT, GEO, ALL; nullable) | Add Project wizard "Primary Goal" (migration `20261006191720_project_primary_goal`). |
 
 "Scheduled" CMS content is `status = PUBLISHED` with a future `published_at`. Public queries must filter `status = 'PUBLISHED' AND published_at <= now()`.
 

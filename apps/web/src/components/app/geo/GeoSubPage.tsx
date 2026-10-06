@@ -4,6 +4,7 @@ import { StateView } from '@/components/ui/StateView';
 import { ProjectPicker } from '@/components/app/ProjectPicker';
 import { appCrumbs } from '@/lib/nav';
 import { getAppContext } from '@/lib/project';
+import { GeoSetup } from '@/components/app/ModuleSetup';
 import p from '@/components/app/pages.module.css';
 
 /**
@@ -21,6 +22,7 @@ export async function GeoSubPage({
   emptyTitle,
   emptyText,
   action,
+  setup = false,
 }: {
   title: string;
   description: string;
@@ -30,6 +32,8 @@ export async function GeoSubPage({
   emptyTitle: string;
   emptyText: string;
   action?: string;
+  /** Show the tracked-domain / prompts setup panel (Prompt Tracking). */
+  setup?: boolean;
 }) {
   const { projects, selectedProject } = await getAppContext();
   return (
@@ -51,6 +55,7 @@ export async function GeoSubPage({
           )}
         </div>
       </Card>
+      {setup && selectedProject && <GeoSetup project={selectedProject} />}
       <Panel title={tableTitle} bodyless actions={action ? <Button disabled>{action}</Button> : undefined}>
         <DataTable
           columns={columns}

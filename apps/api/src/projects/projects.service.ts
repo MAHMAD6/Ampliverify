@@ -1,9 +1,10 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Project } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RbacService } from '../rbac/rbac.service';
 import { AuditService } from '../audit/audit.service';
 import { RequestMeta } from '../common/types/request-meta.type';
+import { normalizeHost } from '../common/utils/domain';
 import { slugify } from '../common/utils/slug';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -15,6 +16,7 @@ const PROJECT_FIELDS = {
   name: true,
   slug: true,
   status: true,
+  primaryGoal: true,
   createdBy: true,
   createdAt: true,
   updatedAt: true,
@@ -74,6 +76,10 @@ export class ProjectsService {
     });
 
     const name = dto.name.trim();
+    const host = dto.domain === undefined || dto.domain.trim() === '' ? null : normalizeHost(dto.domain);
+    if (dto.domain !== undefined && dto.domain.trim() !== '' && !host) {
+      throw new BadRequestException({ code: 'INVALID_DOMAIN', message: 'Enter a valid domain, for example example.com.' });
+    }
     const slug = slugify(name, `project-${Date.now()}`);
     await this.assertSlugAvailable(workspace.id, slug);
 
@@ -84,10 +90,14 @@ export class ProjectsService {
           workspaceId: workspace.id,
           name,
           slug,
+          primaryGoal: dto.primaryGoal ?? null,
           createdBy: actorId,
         },
         select: PROJECT_FIELDS,
       });
+      if (host) {
+        await tx.domain.create({ data: { projectId: project.id, host, canonicalUrl: `https://${host}` } });
+      }
 
       await this.audit.record(
         {
@@ -97,12 +107,12 @@ export class ProjectsService {
           action: 'project.create',
           targetType: 'project',
           targetId: project.id,
-          afterState: this.auditState(project),
+          afterState: { ...this.auditState(project), primaryDomain: host },
           requestMeta,
         },
         tx,
       );
-      return project;
+      return { ...project, primaryDomain: host };
     });
   }
 
@@ -173,6 +183,7 @@ export class ProjectsService {
       name: project.name,
       slug: project.slug,
       status: project.status,
+      primaryGoal: project.primaryGoal,
     };
   }
 }

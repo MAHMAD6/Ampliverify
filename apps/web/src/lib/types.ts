@@ -74,4 +74,5 @@ export type Project = {
   updatedAt: string;
   /** Present on list responses: first domain added to the project. */
   primaryDomain?: string | null;
+  primaryGoal?: 'SEO' | 'CONTENT' | 'GEO' | 'ALL' | null;
 };

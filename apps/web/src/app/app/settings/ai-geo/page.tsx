@@ -1,14 +1,10 @@
-import { Settings } from 'lucide-react';
-import { EmptyState } from '@/components/ui';
+import { AiGeoPreferences } from '@/components/app/settings/AiGeoPreferences';
+import { LANGUAGES, LOCATIONS } from '@/components/app/keywords/config';
+import { apiList } from '@/lib/api';
 
 export const metadata = { title: 'AI & GEO Preferences · Settings' };
 
-export default function Page() {
-  return (
-    <>
-      <h2>AI & GEO Preferences</h2>
-      <p>Preferences for AI-assisted suggestions and AI search monitoring.</p>
-      <EmptyState icon={<Settings size={26} />} title="No settings to show yet" description="These settings will be available here soon." />
-    </>
-  );
+export default async function AiGeoPreferencesPage() {
+  const platforms = await apiList<{ key: string; name: string }>('/public/geo-platforms');
+  return <AiGeoPreferences platforms={platforms} locations={LOCATIONS} languages={LANGUAGES} />;
 }
