@@ -1,0 +1,19 @@
+{
+  "name": "ampliverify",
+  "private": true,
+  "description": "AmpliVerify — Audit • Optimize • Verify. Multi-tenant SEO / AI-search SaaS.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspace apps/api",
+    "test": "npm run test --workspace apps/api",
+    "test:db": "npm run test:db --workspace apps/api",
+    "typecheck": "npm run typecheck --workspace apps/api",
+    "db:migrate": "npm run db:migrate --workspace apps/api",
+    "db:deploy": "npm run db:deploy --workspace apps/api"
+  }
+}

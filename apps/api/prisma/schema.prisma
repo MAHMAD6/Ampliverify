@@ -1,0 +1,2452 @@
+// AmpliVerify — PostgreSQL + Prisma schema (NestJS API)
+//
+// Source of truth: docs/AmpliVerify_Database_Architecture_Implementation_Guide.pdf
+// (section 22 "Complete Table Catalog" / 22A "Table-by-Table Field Specification").
+//
+// Conventions (guide §2, §21):
+//   * PascalCase models mapped to snake_case tables/columns with @@map / @map.
+//   * UUID primary keys, timestamptz(6) timestamps in UTC.
+//   * Money is integer minor units (BigInt); credits/units are Decimal(18,4).
+//   * Financial, security and audit history uses onDelete: Restrict and is append-only.
+//   * Tenant boundary is workspace_id; project-scoped data resolves project -> workspace.
+//   * Secrets are never stored here — only *_ref pointers into secret/object storage.
+//
+// Things Prisma cannot express (partial indexes, append-only triggers, CHECK
+// constraints) live in the hand-written SQL at the end of the initial migration.
+// Additions beyond the guide's catalog are marked "ADDITION" with the reason.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// The guide fixes the first six; the remaining value sets are proposed here
+// and should be confirmed with product before the first production migration.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+
+  @@map("user_status")
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+
+  @@map("workspace_status")
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+
+  @@map("membership_status")
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+
+  @@map("run_status")
+}
+
+/// Scheduled content = PUBLISHED with published_at in the future. Public routes
+/// must filter status = PUBLISHED AND published_at <= now().
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@map("publish_status")
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+
+  @@map("subscription_status")
+}
+
+enum MfaType {
+  TOTP
+  WEBAUTHN
+  SMS
+  BACKUP_CODES
+
+  @@map("mfa_type")
+}
+
+/// Scope of a role assignment. Inheritance: GLOBAL > ORGANIZATION > WORKSPACE > PROJECT.
+enum ScopeType {
+  GLOBAL
+  ORGANIZATION
+  WORKSPACE
+  PROJECT
+
+  @@map("scope_type")
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+
+  @@map("organization_status")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+
+  @@map("project_status")
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+
+  @@map("verification_status")
+}
+
+enum ConnectionStatus {
+  PENDING
+  CONNECTED
+  ERROR
+  DISCONNECTED
+  REVOKED
+
+  @@map("connection_status")
+}
+
+enum RunTrigger {
+  MANUAL
+  SCHEDULED
+  API
+  SYSTEM
+
+  @@map("run_trigger")
+}
+
+enum FindingSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+
+  @@map("finding_severity")
+}
+
+enum FindingStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  IGNORED
+  REGRESSED
+
+  @@map("finding_status")
+}
+
+enum RecommendationSource {
+  RULE
+  AI
+  MANUAL
+
+  @@map("recommendation_source")
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  DISMISSED
+
+  @@map("task_status")
+}
+
+enum VerificationResult {
+  PASSED
+  FAILED
+  PARTIAL
+  INCONCLUSIVE
+
+  @@map("verification_result")
+}
+
+enum EditorStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+
+  @@map("editor_status")
+}
+
+enum SuggestionType {
+  CONTENT
+  STRUCTURE
+  KEYWORD
+  METADATA
+  LINK
+  READABILITY
+  TECHNICAL
+
+  @@map("suggestion_type")
+}
+
+enum SuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  DISMISSED
+  EXPIRED
+
+  @@map("suggestion_status")
+}
+
+enum ContentStatus {
+  DRAFT
+  PLANNED
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+  ARCHIVED
+
+  @@map("content_status")
+}
+
+enum GeoPromptStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+
+  @@map("geo_prompt_status")
+}
+
+enum ResultStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+
+  @@map("result_status")
+}
+
+enum ReportType {
+  SEO_AUDIT
+  KEYWORD
+  GEO_VISIBILITY
+  CONTENT
+  EXECUTIVE_SUMMARY
+  CUSTOM
+
+  @@map("report_type")
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+
+  @@map("plan_status")
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+
+  @@map("billing_interval")
+}
+
+enum EntitlementValueType {
+  BOOLEAN
+  LIMIT
+  CONFIG
+
+  @@map("entitlement_value_type")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+
+  @@map("invoice_status")
+}
+
+enum CreditReason {
+  PLAN_GRANT
+  PURCHASE
+  USAGE
+  ADJUSTMENT_CREDIT
+  ADJUSTMENT_DEBIT
+  PROMOTIONAL
+  REFUND
+  REVERSAL
+  EXPIRATION
+
+  @@map("credit_reason")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+
+  @@map("payment_status")
+}
+
+enum AdjustmentType {
+  CREDIT
+  DEBIT
+  PROMOTIONAL_CREDIT
+  CORRECTION
+
+  @@map("adjustment_type")
+}
+
+enum AdjustmentStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  APPLIED
+  REVERSED
+
+  @@map("adjustment_status")
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  WEBHOOK
+
+  @@map("notification_channel")
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+
+  @@map("delivery_status")
+}
+
+enum CmsContentType {
+  BLOG
+  GUIDE
+  HELP
+
+  @@map("cms_content_type")
+}
+
+enum JobStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+
+  @@map("job_status")
+}
+
+enum WorkArrangement {
+  REMOTE
+  HYBRID
+  ON_SITE
+
+  @@map("work_arrangement")
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  IN_REVIEW
+  INTERVIEWING
+  OFFERED
+  HIRED
+  REJECTED
+  WITHDRAWN
+
+  @@map("application_status")
+}
+
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+
+  @@map("scan_status")
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+
+  @@map("webhook_status")
+}
+
+enum JobRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  DEAD
+
+  @@map("job_run_status")
+}
+
+enum IncidentStatus {
+  INVESTIGATING
+  IDENTIFIED
+  MONITORING
+  RESOLVED
+
+  @@map("incident_status")
+}
+
+enum HealthStatus {
+  HEALTHY
+  DEGRADED
+  DOWN
+
+  @@map("health_status")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §4 Identity, workspace and RBAC
+// Better Auth may own its adapter tables; auth_* here hold only the
+// application-side fields the guide specifies.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id          String     @id @default(uuid()) @db.Uuid
+  /// Better Auth user id (JWT `sub`). Set by the trusted auth-sync endpoint.
+  authSubject String     @unique @map("auth_subject")
+  email       String     @unique @db.Citext
+  displayName String?    @map("display_name")
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?  @map("deleted_at") @db.Timestamptz(6)
+
+  authAccounts      AuthAccount[]
+  authSessions      AuthSession[]
+  mfaFactors        MfaFactor[]
+  passkeys          Passkey[]
+  orgMemberships    OrganizationMembership[]
+  memberships       WorkspaceMembership[]
+  roleAssignments   RoleAssignment[]               @relation("AssignmentUser")
+  assignmentsMade   RoleAssignment[]               @relation("AssignmentCreator")
+  organizationsMade Organization[]                 @relation("OrganizationCreator")
+  workspacesCreated Workspace[]                    @relation("WorkspaceCreator")
+  projectsCreated   Project[]                      @relation("ProjectCreator")
+  tasksAssigned     OptimizationTask[]             @relation("TaskAssignee")
+  editorDocuments   EditorDocument[]
+  editorVersions    EditorVersion[]
+  editorEvents      EditorChangeEvent[]
+  keywordQueries    KeywordQuery[]
+  keywordLists      KeywordList[]
+  geoPrompts        GeoPrompt[]
+  reports           Report[]
+  integrations      WorkspaceIntegration[]
+  notificationPrefs NotificationPreference[]
+  notifications     Notification[]
+  cmsAuthor         CmsAuthor?
+  mediaAssets       MediaAsset[]
+  hiringNotes       HiringNote[]
+  moduleControls    ModuleControl[]
+  systemSettings    SystemSetting[]
+  securitySettings  SecuritySetting[]
+  adminActivity     AdminActivity[]
+  adjustmentsAsked  CreditAdjustment[]             @relation("AdjustmentRequester")
+  adjustmentsSigned CreditAdjustment[]             @relation("AdjustmentApprover")
+  overridesCreated  WorkspaceEntitlementOverride[]
+
+  @@index([status])
+  @@map("users")
+}
+
+model AuthAccount {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  provider          String
+  providerAccountId String   @map("provider_account_id")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("auth_accounts")
+}
+
+/// Never store the raw session token — only its hash.
+model AuthSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  ipHash    String?   @map("ip_hash")
+  userAgent String?   @map("user_agent")
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("auth_sessions")
+}
+
+model MfaFactor {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       MfaType
+  /// Encrypted reference into secret storage — never the secret itself.
+  secretRef  String    @map("secret_ref")
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_factors")
+}
+
+model Passkey {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  credentialId String    @unique @map("credential_id")
+  publicKey    Bytes     @map("public_key")
+  counter      BigInt    @default(0)
+  transports   Json?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+/// ADDITION (Backend Batch 1): organizations group workspaces. The workspace
+/// remains the data tenant boundary (workspace_id on tenant-owned rows).
+model Organization {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String             @unique @db.Citext
+  status    OrganizationStatus @default(ACTIVE)
+  createdBy String             @map("created_by") @db.Uuid
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime?          @map("deleted_at") @db.Timestamptz(6)
+
+  creator         User                     @relation("OrganizationCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  memberships     OrganizationMembership[]
+  workspaces      Workspace[]
+  projects        Project[]
+  roleAssignments RoleAssignment[]
+
+  @@index([status])
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  status         MembershipStatus @default(ACTIVE)
+  joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId, status])
+  @@map("organization_memberships")
+}
+
+model Workspace {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  name           String
+  /// Unique within the organization.
+  slug           String          @db.Citext
+  status         WorkspaceStatus @default(ACTIVE)
+  createdBy      String          @map("created_by") @db.Uuid
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Grace-period marker for the policy-aware deletion workflow (§19).
+  deletedAt      DateTime?       @map("deleted_at") @db.Timestamptz(6)
+
+  organization         Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  creator              User                           @relation("WorkspaceCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  memberships          WorkspaceMembership[]
+  roleAssignments      RoleAssignment[]
+  projects             Project[]
+  billingCustomers     BillingCustomer[]
+  subscriptions        Subscription[]
+  invoices             Invoice[]
+  creditWallet         CreditWallet?
+  creditPurchases      CreditPurchase[]
+  creditAdjustments    CreditAdjustment[]
+  usageEvents          UsageEvent[]
+  entitlementOverrides WorkspaceEntitlementOverride[]
+  integrations         WorkspaceIntegration[]
+  notificationPrefs    NotificationPreference[]
+  notifications        Notification[]
+
+  @@unique([organizationId, slug])
+  /// Target of the projects composite FK (project org must match workspace org).
+  @@unique([id, organizationId])
+  @@index([status])
+  @@map("workspaces")
+}
+
+model WorkspaceMembership {
+  id          String           @id @default(uuid()) @db.Uuid
+  workspaceId String           @map("workspace_id") @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  status      MembershipStatus @default(ACTIVE)
+  joinedAt    DateTime         @default(now()) @map("joined_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId, status])
+  @@index([status])
+  @@map("workspace_memberships")
+}
+
+/// Roles are permission bundles. Where they apply is decided by the scope of
+/// each role_assignments row, not by the role itself (Backend Batch 1 model,
+/// replacing the guide's membership_roles junction).
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  name        String
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  permissions RolePermission[]
+  assignments RoleAssignment[]
+
+  @@index([isSystem])
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(uuid()) @db.Uuid
+  key         String @unique
+  description String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+/// Scoped grant of a role to a user. Exactly one target column is set for a
+/// non-GLOBAL scope (CHECK constraint), and at most one identical active
+/// assignment exists (partial unique index) — both in migration SQL.
+/// Revocation sets revoked_at; rows are never deleted.
+model RoleAssignment {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  roleId         String    @map("role_id") @db.Uuid
+  scopeType      ScopeType @map("scope_type")
+  organizationId String?   @map("organization_id") @db.Uuid
+  workspaceId    String?   @map("workspace_id") @db.Uuid
+  projectId      String?   @map("project_id") @db.Uuid
+  createdBy      String    @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+
+  user         User          @relation("AssignmentUser", fields: [userId], references: [id], onDelete: Cascade)
+  role         Role          @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  creator      User          @relation("AssignmentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workspace    Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([roleId])
+  @@index([organizationId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@map("role_assignments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §5 Projects, domains and pages
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Project {
+  id             String        @id @default(uuid()) @db.Uuid
+  /// Denormalized for scope checks; composite FK keeps it equal to the workspace's org.
+  organizationId String        @map("organization_id") @db.Uuid
+  workspaceId    String        @map("workspace_id") @db.Uuid
+  name           String
+  slug           String        @db.Citext
+  status         ProjectStatus @default(ACTIVE)
+  createdBy      String        @map("created_by") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz(6)
+
+  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workspace         Workspace               @relation(fields: [workspaceId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  creator           User                    @relation("ProjectCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  settings          ProjectSetting?
+  dataSources       ProjectDataSource[]
+  domains           Domain[]
+  auditRuns         AuditRun[]
+  optimizationTasks OptimizationTask[]
+  editorDocuments   EditorDocument[]
+  contentIdeas      ContentIdea[]
+  contentBriefs     ContentBrief[]
+  contentPlans      ContentPlan[]
+  keywordQueries    KeywordQuery[]
+  keywordLists      KeywordList[]
+  keywordClusters   KeywordCluster[]
+  geoPrompts        GeoPrompt[]
+  geoCompetitors    GeoCompetitor[]
+  geoVisibility     GeoVisibilitySnapshot[]
+  geoOpportunities  GeoOpportunity[]
+  reports           Report[]
+  reportSchedules   ReportSchedule[]
+  usageEvents       UsageEvent[]
+  roleAssignments   RoleAssignment[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, status, createdAt(sort: Desc)])
+  @@index([organizationId])
+  @@map("projects")
+}
+
+model Domain {
+  id                 String             @id @default(uuid()) @db.Uuid
+  projectId          String             @map("project_id") @db.Uuid
+  /// Normalized host (lower-case, no scheme/port/trailing dot).
+  host               String             @db.Citext
+  canonicalUrl       String             @map("canonical_url")
+  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pages     Page[]
+  auditRuns AuditRun[]
+
+  @@unique([projectId, host])
+  @@map("domains")
+}
+
+model Page {
+  id           String    @id @default(uuid()) @db.Uuid
+  domainId     String    @map("domain_id") @db.Uuid
+  /// Normalized URL used for uniqueness; the fetched form is canonical_url.
+  url          String
+  canonicalUrl String?   @map("canonical_url")
+  httpStatus   Int?      @map("http_status")
+  lastSeenAt   DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  contentHash  String?   @map("content_hash")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  domain          Domain           @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  auditPages      AuditPage[]
+  editorDocuments EditorDocument[]
+
+  @@unique([domainId, url])
+  @@index([domainId, lastSeenAt])
+  @@map("pages")
+}
+
+model ProjectSetting {
+  projectId   String   @id @map("project_id") @db.Uuid
+  locale      String   @default("en")
+  timezone    String   @default("UTC")
+  crawlConfig Json?    @map("crawl_config")
+  seoDefaults Json?    @map("seo_defaults")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_settings")
+}
+
+model ProjectDataSource {
+  id                     String           @id @default(uuid()) @db.Uuid
+  projectId              String           @map("project_id") @db.Uuid
+  workspaceIntegrationId String           @map("workspace_integration_id") @db.Uuid
+  sourceType             String           @map("source_type")
+  status                 ConnectionStatus @default(PENDING)
+  createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project              Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workspaceIntegration WorkspaceIntegration @relation(fields: [workspaceIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, workspaceIntegrationId, sourceType])
+  @@index([projectId, status])
+  @@map("project_data_sources")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §6 SEO audit and optimization — runs are historical, never overwritten.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditRun {
+  id          String     @id @default(uuid()) @db.Uuid
+  projectId   String     @map("project_id") @db.Uuid
+  domainId    String?    @map("domain_id") @db.Uuid
+  status      RunStatus  @default(QUEUED)
+  trigger     RunTrigger
+  startedAt   DateTime   @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime?  @map("completed_at") @db.Timestamptz(6)
+  summaryJson Json?      @map("summary_json")
+
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  domain           Domain?           @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  pages            AuditPage[]
+  verificationRuns VerificationRun[]
+
+  @@index([projectId, status, startedAt(sort: Desc)])
+  @@index([projectId, startedAt(sort: Desc)])
+  @@map("audit_runs")
+}
+
+model AuditPage {
+  id          String   @id @default(uuid()) @db.Uuid
+  auditRunId  String   @map("audit_run_id") @db.Uuid
+  pageId      String   @map("page_id") @db.Uuid
+  score       Decimal? @db.Decimal(6, 2)
+  metricsJson Json?    @map("metrics_json")
+
+  auditRun AuditRun       @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  page     Page           @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  findings AuditFinding[]
+
+  @@unique([auditRunId, pageId])
+  @@index([pageId])
+  @@map("audit_pages")
+}
+
+model AuditFinding {
+  id          String          @id @default(uuid()) @db.Uuid
+  auditPageId String          @map("audit_page_id") @db.Uuid
+  ruleKey     String          @map("rule_key")
+  severity    FindingSeverity
+  status      FindingStatus   @default(OPEN)
+  /// Stable hash of page + rule + context to recognize recurrence across runs.
+  fingerprint String
+  detailsJson Json?           @map("details_json")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  auditPage         AuditPage             @relation(fields: [auditPageId], references: [id], onDelete: Cascade)
+  recommendations   AuditRecommendation[]
+  events            FindingEvent[]
+  optimizationTasks OptimizationTask[]
+
+  @@unique([auditPageId, fingerprint])
+  @@index([auditPageId, severity, status, ruleKey])
+  @@index([fingerprint])
+  @@map("audit_findings")
+}
+
+model AuditRecommendation {
+  id        String               @id @default(uuid()) @db.Uuid
+  findingId String               @map("finding_id") @db.Uuid
+  priority  Int                  @db.SmallInt
+  title     String
+  guidance  String
+  source    RecommendationSource
+
+  finding AuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@index([findingId, priority])
+  @@map("audit_recommendations")
+}
+
+/// Append-only finding lifecycle history.
+model FindingEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  findingId   String   @map("finding_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  eventType   String   @map("event_type")
+  payload     Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  finding AuditFinding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@index([findingId, createdAt])
+  @@map("finding_events")
+}
+
+model OptimizationTask {
+  id         String     @id @default(uuid()) @db.Uuid
+  projectId  String     @map("project_id") @db.Uuid
+  findingId  String?    @map("finding_id") @db.Uuid
+  assignedTo String?    @map("assigned_to") @db.Uuid
+  title      String
+  status     TaskStatus @default(OPEN)
+  priority   Int        @db.SmallInt
+  dueAt      DateTime?  @map("due_at") @db.Timestamptz(6)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  finding          AuditFinding?     @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  assignee         User?             @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  verificationRuns VerificationRun[]
+
+  @@index([projectId, status, assignedTo])
+  @@index([assignedTo])
+  @@map("optimization_tasks")
+}
+
+/// Append-only verification history.
+model VerificationRun {
+  id           String              @id @default(uuid()) @db.Uuid
+  taskId       String              @map("task_id") @db.Uuid
+  auditRunId   String?             @map("audit_run_id") @db.Uuid
+  status       RunStatus           @default(QUEUED)
+  result       VerificationResult?
+  evidenceJson Json?               @map("evidence_json")
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  task     OptimizationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  auditRun AuditRun?        @relation(fields: [auditRunId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt(sort: Desc)])
+  @@map("verification_runs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §7 SEO editor and content strategy
+// ─────────────────────────────────────────────────────────────────────────────
+
+model EditorDocument {
+  id        String       @id @default(uuid()) @db.Uuid
+  projectId String       @map("project_id") @db.Uuid
+  pageId    String?      @map("page_id") @db.Uuid
+  title     String
+  status    EditorStatus @default(DRAFT)
+  createdBy String       @map("created_by") @db.Uuid
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project  Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  page     Page?               @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  creator  User                @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  versions EditorVersion[]
+  events   EditorChangeEvent[]
+
+  @@index([projectId, pageId, status])
+  @@map("editor_documents")
+}
+
+/// Immutable snapshot. Large bodies live in object storage (content_ref).
+model EditorVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentId  String   @map("document_id") @db.Uuid
+  versionNo   Int      @map("version_no")
+  contentRef  String   @map("content_ref")
+  contentHash String   @map("content_hash")
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document    EditorDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  creator     User               @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  suggestions EditorSuggestion[]
+
+  @@unique([documentId, versionNo(sort: Desc)])
+  @@map("editor_versions")
+}
+
+/// Advisory AI/rule suggestion; accepted/rejected history is never overwritten.
+model EditorSuggestion {
+  id             String           @id @default(uuid()) @db.Uuid
+  versionId      String           @map("version_id") @db.Uuid
+  type           SuggestionType
+  status         SuggestionStatus @default(PENDING)
+  suggestionJson Json             @map("suggestion_json")
+  modelRef       String?          @map("model_ref")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  decidedAt      DateTime?        @map("decided_at") @db.Timestamptz(6)
+
+  version EditorVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, status, type])
+  @@map("editor_suggestions")
+}
+
+/// Append-only editor audit trail.
+model EditorChangeEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentId  String   @map("document_id") @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  action      String
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document EditorDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actor    User           @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([documentId, createdAt])
+  @@map("editor_change_events")
+}
+
+model ContentIdea {
+  id        String        @id @default(uuid()) @db.Uuid
+  projectId String        @map("project_id") @db.Uuid
+  title     String
+  status    ContentStatus @default(DRAFT)
+  source    String
+  metadata  Json?
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@map("content_ideas")
+}
+
+model ContentBrief {
+  id               String        @id @default(uuid()) @db.Uuid
+  projectId        String        @map("project_id") @db.Uuid
+  title            String
+  primaryKeywordId String?       @map("primary_keyword_id") @db.Uuid
+  briefJson        Json?         @map("brief_json")
+  status           ContentStatus @default(DRAFT)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  primaryKeyword Keyword?          @relation(fields: [primaryKeywordId], references: [id], onDelete: SetNull)
+  planItems      ContentPlanItem[]
+
+  @@index([projectId, status])
+  @@map("content_briefs")
+}
+
+model ContentPlan {
+  id        String        @id @default(uuid()) @db.Uuid
+  projectId String        @map("project_id") @db.Uuid
+  name      String
+  status    ContentStatus @default(DRAFT)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   ContentPlanItem[]
+
+  @@index([projectId, status])
+  @@map("content_plans")
+}
+
+model ContentPlanItem {
+  id         String        @id @default(uuid()) @db.Uuid
+  planId     String        @map("plan_id") @db.Uuid
+  briefId    String?       @map("brief_id") @db.Uuid
+  title      String
+  status     ContentStatus @default(PLANNED)
+  targetDate DateTime?     @map("target_date") @db.Date
+
+  plan  ContentPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  brief ContentBrief? @relation(fields: [briefId], references: [id], onDelete: SetNull)
+
+  @@index([planId, status, targetDate])
+  @@map("content_plan_items")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §8 Keyword research and SERP — metrics are time-series snapshots.
+// keywords / keyword_metric_snapshots / serp_* are a shared, non-tenant
+// dictionary; tenant ownership comes from keyword_queries/lists/clusters.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model KeywordQuery {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  query       String
+  locale      String
+  countryCode String   @map("country_code") @db.Char(2)
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User    @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("keyword_queries")
+}
+
+model Keyword {
+  id             String @id @default(uuid()) @db.Uuid
+  normalizedTerm String @map("normalized_term") @db.Citext
+  locale         String
+  countryCode    String @map("country_code") @db.Char(2)
+
+  metricSnapshots KeywordMetricSnapshot[]
+  listItems       KeywordListItem[]
+  clusterItems    KeywordClusterItem[]
+  serpSnapshots   SerpSnapshot[]
+  contentBriefs   ContentBrief[]
+
+  @@unique([normalizedTerm, locale, countryCode])
+  @@index([normalizedTerm])
+  @@map("keywords")
+}
+
+model KeywordMetricSnapshot {
+  id           String   @id @default(uuid()) @db.Uuid
+  keywordId    String   @map("keyword_id") @db.Uuid
+  provider     String
+  searchVolume Int?     @map("search_volume")
+  difficulty   Decimal? @db.Decimal(6, 2)
+  /// CPC in the provider's major currency unit as reported (not billing money).
+  cpc          Decimal? @db.Decimal(12, 4)
+  capturedAt   DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  keyword Keyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@index([keywordId, capturedAt(sort: Desc)])
+  @@map("keyword_metric_snapshots")
+}
+
+model KeywordList {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  name      String
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator User              @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  items   KeywordListItem[]
+
+  @@unique([projectId, name])
+  @@map("keyword_lists")
+}
+
+model KeywordListItem {
+  listId    String   @map("list_id") @db.Uuid
+  keywordId String   @map("keyword_id") @db.Uuid
+  addedAt   DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  list    KeywordList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  keyword Keyword     @relation(fields: [keywordId], references: [id], onDelete: Restrict)
+
+  @@id([listId, keywordId])
+  @@index([keywordId])
+  @@map("keyword_list_items")
+}
+
+model KeywordCluster {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  label     String
+  method    String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   KeywordClusterItem[]
+
+  @@index([projectId])
+  @@map("keyword_clusters")
+}
+
+model KeywordClusterItem {
+  clusterId String   @map("cluster_id") @db.Uuid
+  keywordId String   @map("keyword_id") @db.Uuid
+  score     Decimal? @db.Decimal(8, 4)
+
+  cluster KeywordCluster @relation(fields: [clusterId], references: [id], onDelete: Cascade)
+  keyword Keyword        @relation(fields: [keywordId], references: [id], onDelete: Restrict)
+
+  @@id([clusterId, keywordId])
+  @@index([keywordId])
+  @@map("keyword_cluster_items")
+}
+
+model SerpSnapshot {
+  id         String   @id @default(uuid()) @db.Uuid
+  keywordId  String   @map("keyword_id") @db.Uuid
+  provider   String
+  locale     String
+  capturedAt DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  keyword Keyword      @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  results SerpResult[]
+
+  @@index([keywordId, capturedAt(sort: Desc)])
+  @@map("serp_snapshots")
+}
+
+model SerpResult {
+  id         String  @id @default(uuid()) @db.Uuid
+  snapshotId String  @map("snapshot_id") @db.Uuid
+  position   Int
+  url        String
+  domain     String  @db.Citext
+  title      String?
+  resultType String  @map("result_type")
+
+  snapshot SerpSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, position, resultType, url])
+  @@index([snapshotId, position])
+  @@index([domain])
+  @@map("serp_results")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §9 AI Search / GEO — prompt -> run -> platform result -> mentions/citations.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Backend-configured registry; the frontend must not hard-code platforms.
+model GeoPlatform {
+  id           String  @id @default(uuid()) @db.Uuid
+  key          String  @unique
+  name         String
+  isActive     Boolean @default(true) @map("is_active")
+  capabilities Json?
+
+  results    GeoPlatformResult[]
+  visibility GeoVisibilitySnapshot[]
+
+  @@index([isActive])
+  @@map("geo_platforms")
+}
+
+model GeoPrompt {
+  id        String          @id @default(uuid()) @db.Uuid
+  projectId String          @map("project_id") @db.Uuid
+  prompt    String
+  status    GeoPromptStatus @default(ACTIVE)
+  createdBy String          @map("created_by") @db.Uuid
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  creator   User                @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  schedules GeoPromptSchedule[]
+  runs      GeoRun[]
+
+  @@index([projectId, status])
+  @@map("geo_prompts")
+}
+
+model GeoPromptSchedule {
+  id        String   @id @default(uuid()) @db.Uuid
+  promptId  String   @map("prompt_id") @db.Uuid
+  cadence   String
+  timezone  String   @default("UTC")
+  nextRunAt DateTime @map("next_run_at") @db.Timestamptz(6)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  prompt GeoPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  // Partial index on next_run_at WHERE enabled is created in SQL.
+  @@index([promptId])
+  @@map("geo_prompt_schedules")
+}
+
+model GeoRun {
+  id          String     @id @default(uuid()) @db.Uuid
+  promptId    String     @map("prompt_id") @db.Uuid
+  status      RunStatus  @default(QUEUED)
+  trigger     RunTrigger
+  startedAt   DateTime   @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime?  @map("completed_at") @db.Timestamptz(6)
+  creditCost  Decimal?   @map("credit_cost") @db.Decimal(18, 4)
+
+  prompt          GeoPrompt           @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  platformResults GeoPlatformResult[]
+  opportunities   GeoOpportunity[]
+
+  @@index([promptId, startedAt(sort: Desc), status])
+  @@map("geo_runs")
+}
+
+model GeoPlatformResult {
+  id           String       @id @default(uuid()) @db.Uuid
+  runId        String       @map("run_id") @db.Uuid
+  platformId   String       @map("platform_id") @db.Uuid
+  /// Object-storage reference to the raw provider response.
+  responseRef  String?      @map("response_ref")
+  responseHash String?      @map("response_hash")
+  status       ResultStatus @default(PENDING)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  run                GeoRun                 @relation(fields: [runId], references: [id], onDelete: Cascade)
+  platform           GeoPlatform            @relation(fields: [platformId], references: [id], onDelete: Restrict)
+  mentions           GeoMention[]
+  citations          GeoCitation[]
+  competitorMentions GeoCompetitorMention[]
+
+  @@unique([runId, platformId])
+  @@index([runId, platformId, status])
+  @@map("geo_platform_results")
+}
+
+model GeoMention {
+  id           String  @id @default(uuid()) @db.Uuid
+  resultId     String  @map("result_id") @db.Uuid
+  entity       String
+  mentionType  String  @map("mention_type")
+  positionHint Int?    @map("position_hint")
+  sentiment    String?
+
+  result GeoPlatformResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@index([resultId, entity])
+  @@map("geo_mentions")
+}
+
+model GeoSource {
+  id           String   @id @default(uuid()) @db.Uuid
+  canonicalUrl String   @unique @map("canonical_url")
+  domain       String   @db.Citext
+  title        String?
+  firstSeenAt  DateTime @default(now()) @map("first_seen_at") @db.Timestamptz(6)
+
+  citations GeoCitation[]
+
+  @@index([domain])
+  @@map("geo_sources")
+}
+
+model GeoCitation {
+  id               String  @id @default(uuid()) @db.Uuid
+  resultId         String  @map("result_id") @db.Uuid
+  sourceId         String  @map("source_id") @db.Uuid
+  rank             Int?
+  citationTextHash String? @map("citation_text_hash")
+
+  result GeoPlatformResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  source GeoSource         @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@unique([resultId, sourceId, rank])
+  @@index([resultId])
+  @@index([sourceId])
+  @@map("geo_citations")
+}
+
+model GeoCompetitor {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  name      String
+  domain    String?  @db.Citext
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project  Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mentions GeoCompetitorMention[]
+
+  @@unique([projectId, name])
+  @@index([projectId, status])
+  @@map("geo_competitors")
+}
+
+model GeoCompetitorMention {
+  id           String @id @default(uuid()) @db.Uuid
+  resultId     String @map("result_id") @db.Uuid
+  competitorId String @map("competitor_id") @db.Uuid
+  positionHint Int?   @map("position_hint")
+
+  result     GeoPlatformResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  competitor GeoCompetitor     @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  @@unique([resultId, competitorId])
+  @@index([competitorId])
+  @@map("geo_competitor_mentions")
+}
+
+/// Append-only derived data. Trend arrows need >= 2 comparable observations.
+model GeoVisibilitySnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  platformId  String   @map("platform_id") @db.Uuid
+  metricKey   String   @map("metric_key")
+  metricValue Decimal  @map("metric_value") @db.Decimal(18, 4)
+  capturedAt  DateTime @default(now()) @map("captured_at") @db.Timestamptz(6)
+
+  project  Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  platform GeoPlatform @relation(fields: [platformId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, platformId, capturedAt(sort: Desc)])
+  @@map("geo_visibility_snapshots")
+}
+
+model GeoOpportunity {
+  id          String     @id @default(uuid()) @db.Uuid
+  projectId   String     @map("project_id") @db.Uuid
+  runId       String?    @map("run_id") @db.Uuid
+  type        String
+  priority    Int        @db.SmallInt
+  status      TaskStatus @default(OPEN)
+  detailsJson Json?      @map("details_json")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  run     GeoRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, priority])
+  @@map("geo_opportunities")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §10 Reports — scheduling is a trigger that creates ordinary reports.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Report {
+  id          String     @id @default(uuid()) @db.Uuid
+  projectId   String     @map("project_id") @db.Uuid
+  scheduleId  String?    @map("schedule_id") @db.Uuid
+  type        ReportType
+  status      RunStatus  @default(QUEUED)
+  title       String
+  periodStart DateTime?  @map("period_start") @db.Date
+  periodEnd   DateTime?  @map("period_end") @db.Date
+  createdBy   String?    @map("created_by") @db.Uuid
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  schedule ReportSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  creator  User?           @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  sections ReportSection[]
+  files    ReportFile[]
+  shares   ReportShare[]
+
+  @@index([projectId, status, createdAt(sort: Desc)])
+  @@map("reports")
+}
+
+model ReportSection {
+  id         String @id @default(uuid()) @db.Uuid
+  reportId   String @map("report_id") @db.Uuid
+  sectionKey String @map("section_key")
+  position   Int
+  payload    Json
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, sectionKey])
+  @@index([reportId, position])
+  @@map("report_sections")
+}
+
+model ReportFile {
+  id         String   @id @default(uuid()) @db.Uuid
+  reportId   String   @map("report_id") @db.Uuid
+  format     String
+  storageKey String   @unique @map("storage_key")
+  sizeBytes  BigInt   @map("size_bytes")
+  checksum   String
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_files")
+}
+
+model ReportSchedule {
+  id         String     @id @default(uuid()) @db.Uuid
+  projectId  String     @map("project_id") @db.Uuid
+  name       String
+  reportType ReportType @map("report_type")
+  cadence    String
+  timezone   String     @default("UTC")
+  nextRunAt  DateTime   @map("next_run_at") @db.Timestamptz(6)
+  enabled    Boolean    @default(true)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reports Report[]
+
+  // Partial index on next_run_at WHERE enabled is created in SQL.
+  @@index([projectId])
+  @@map("report_schedules")
+}
+
+/// Share tokens are random, stored hashed, revocable and optionally expiring.
+model ReportShare {
+  id        String    @id @default(uuid()) @db.Uuid
+  reportId  String    @map("report_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId, expiresAt])
+  @@map("report_shares")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §11 Usage and credits — credit_ledger is the financial source of truth.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CreditWallet {
+  id           String   @id @default(uuid()) @db.Uuid
+  workspaceId  String   @unique @map("workspace_id") @db.Uuid
+  /// Convenience cache; must always reconcile to SUM(credit_ledger.delta).
+  balanceCache Decimal  @default(0) @map("balance_cache") @db.Decimal(18, 4)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  entries   CreditLedger[]
+
+  @@map("credit_wallets")
+}
+
+/// Append-only (UPDATE/DELETE blocked by trigger). Corrections are new
+/// REVERSAL entries referencing the original.
+model CreditLedger {
+  id             String       @id @default(uuid()) @db.Uuid
+  walletId       String       @map("wallet_id") @db.Uuid
+  delta          Decimal      @db.Decimal(18, 4)
+  reason         CreditReason
+  referenceType  String?      @map("reference_type")
+  referenceId    String?      @map("reference_id") @db.Uuid
+  idempotencyKey String       @unique @map("idempotency_key")
+  createdBy      String?      @map("created_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  wallet CreditWallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@index([referenceType, referenceId])
+  @@map("credit_ledger")
+}
+
+model CreditPurchase {
+  id                String        @id @default(uuid()) @db.Uuid
+  workspaceId       String        @map("workspace_id") @db.Uuid
+  providerPaymentId String        @unique @map("provider_payment_id")
+  credits           Decimal       @db.Decimal(18, 4)
+  amountMinor       BigInt        @map("amount_minor")
+  currency          String        @db.Char(3)
+  status            PaymentStatus @default(PENDING)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, status])
+  @@map("credit_purchases")
+}
+
+/// ADDITION: Super Admin "Credits & Adjustments" requires reason codes, internal
+/// notes, secondary approval and reversals before a ledger entry is written.
+/// An adjustment becomes APPLIED only once its ledger entry exists.
+model CreditAdjustment {
+  id                   String           @id @default(uuid()) @db.Uuid
+  workspaceId          String           @map("workspace_id") @db.Uuid
+  type                 AdjustmentType
+  /// Signed credit amount to apply (positive = credit, negative = debit).
+  amount               Decimal          @db.Decimal(18, 4)
+  reasonCode           String           @map("reason_code")
+  internalNote         String           @map("internal_note")
+  status               AdjustmentStatus @default(PENDING_REVIEW)
+  requestedBy          String           @map("requested_by") @db.Uuid
+  approvedBy           String?          @map("approved_by") @db.Uuid
+  approvedAt           DateTime?        @map("approved_at") @db.Timestamptz(6)
+  ledgerEntryId        String?          @unique @map("ledger_entry_id") @db.Uuid
+  reversesAdjustmentId String?          @unique @map("reverses_adjustment_id") @db.Uuid
+  balanceBefore        Decimal?         @map("balance_before") @db.Decimal(18, 4)
+  balanceAfter         Decimal?         @map("balance_after") @db.Decimal(18, 4)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  requester  User              @relation("AdjustmentRequester", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approver   User?             @relation("AdjustmentApprover", fields: [approvedBy], references: [id], onDelete: Restrict)
+  reverses   CreditAdjustment? @relation("AdjustmentReversal", fields: [reversesAdjustmentId], references: [id], onDelete: Restrict)
+  reversedBy CreditAdjustment? @relation("AdjustmentReversal")
+
+  @@index([workspaceId, status, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("credit_adjustments")
+}
+
+model UsageEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  projectId      String?  @map("project_id") @db.Uuid
+  featureKey     String   @map("feature_key")
+  units          Decimal  @db.Decimal(18, 4)
+  idempotencyKey String   @unique @map("idempotency_key")
+  occurredAt     DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  workspace     Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  project       Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  providerUsage ProviderUsage[]
+
+  @@index([workspaceId, featureKey, occurredAt(sort: Desc)])
+  @@map("usage_events")
+}
+
+/// Append-only provider cost telemetry.
+model ProviderUsage {
+  id           String   @id @default(uuid()) @db.Uuid
+  usageEventId String?  @map("usage_event_id") @db.Uuid
+  provider     String
+  operation    String
+  inputUnits   Decimal? @map("input_units") @db.Decimal(18, 4)
+  outputUnits  Decimal? @map("output_units") @db.Decimal(18, 4)
+  costMinor    BigInt?  @map("cost_minor")
+  currency     String?  @db.Char(3)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  usageEvent UsageEvent? @relation(fields: [usageEventId], references: [id], onDelete: SetNull)
+
+  @@index([provider, operation, createdAt(sort: Desc)])
+  @@index([usageEventId])
+  @@map("provider_usage")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §12 Billing, pricing and entitlements
+// Stripe/provider is payment authority; AmpliVerify is entitlement authority.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Plan {
+  id           String     @id @default(uuid()) @db.Uuid
+  code         String     @unique
+  name         String
+  description  String?
+  status       PlanStatus @default(DRAFT)
+  /// Whether the public Pricing page may list this plan.
+  isPublic     Boolean    @default(false) @map("is_public")
+  displayOrder Int        @default(0) @map("display_order")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  prices        PlanPrice[]
+  entitlements  PlanEntitlement[]
+  subscriptions Subscription[]
+
+  @@index([status, displayOrder])
+  @@map("plans")
+}
+
+/// At most one active price per (plan, interval, currency) — partial unique
+/// index in SQL. Inactive prices are retained for history.
+model PlanPrice {
+  id              String          @id @default(uuid()) @db.Uuid
+  planId          String          @map("plan_id") @db.Uuid
+  billingInterval BillingInterval @map("billing_interval")
+  currency        String          @db.Char(3)
+  amountMinor     BigInt          @map("amount_minor")
+  providerPriceId String?         @unique @map("provider_price_id")
+  active          Boolean         @default(true)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  plan              Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  subscriptionItems SubscriptionItem[]
+
+  @@index([planId, active])
+  @@map("plan_prices")
+}
+
+model Feature {
+  id          String               @id @default(uuid()) @db.Uuid
+  key         String               @unique
+  name        String
+  /// Module grouping for the Feature Entitlements matrix filter.
+  moduleKey   String?              @map("module_key")
+  description String?
+  valueType   EntitlementValueType @map("value_type")
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  entitlements PlanEntitlement[]
+  overrides    WorkspaceEntitlementOverride[]
+
+  @@index([moduleKey])
+  @@map("features")
+}
+
+model PlanEntitlement {
+  id           String   @id @default(uuid()) @db.Uuid
+  planId       String   @map("plan_id") @db.Uuid
+  featureId    String   @map("feature_id") @db.Uuid
+  enabled      Boolean  @default(false)
+  limitNumeric Decimal? @map("limit_numeric") @db.Decimal(18, 4)
+  configJson   Json?    @map("config_json")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  feature Feature @relation(fields: [featureId], references: [id], onDelete: Restrict)
+
+  @@unique([planId, featureId])
+  @@index([featureId])
+  @@map("plan_entitlements")
+}
+
+/// ADDITION: Feature Entitlements screen calls for explicit, time-bounded
+/// organization-specific overrides on top of plan entitlements.
+model WorkspaceEntitlementOverride {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  featureId    String    @map("feature_id") @db.Uuid
+  enabled      Boolean
+  limitNumeric Decimal?  @map("limit_numeric") @db.Decimal(18, 4)
+  configJson   Json?     @map("config_json")
+  reason       String
+  startsAt     DateTime  @default(now()) @map("starts_at") @db.Timestamptz(6)
+  endsAt       DateTime? @map("ends_at") @db.Timestamptz(6)
+  createdBy    String    @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  feature   Feature   @relation(fields: [featureId], references: [id], onDelete: Restrict)
+  creator   User      @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, featureId, startsAt(sort: Desc)])
+  @@map("workspace_entitlement_overrides")
+}
+
+model BillingCustomer {
+  id                 String   @id @default(uuid()) @db.Uuid
+  workspaceId        String   @map("workspace_id") @db.Uuid
+  provider           String
+  providerCustomerId String   @map("provider_customer_id")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerCustomerId])
+  @@unique([workspaceId, provider])
+  @@map("billing_customers")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  workspaceId            String             @map("workspace_id") @db.Uuid
+  planId                 String             @map("plan_id") @db.Uuid
+  providerSubscriptionId String?            @unique @map("provider_subscription_id")
+  status                 SubscriptionStatus
+  currentPeriodStart     DateTime           @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd       DateTime           @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd      Boolean            @default(false) @map("cancel_at_period_end")
+  canceledAt             DateTime?          @map("canceled_at") @db.Timestamptz(6)
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  plan      Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  items     SubscriptionItem[]
+  invoices  Invoice[]
+
+  @@index([workspaceId, status])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model SubscriptionItem {
+  id             String @id @default(uuid()) @db.Uuid
+  subscriptionId String @map("subscription_id") @db.Uuid
+  planPriceId    String @map("plan_price_id") @db.Uuid
+  quantity       Int    @default(1)
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  planPrice    PlanPrice    @relation(fields: [planPriceId], references: [id], onDelete: Restrict)
+
+  @@unique([subscriptionId, planPriceId])
+  @@map("subscription_items")
+}
+
+model Invoice {
+  id                String        @id @default(uuid()) @db.Uuid
+  subscriptionId    String?       @map("subscription_id") @db.Uuid
+  workspaceId       String        @map("workspace_id") @db.Uuid
+  providerInvoiceId String        @unique @map("provider_invoice_id")
+  status            InvoiceStatus
+  currency          String        @db.Char(3)
+  totalMinor        BigInt        @map("total_minor")
+  issuedAt          DateTime?     @map("issued_at") @db.Timestamptz(6)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  lines        InvoiceLine[]
+
+  @@index([workspaceId, status, issuedAt(sort: Desc)])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid()) @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  description String
+  amountMinor BigInt   @map("amount_minor")
+  quantity    Decimal? @db.Decimal(18, 4)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+/// Normalized billing/payment webhook history.
+model PaymentEvent {
+  id              String   @id @default(uuid()) @db.Uuid
+  workspaceId     String?  @map("workspace_id") @db.Uuid
+  provider        String
+  providerEventId String   @map("provider_event_id")
+  eventType       String   @map("event_type")
+  payloadRef      String?  @map("payload_ref")
+  receivedAt      DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+
+  @@unique([provider, providerEventId])
+  @@index([receivedAt, eventType])
+  @@index([workspaceId])
+  @@map("payment_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §13 Integrations and notifications
+// ─────────────────────────────────────────────────────────────────────────────
+
+model IntegrationProvider {
+  id         String   @id @default(uuid()) @db.Uuid
+  key        String   @unique
+  name       String
+  authType   String   @map("auth_type")
+  active     Boolean  @default(true)
+  scopesJson Json?    @map("scopes_json")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspaceIntegrations WorkspaceIntegration[]
+
+  @@index([active])
+  @@map("integration_providers")
+}
+
+model WorkspaceIntegration {
+  id                 String           @id @default(uuid()) @db.Uuid
+  workspaceId        String           @map("workspace_id") @db.Uuid
+  providerId         String           @map("provider_id") @db.Uuid
+  status             ConnectionStatus @default(PENDING)
+  externalAccountRef String?          @map("external_account_ref")
+  connectedBy        String           @map("connected_by") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider    IntegrationProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  connector   User                @relation(fields: [connectedBy], references: [id], onDelete: Restrict)
+  tokens      IntegrationToken[]
+  syncRuns    SyncRun[]
+  dataSources ProjectDataSource[]
+
+  @@index([workspaceId, providerId, status])
+  @@map("workspace_integrations")
+}
+
+/// Secret references only — never plaintext tokens. Exclude from normal queries.
+model IntegrationToken {
+  id                     String    @id @default(uuid()) @db.Uuid
+  workspaceIntegrationId String    @map("workspace_integration_id") @db.Uuid
+  accessSecretRef        String    @map("access_secret_ref")
+  refreshSecretRef       String?   @map("refresh_secret_ref")
+  expiresAt              DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspaceIntegration WorkspaceIntegration @relation(fields: [workspaceIntegrationId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceIntegrationId])
+  @@map("integration_tokens")
+}
+
+model SyncRun {
+  id                     String    @id @default(uuid()) @db.Uuid
+  workspaceIntegrationId String    @map("workspace_integration_id") @db.Uuid
+  syncType               String    @map("sync_type")
+  status                 RunStatus @default(QUEUED)
+  startedAt              DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt            DateTime? @map("completed_at") @db.Timestamptz(6)
+  errorCode              String?   @map("error_code")
+
+  workspaceIntegration WorkspaceIntegration @relation(fields: [workspaceIntegrationId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceIntegrationId, startedAt(sort: Desc)])
+  @@map("sync_runs")
+}
+
+model NotificationPreference {
+  id          String              @id @default(uuid()) @db.Uuid
+  workspaceId String              @map("workspace_id") @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  eventKey    String              @map("event_key")
+  channel     NotificationChannel
+  enabled     Boolean             @default(true)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, eventKey, channel])
+  @@index([userId, workspaceId])
+  @@map("notification_preferences")
+}
+
+model Notification {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  eventKey    String    @map("event_key")
+  title       String
+  body        String
+  readAt      DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace  Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
+
+  // Partial index (user_id, created_at DESC) WHERE read_at IS NULL is in SQL.
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@index([workspaceId])
+  @@map("notifications")
+}
+
+/// Append-only delivery attempts.
+model NotificationDelivery {
+  id                String              @id @default(uuid()) @db.Uuid
+  notificationId    String              @map("notification_id") @db.Uuid
+  channel           NotificationChannel
+  status            DeliveryStatus      @default(QUEUED)
+  providerMessageId String?             @map("provider_message_id")
+  attemptedAt       DateTime            @default(now()) @map("attempted_at") @db.Timestamptz(6)
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId, attemptedAt])
+  @@map("notification_deliveries")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §14 Public CMS — public routes read only PUBLISHED rows with
+// published_at <= now(). Bodies live in object storage (body_ref).
+// ─────────────────────────────────────────────────────────────────────────────
+
+model CmsAuthor {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @unique @map("user_id") @db.Uuid
+  displayName String   @map("display_name")
+  slug        String   @unique @db.Citext
+  bio         String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  blogPosts BlogPost[]
+
+  @@map("cms_authors")
+}
+
+model CmsCategory {
+  id          String         @id @default(uuid()) @db.Uuid
+  contentType CmsContentType @map("content_type")
+  name        String
+  slug        String         @db.Citext
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  blogPosts    BlogPost[]
+  guides       Guide[]
+  helpArticles HelpArticle[]
+
+  @@unique([contentType, slug])
+  @@map("cms_categories")
+}
+
+model CmsTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique @db.Citext
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  posts BlogPostTag[]
+
+  @@map("cms_tags")
+}
+
+model BlogPost {
+  id              String        @id @default(uuid()) @db.Uuid
+  authorId        String?       @map("author_id") @db.Uuid
+  categoryId      String?       @map("category_id") @db.Uuid
+  featuredMediaId String?       @map("featured_media_id") @db.Uuid
+  title           String
+  slug            String        @unique @db.Citext
+  status          PublishStatus @default(DRAFT)
+  excerpt         String?
+  bodyRef         String        @map("body_ref")
+  seoTitle        String?       @map("seo_title")
+  metaDescription String?       @map("meta_description")
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  author        CmsAuthor?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  category      CmsCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  featuredMedia MediaAsset?   @relation(fields: [featuredMediaId], references: [id], onDelete: SetNull)
+  tags          BlogPostTag[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([authorId])
+  @@map("blog_posts")
+}
+
+model BlogPostTag {
+  postId String @map("post_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  post BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  CmsTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+  @@map("blog_post_tags")
+}
+
+/// Shown as "Resources" in Super Admin and "Guides" on the public site.
+model Guide {
+  id              String        @id @default(uuid()) @db.Uuid
+  categoryId      String?       @map("category_id") @db.Uuid
+  title           String
+  slug            String        @unique @db.Citext
+  status          PublishStatus @default(DRAFT)
+  excerpt         String?
+  bodyRef         String        @map("body_ref")
+  seoTitle        String?       @map("seo_title")
+  metaDescription String?       @map("meta_description")
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category CmsCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("guides")
+}
+
+model HelpArticle {
+  id              String        @id @default(uuid()) @db.Uuid
+  categoryId      String?       @map("category_id") @db.Uuid
+  title           String
+  slug            String        @unique @db.Citext
+  status          PublishStatus @default(DRAFT)
+  excerpt         String?
+  bodyRef         String        @map("body_ref")
+  seoTitle        String?       @map("seo_title")
+  metaDescription String?       @map("meta_description")
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  category CmsCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("help_articles")
+}
+
+/// Public/CMS media only. Applicant files never go here.
+model MediaAsset {
+  id         String   @id @default(uuid()) @db.Uuid
+  storageKey String   @unique @map("storage_key")
+  mimeType   String   @map("mime_type")
+  sizeBytes  BigInt   @map("size_bytes")
+  altText    String?  @map("alt_text")
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  uploader  User       @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
+  blogPosts BlogPost[]
+
+  @@index([mimeType, uploadedBy])
+  @@map("media_assets")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §15 Careers and job applications
+// ─────────────────────────────────────────────────────────────────────────────
+
+model JobOpening {
+  id                  String           @id @default(uuid()) @db.Uuid
+  title               String
+  slug                String           @unique @db.Citext
+  status              JobStatus        @default(DRAFT)
+  department          String?
+  locationText        String?          @map("location_text")
+  employmentType      String           @map("employment_type")
+  workArrangement     WorkArrangement? @map("work_arrangement")
+  /// Only set when compensation has been approved for publication.
+  compensationText    String?          @map("compensation_text")
+  summary             String?
+  descriptionRef      String           @map("description_ref")
+  showOnCareersPage   Boolean          @default(true) @map("show_on_careers_page")
+  applicationDeadline DateTime?        @map("application_deadline") @db.Timestamptz(6)
+  requireResume       Boolean          @default(true) @map("require_resume")
+  requireCoverLetter  Boolean          @default(false) @map("require_cover_letter")
+  seoTitle            String?          @map("seo_title")
+  metaDescription     String?          @map("meta_description")
+  publishedAt         DateTime?        @map("published_at") @db.Timestamptz(6)
+  closedAt            DateTime?        @map("closed_at") @db.Timestamptz(6)
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  applications JobApplication[]
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("job_openings")
+}
+
+/// The submitting transaction must re-check the job is PUBLISHED and open.
+model JobApplication {
+  id           String            @id @default(uuid()) @db.Uuid
+  jobId        String            @map("job_id") @db.Uuid
+  firstName    String            @map("first_name")
+  lastName     String            @map("last_name")
+  email        String            @db.Citext
+  phone        String?
+  linkedinUrl  String?           @map("linkedin_url")
+  portfolioUrl String?           @map("portfolio_url")
+  message      String?
+  status       ApplicationStatus @default(SUBMITTED)
+  submittedAt  DateTime          @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  job    JobOpening         @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  files  ApplicantFile[]
+  events ApplicationEvent[]
+  notes  HiringNote[]
+
+  @@index([jobId, status, submittedAt(sort: Desc)])
+  @@index([email])
+  @@map("job_applications")
+}
+
+/// Private object storage only — no public URL.
+model ApplicantFile {
+  id                String     @id @default(uuid()) @db.Uuid
+  applicationId     String     @map("application_id") @db.Uuid
+  storageKey        String     @unique @map("storage_key")
+  mimeType          String     @map("mime_type")
+  sizeBytes         BigInt     @map("size_bytes")
+  malwareScanStatus ScanStatus @default(PENDING) @map("malware_scan_status")
+  checksum          String
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  application JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("applicant_files")
+}
+
+model ApplicationEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  eventType     String   @map("event_type")
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  application JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, createdAt])
+  @@map("application_events")
+}
+
+model HiringNote {
+  id            String   @id @default(uuid()) @db.Uuid
+  applicationId String   @map("application_id") @db.Uuid
+  authorUserId  String   @map("author_user_id") @db.Uuid
+  note          String
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  application JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author      User           @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([applicationId, createdAt])
+  @@map("hiring_notes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §16 Super Admin, security and audit. Module controls, feature flags, RBAC
+// and plan entitlements are deliberately separate mechanisms.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ModuleControl {
+  moduleKey String   @id @map("module_key")
+  enabled   Boolean  @default(true)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updater User? @relation(fields: [updatedBy], references: [id], onDelete: Restrict)
+
+  @@index([enabled])
+  @@map("module_controls")
+}
+
+model FeatureFlag {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String
+  enabled     Boolean  @default(false)
+  description String
+  environment String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  rules FeatureFlagRule[]
+
+  @@unique([key, environment])
+  @@index([enabled, environment])
+  @@map("feature_flags")
+}
+
+model FeatureFlagRule {
+  id         String   @id @default(uuid()) @db.Uuid
+  flagId     String   @map("flag_id") @db.Uuid
+  scopeType  String   @map("scope_type")
+  scopeValue String   @map("scope_value")
+  percentage Decimal? @db.Decimal(5, 2)
+  priority   Int
+
+  flag FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([flagId, priority])
+  @@map("feature_flag_rules")
+}
+
+/// Allowlisted keys only (enforced by the settings service).
+model SystemSetting {
+  key       String   @id
+  valueJson Json     @map("value_json")
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updater User? @relation(fields: [updatedBy], references: [id], onDelete: Restrict)
+
+  @@map("system_settings")
+}
+
+/// Every change must also write an audit_logs row.
+model SecuritySetting {
+  key       String   @id
+  valueJson Json     @map("value_json")
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updater User? @relation(fields: [updatedBy], references: [id], onDelete: Restrict)
+
+  @@map("security_settings")
+}
+
+/// Human-readable admin feed. Append-only (trigger-enforced).
+model AdminActivity {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  action      String
+  targetType  String   @map("target_type")
+  targetId    String?  @map("target_id")
+  summary     String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([targetType, targetId])
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_activity")
+}
+
+/// Authoritative before/after evidence trail. Append-only (trigger-enforced).
+/// actor_user_id intentionally has no FK so history survives user deletion.
+/// Tenant ids are copied (no FK) for the same reason.
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  actorRole      String?  @map("actor_role")
+  organizationId String?  @map("organization_id") @db.Uuid
+  workspaceId    String?  @map("workspace_id") @db.Uuid
+  eventType      String   @map("event_type")
+  targetType     String   @map("target_type")
+  targetId       String?  @map("target_id")
+  beforeJson     Json?    @map("before_json")
+  afterJson      Json?    @map("after_json")
+  reason         String?
+  ipAddress      String?  @map("ip_address") @db.Inet
+  deviceMetadata Json?    @map("device_metadata")
+  requestId      String?  @map("request_id")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([eventType])
+  @@index([actorUserId, createdAt(sort: Desc)])
+  @@index([targetType, targetId])
+  @@map("audit_logs")
+}
+
+/// Append-only (trigger-enforced).
+model SecurityEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  eventType String   @map("event_type")
+  riskLevel String   @map("risk_level")
+  ipHash    String?  @map("ip_hash")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([riskLevel])
+  @@map("security_events")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// §17 Operations, webhooks and background work
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// verify signature -> insert (unique provider event) -> ack -> process async.
+model WebhookEvent {
+  id              String        @id @default(uuid()) @db.Uuid
+  provider        String
+  providerEventId String        @map("provider_event_id")
+  eventType       String        @map("event_type")
+  payloadRef      String        @map("payload_ref")
+  status          WebhookStatus @default(RECEIVED)
+  attemptCount    Int           @default(0) @map("attempt_count")
+  lastError       String?       @map("last_error")
+  receivedAt      DateTime      @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt     DateTime?     @map("processed_at") @db.Timestamptz(6)
+
+  @@unique([provider, providerEventId])
+  @@index([status, receivedAt])
+  @@map("webhook_events")
+}
+
+model BackgroundJob {
+  id         String       @id @default(uuid()) @db.Uuid
+  queue      String
+  /// Set only for idempotent jobs; NULLs are distinct in PostgreSQL.
+  jobKey     String?      @unique @map("job_key")
+  status     JobRunStatus @default(QUEUED)
+  payloadRef String?      @map("payload_ref")
+  attempts   Int          @default(0)
+  lastError  String?      @map("last_error")
+  runAt      DateTime     @default(now()) @map("run_at") @db.Timestamptz(6)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([queue, status, runAt])
+  @@map("background_jobs")
+}
+
+model ProviderEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  provider  String
+  operation String
+  status    String
+  requestId String?  @map("request_id")
+  latencyMs Int?     @map("latency_ms")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([provider, operation, createdAt(sort: Desc)])
+  @@map("provider_events")
+}
+
+model SystemIncident {
+  id            String         @id @default(uuid()) @db.Uuid
+  status        IncidentStatus @default(INVESTIGATING)
+  title         String
+  startedAt     DateTime       @default(now()) @map("started_at") @db.Timestamptz(6)
+  resolvedAt    DateTime?      @map("resolved_at") @db.Timestamptz(6)
+  publicSummary String?        @map("public_summary")
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, startedAt(sort: Desc)])
+  @@map("system_incidents")
+}
+
+model HealthCheckResult {
+  id           String       @id @default(uuid()) @db.Uuid
+  componentKey String       @map("component_key")
+  status       HealthStatus
+  latencyMs    Int?         @map("latency_ms")
+  checkedAt    DateTime     @default(now()) @map("checked_at") @db.Timestamptz(6)
+
+  @@index([componentKey, checkedAt(sort: Desc)])
+  @@map("health_check_results")
+}
+
+model IdempotencyKey {
+  key         String   @id
+  scope       String
+  requestHash String   @map("request_hash")
+  responseRef String?  @map("response_ref")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
