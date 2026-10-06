@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { BarChart3, BookOpen, Crown, CreditCard, Database, ExternalLink, FileText, Info } from 'lucide-react';
+import { BarChart3, BookOpen, Coins, Repeat, ShieldCheck, Crown, CreditCard, Database, ExternalLink, FileText, Info } from 'lucide-react';
 import { AddCreditsButton } from '@/components/app/billing/AddCreditsDialog';
 import { Button, ButtonLink, EmptyState, Grid, IconCircle } from '@/components/ui';
 import { PlanCatalog, priceFor, type Interval } from '@/components/app/billing/PlanCatalog';
+import { PlanCompare } from '@/components/app/billing/PlanCompare';
 import { apiList } from '@/lib/api';
 import type { PublicPlan } from '@/lib/types';
 import b from '@/components/app/billing/billing.module.css';
@@ -87,6 +88,31 @@ export default async function SettingsBillingPage({ searchParams }: { searchPara
             </div>
           )}
         </section>
+
+        {plans.length > 0 && (
+          <section>
+            <h3 style={{ fontSize: 20 }}>Compare Features</h3>
+            <p style={{ color: 'var(--muted)', marginBottom: 12 }}>Every feature included in each published plan, grouped by area.</p>
+            <PlanCompare plans={plans} interval={interval} />
+          </section>
+        )}
+
+        <div className={b.facts}>
+          {[
+            [<Repeat key="r" size={20} color="var(--blue)" />, 'Change anytime', 'Upgrade, downgrade or cancel from this page.'],
+            [<Coins key="c" size={20} color="var(--blue)" />, 'AI credits', 'Credits power AI analysis and generation; see each plan for its allowance.'],
+            [<Database key="d" size={20} color="var(--blue)" />, 'Top up when needed', 'Add credit packs without changing your plan.'],
+            [<ShieldCheck key="s" size={20} color="var(--blue)" />, 'Secure payments', 'Card details are handled by our payment provider.'],
+          ].map(([i, t, x]) => (
+            <div key={t as string}>
+              {i}
+              <span>
+                <b>{t}</b>
+                {x}
+              </span>
+            </div>
+          ))}
+        </div>
 
         <Grid cols={2}>
           <section>
