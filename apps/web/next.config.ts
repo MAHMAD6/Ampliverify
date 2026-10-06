@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
       // Prompt Tracking is the AI Search (GEO) Overview's default tab (GEO design, docs/INPUTS.md #67).
       // Prompt detail pages stay at /app/geo/prompts/[id].
       { source: '/app/geo/prompts', destination: '/app/geo', permanent: false },
+      // Policies live on one page (public-website-v2/11-Legal).
+      { source: '/legal/privacy', destination: '/legal#privacy', permanent: true },
+      { source: '/legal/terms', destination: '/legal#terms', permanent: true },
+      { source: '/legal/cookies', destination: '/legal#cookies', permanent: true },
     ];
   },
 };

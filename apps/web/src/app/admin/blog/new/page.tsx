@@ -1,10 +1,18 @@
-import { Image as ImageIcon } from 'lucide-react';
+import { HelpCircle, Image as ImageIcon, Lightbulb, ListTree, Megaphone } from 'lucide-react';
 import { AdminHeader, Dropzone } from '@/components/admin/AdminParts';
 import { MarkdownField } from '@/components/admin/MarkdownField';
 import { SlugFields } from '@/components/admin/SlugFields';
 import { Button, Card, Field, Input, Notice, Panel, Select, Stack, Textarea } from '@/components/ui';
 import { Toggle } from '@/components/ui/Toggle';
+import { apiList } from '@/lib/api';
 import s from '@/components/admin/parts.module.css';
+
+const BLOCKS = [
+  { label: 'Table of Contents', hint: 'Auto-generated from headings', icon: <ListTree size={22} />, markdown: '## In this article\n\n_The public page builds the table of contents from your H2 headings._' },
+  { label: 'Key Takeaways', hint: 'Add key points', icon: <Lightbulb size={22} />, markdown: '## Key takeaways\n\n- First point\n- Second point\n- Third point' },
+  { label: 'FAQ Section', hint: 'Add common questions', icon: <HelpCircle size={22} />, markdown: '## Frequently asked questions\n\n### Question?\n\nAnswer.' },
+  { label: 'CTA Block', hint: 'Add a call to action', icon: <Megaphone size={22} />, markdown: '> **Ready to start?** [Get started free](/pricing)' },
+];
 
 export const metadata = { title: 'Create Blog Post' };
 
@@ -14,6 +22,7 @@ export const metadata = { title: 'Create Blog Post' };
  */
 export default async function NewBlogPostPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
   const isGuide = (await searchParams).type === 'guide';
+  const categories = await apiList<{ name: string; slug: string }>(`/public/categories?type=${isGuide ? 'GUIDE' : 'BLOG'}`);
   const noun = isGuide ? 'Resource' : 'Blog Post';
   return (
     <form>
@@ -40,7 +49,7 @@ export default async function NewBlogPostPage({ searchParams }: { searchParams: 
             <Textarea id="f-excerpt" name="excerpt" placeholder="Add a short summary for listings and search previews" style={{ minHeight: 90 }} />
           </Field>
           <Field label="Content" htmlFor="f-body" hint="Markdown. The public site renders headings, lists, links and quotes.">
-            <MarkdownField id="f-body" name="body" placeholder="Start writing…" />
+            <MarkdownField id="f-body" name="body" placeholder="Start writing your post… Add content, images, links, and formatting." blocks={BLOCKS} />
           </Field>
         </Card>
         <Stack>
@@ -66,6 +75,11 @@ export default async function NewBlogPostPage({ searchParams }: { searchParams: 
             <Field label="Category" htmlFor="f-category">
               <Select id="f-category" name="categoryId" defaultValue="">
                 <option value="">Select category</option>
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.name}
+                  </option>
+                ))}
               </Select>
             </Field>
             {!isGuide && (
@@ -79,12 +93,15 @@ export default async function NewBlogPostPage({ searchParams }: { searchParams: 
               <Dropzone icon={<ImageIcon size={26} />} title="Upload or choose from Media Library" hint="Recommended 1200 × 630 px." />
             </Panel>
           )}
-          <Panel title="SEO" description="Optional search metadata.">
-            <Field label="SEO title" htmlFor="f-seo">
-              <Input id="f-seo" name="seoTitle" placeholder="Optional" />
+          <Panel title="SEO & GEO" description="Search and AI-search metadata.">
+            <Field label="SEO title" htmlFor="f-seo" hint="Recommended 50–60 characters.">
+              <Input id="f-seo" name="seoTitle" maxLength={70} placeholder="Enter SEO title" />
             </Field>
-            <Field label="Meta description" htmlFor="f-meta">
-              <Textarea id="f-meta" name="metaDescription" placeholder="Optional" style={{ minHeight: 70 }} />
+            <Field label="Meta description" htmlFor="f-meta" hint="Recommended 150–160 characters.">
+              <Textarea id="f-meta" name="metaDescription" maxLength={200} placeholder="Enter meta description" style={{ minHeight: 70 }} />
+            </Field>
+            <Field label="Canonical URL" htmlFor="f-canonical" hint="Optional. Defaults to the post URL.">
+              <Input id="f-canonical" name="canonicalUrl" type="url" placeholder={`https://www.ampliverify.com/${isGuide ? 'guides' : 'blog'}/`} />
             </Field>
           </Panel>
           <Notice tone="neutral">Content stays private until an authorized administrator publishes it.</Notice>

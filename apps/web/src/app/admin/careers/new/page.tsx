@@ -1,9 +1,18 @@
+import { ListPlus } from 'lucide-react';
 import { AdminHeader } from '@/components/admin/AdminParts';
 import { MarkdownField } from '@/components/admin/MarkdownField';
 import { SlugFields } from '@/components/admin/SlugFields';
 import { Button, ButtonLink, Card, Field, FormGrid, Input, Notice, Panel, Select, Stack, Textarea } from '@/components/ui';
 import { Toggle } from '@/components/ui/Toggle';
 import s from '@/components/admin/parts.module.css';
+
+/** Job Sections from the Create Job Opening design, inserted as markdown headings into the description. */
+const JOB_SECTIONS = ['About the Role', 'Responsibilities', 'Qualifications', 'Preferred Qualifications', 'Benefits', 'Company Overview', 'Equal Opportunity Statement', 'Additional Information'].map((label) => ({
+  label,
+  hint: 'Add section',
+  icon: <ListPlus size={20} />,
+  markdown: `## ${label}\n\n${label === 'Responsibilities' || label.includes('Qualifications') ? '- ' : ''}`,
+}));
 
 export const metadata = { title: 'Create Job Opening' };
 
@@ -68,10 +77,10 @@ export default function NewJobOpeningPage() {
             <Input id="j-comp" name="compensationText" placeholder="Optional" />
           </Field>
           <Field label="Short summary" htmlFor="j-summary">
-            <Textarea id="j-summary" name="summary" placeholder="Briefly describe the role and what it contributes to AmpliVerify." style={{ minHeight: 80 }} />
+            <Textarea id="j-summary" name="summary" maxLength={300} placeholder="A brief summary of the role (shown in job listings). Max 300 characters." style={{ minHeight: 80 }} />
           </Field>
           <Field label="Job description" htmlFor="j-desc">
-            <MarkdownField id="j-desc" name="description" placeholder="Write responsibilities, qualifications, expectations, and other approved details here…" />
+            <MarkdownField id="j-desc" name="description" placeholder="Write the full job description here. You can use headings, lists, images, and links." blocks={JOB_SECTIONS} />
           </Field>
         </Card>
         <Stack>

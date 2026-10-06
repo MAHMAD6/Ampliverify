@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ArticleLayout } from '@/components/public/ArticleLayout';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiList } from '@/lib/api';
 import { formatDate, readingTime } from '@/lib/format';
-import type { ContentDetail } from '@/lib/types';
+import type { ContentDetail, ContentSummary } from '@/lib/types';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -27,9 +27,10 @@ export default async function GuidePage({ params }: Props) {
       title={guide.title}
       summary={guide.excerpt}
       meta={meta}
+      author={guide.author?.displayName}
       body={guide.body}
-      tocTitle="Guide sections"
-      breadcrumb={[{ label: 'Guides', href: '/guides' }, { label: guide.title }]}
+      breadcrumb={[{ label: 'Resources', href: '/guides' }, { label: guide.title }]}
+      related={(await apiList<ContentSummary>('/public/guides?limit=6')).filter((g) => g.slug !== guide.slug).map((g) => ({ href: `/guides/${g.slug}`, title: g.title, category: g.category?.name }))}
     />
   );
 }

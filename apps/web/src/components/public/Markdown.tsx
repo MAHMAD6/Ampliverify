@@ -1,11 +1,11 @@
 import ReactMarkdown from 'react-markdown';
 import { slugifyHeading } from '@/lib/format';
-import s from './public.module.css';
+import s from './site.module.css';
 
 /** Renders CMS markdown. Raw HTML is not rendered (react-markdown default). */
-export function Markdown({ source }: { source: string }) {
+export function Markdown({ source, className }: { source: string; className?: string }) {
   return (
-    <div className={s.prose}>
+    <div className={className ?? s.prose}>
       <ReactMarkdown
         components={{
           h2: ({ children }) => <h2 id={slugifyHeading(String(children))}>{children}</h2>,
