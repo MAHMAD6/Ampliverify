@@ -33,3 +33,11 @@
   .main { margin-left: 0; }
   .profile { display: none; }
 }
+.group { display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 12px; margin: 2px 0; border: 0; background: none; border-radius: 8px; color: #e6eefa; font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.group span { flex: 1; }
+.group:hover { background: rgba(255, 255, 255, 0.06); }
+.groupActive { background: rgba(255, 255, 255, 0.06); }
+.chev { transition: transform 0.15s; color: #9db6d2; }
+.children { margin: 2px 0 8px 22px; padding-left: 10px; border-left: 1px solid rgba(255, 255, 255, 0.18); display: grid; gap: 2px; }
+.child { display: block; padding: 8px 12px; border-radius: 8px; font-size: 14px; color: #dbe7f7; }
+.child:hover { background: rgba(255, 255, 255, 0.06); }

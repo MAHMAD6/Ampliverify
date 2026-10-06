@@ -1,0 +1,23 @@
+.profile { display: flex; gap: 24px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 22px; margin-bottom: 16px; }
+.avatar { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; background: #eef2f8; color: #8d9bb3; flex: none; }
+.profile dl { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px 20px; margin: 0; }
+.profile dt { font-size: 13px; color: var(--heading); font-weight: 600; }
+.profile dd { margin: 2px 0 0; font-size: 15px; color: var(--ink); overflow-wrap: anywhere; }
+.body { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 16px; }
+.side { display: grid; gap: 4px; align-content: start; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
+.side a { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: var(--heading); }
+.side a.on { background: var(--blue-50); color: var(--blue); font-weight: 600; }
+.main { display: grid; gap: 14px; }
+.card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+.card h2 { font-size: 20px; color: var(--ink); }
+.card h3 { display: flex; gap: 8px; align-items: center; font-size: 16px; color: var(--ink); margin-bottom: 10px; }
+.card > p { font-size: 14px; color: var(--muted); }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.mini { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--surface-alt); border-radius: 8px; padding: 12px; margin: 0 0 10px; }
+.mini dt { font-size: 13px; color: var(--heading); }
+.mini dd { margin: 2px 0 0; font-size: 14px; }
+.list { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 6px; font-size: 14px; color: var(--text); }
+.list a { color: var(--blue); }
+.link { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; font-weight: 600; color: var(--blue); }
+.empty { text-align: center; font-size: 14px; color: var(--muted); padding: 14px; }
+@media (max-width: 900px) { .body, .two { grid-template-columns: minmax(0, 1fr); } .profile { flex-direction: column; align-items: flex-start; } }

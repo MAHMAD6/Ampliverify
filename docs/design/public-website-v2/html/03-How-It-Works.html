@@ -1,0 +1,249 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>AmpliVerify — How It Works</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap">
+
+<style>
+body{margin:0;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#0B1B35;background:#FFFFFF;-webkit-font-smoothing:antialiased}
+a{color:#0E5E2B;text-decoration:none}a:hover{color:#0E5E2B}
+.d{font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:-0.02em}
+.m{font-family:'Plus Jakarta Sans',sans-serif;font-weight:600}
+.btnp{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:56px;padding:0 26px;border-radius:10px;background:#0E5E2B;color:#fff;font-weight:700;box-shadow:0 10px 22px -10px rgba(14,94,43,.6);font-size:16px;border:0;cursor:pointer;font-family:inherit;box-sizing:border-box}
+.btnp:hover{background:#0E5E2B;color:#fff}
+.btns{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:56px;padding:0 22px;border-radius:10px;background:#fff;color:#0E5E2B;font-weight:700;font-size:16px;border:2px solid #0E5E2B;cursor:pointer;font-family:inherit;box-sizing:border-box}
+.btns:hover{border-color:#0E5E2B;color:#0B1B35}
+.eb{font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:#0E5E2B;font-weight:700}
+.card{background:#fff;border:1px solid #E3E9E5;border-radius:14px;box-sizing:border-box}
+.ic{width:52px;height:52px;border-radius:99px;background:#E4F5E8;color:#0E5E2B;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+svg.s{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.dots{background-image:linear-gradient(180deg,#F4FAF6 0%,#EEF7F1 100%)}
+.tag{font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;font-weight:500;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.04em}
+.num{width:64px;height:64px;border-radius:99px;background:#0E5E2B;color:#B8EBC5;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif;font-size:26px;font-weight:700;flex-shrink:0}
+.li{display:flex;gap:10px;font-size:16px;line-height:1.5}
+.vis{flex-grow:1;background:#F4F8F5;border-radius:16px;padding:28px;height:300px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:12px}
+</style>
+</head><body>
+
+<div style="width: 1440px; height: 3910px; overflow: hidden; display: flex; flex-direction: column; background: #FFFFFF">
+
+
+<header style="position: relative; z-index: 50; width: 1440px; height: 80px; box-sizing: border-box; padding: 0 88px; display: flex; align-items: center; justify-content: space-between; background: #FFFFFF; border-bottom: 1px solid #E6ECE8; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; color: #0B1B35">
+<a href="01-Home.html" aria-label="AmpliVerify home" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #0B1B35">
+<svg width="52" height="44" viewBox="0 0 48 40" fill="none" aria-hidden="true"><path d="M2 38 L19 2 L28 2 L11 38 Z" fill="#0E5E2B"></path><path d="M22 16 L33 38 L24 38 L18 25 Z" fill="#1E9C45"></path><path d="M7 31 L21 21 L27 25 L40 10" stroke="#5CC23A" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M33 7 L45 5 L43 17 Z" fill="#5CC23A"></path></svg>
+<span style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-weight: 800; font-size: 25px; line-height: 1; letter-spacing: 0.01em">AMPLIVERIFY</span>
+<span style="font-weight: 700; font-size: 11px; line-height: 1; letter-spacing: 0.1em; color: #15803D">AUDIT · OPTIMIZE · VERIFY</span>
+</span>
+</a>
+
+<nav aria-label="Main" style="position: relative; z-index: 60; display: flex; align-items: center; gap: 30px; font-size: 15px; font-weight: 500">
+<a href="01-Home.html" style="padding: 28px 0; text-decoration: none; color: #0B1B35; font-weight: 500; box-shadow: inset 0 -3px 0 transparent">Home</a>
+<a href="02-Features.html" style="padding: 28px 0; text-decoration: none; color: #0B1B35; font-weight: 500; box-shadow: inset 0 -3px 0 transparent">Features</a>
+<a href="03-How-It-Works.html" style="padding: 28px 0; text-decoration: none; color: #0E5E2B; font-weight: 700; box-shadow: inset 0 -3px 0 #15803D">How It Works</a>
+<a href="04-Pricing.html" style="padding: 28px 0; text-decoration: none; color: #0B1B35; font-weight: 500; box-shadow: inset 0 -3px 0 transparent">Pricing</a>
+<div style="position: relative">
+<button type="button" onClick="" aria-expanded="false" aria-haspopup="true" style="display: flex; align-items: center; gap: 6px; padding: 28px 0; border: 0; background: none; cursor: pointer; font-family: inherit; font-size: 15px; color: #0B1B35; font-weight: 500; box-shadow: inset 0 -3px 0 transparent">Resources<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: none"><path d="m6 9 6 6 6-6"></path></svg></button>
+
+</div>
+<div style="position: relative">
+<button type="button" onClick="" aria-expanded="false" aria-haspopup="true" style="display: flex; align-items: center; gap: 6px; padding: 28px 0; border: 0; background: none; cursor: pointer; font-family: inherit; font-size: 15px; color: #0B1B35; font-weight: 500; box-shadow: inset 0 -3px 0 transparent">Company<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: none"><path d="m6 9 6 6 6-6"></path></svg></button>
+
+</div>
+</nav>
+<div style="display: flex; align-items: center; gap: 22px">
+<a href="12-Sign-Up.html" style="font-size: 16px; font-weight: 700; color: #0B1B35; text-decoration: none">Log In</a>
+<a href="12-Sign-Up.html" style="display: flex; align-items: center; gap: 10px; height: 50px; padding: 0 22px; border-radius: 10px; background: #0E5E2B; color: #FFFFFF; font-size: 16px; font-weight: 700; text-decoration: none; box-shadow: 0 8px 18px -8px rgba(14,94,43,.6)">Get Started Free<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+</header>
+
+
+<section class="dots" style="padding: 96px 80px 80px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 24px">
+<span class="eb">How It Works</span>
+<h1 class="d" style="margin: 0; font-size: 68px; line-height: 1.02; font-weight: 800; max-width: 980px">From First Crawl to <span style="color: #0E5E2B">Verified Growth</span> in Five Steps</h1>
+<p style="margin: 0; font-size: 20px; line-height: 1.55; color: #34445E; max-width: 700px">A structured, engineering-led process. You always know what to do next, why it matters, and whether it worked.</p>
+<div style="display: flex; gap: 12px; margin-top: 8px">
+<a class="btnp" href="12-Sign-Up.html">Get Started Free<svg class="s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+</section>
+
+<section style="padding: 40px 80px; display: flex; flex-direction: column">
+
+<div style="display: flex; gap: 40px">
+<div style="display: flex; flex-direction: column; align-items: center"><span class="num">1</span><span style="width: 2px; flex-grow: 1; background: #C9E3D2"></span></div>
+<div class="card" style="flex-grow: 1; margin-bottom: 32px; padding: 40px; display: flex; gap: 48px; align-items: center">
+<div style="width: 440px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">About 5 minutes</span></div>
+<h2 class="d" style="margin: 0; font-size: 36px; font-weight: 700">Connect Your Website</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #4A5A72">Add your domain and connect the data sources you already use. You choose what AmpliVerify can access, and you stay in control of every change.</p>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>Verify ownership in one step</div>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>Optional search &amp; analytics connections</div>
+</div>
+<div class="vis">
+<div class="card" style="border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px"><span class="ic" style="width: 36px; height: 36px"><svg class="s" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg></span><span class="m" style="flex-grow: 1">example.com</span><span class="tag" style="background: #E4F5E8; color: #0E5E2B">Verified</span></div>
+<div class="card" style="border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px"><span class="ic" style="width: 36px; height: 36px"><svg class="s" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg></span><span style="flex-grow: 1">Search performance data</span><span class="tag" style="background: #E4F5E8; color: #0E5E2B">Connected</span></div>
+<div class="card" style="border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 12px"><span class="ic" style="width: 36px; height: 36px"><svg class="s" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg></span><span style="flex-grow: 1">Analytics</span><span style="font-size: 14px; font-weight: 600; color: #0E5E2B">Connect</span></div>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 40px">
+<div style="display: flex; flex-direction: column; align-items: center"><span class="num">2</span><span style="width: 2px; flex-grow: 1; background: #C9E3D2"></span></div>
+<div class="card" style="flex-grow: 1; margin-bottom: 32px; padding: 40px; display: flex; gap: 48px; align-items: center">
+<div style="width: 440px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">Website Audit</span></div>
+<h2 class="d" style="margin: 0; font-size: 36px; font-weight: 700">Audit &amp; Analyze</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #4A5A72">Website Audit crawls every page and analyzes technical health, content and search performance, then groups issues by root cause.</p>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>Technical, content and performance checks</div>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>Baseline saved for later comparison</div>
+</div>
+<div class="vis">
+<div style="display: flex; justify-content: space-between; font-size: 14px"><span style="font-weight: 600">Crawling example.com</span><span class="m" style="color: #4A5A72">1,284 / 1,284</span></div>
+<div style="height: 10px; border-radius: 99px; background: #DCE3D9; overflow: hidden"><div style="width: 100%; height: 100%; background: #0E5E2B"></div></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 8px">
+<div class="card" style="border-radius: 12px; padding: 14px"><div style="font-size: 13px; color: #4A5A72">Technical</div><div class="d" style="font-size: 26px; font-weight: 700">74</div></div>
+<div class="card" style="border-radius: 12px; padding: 14px"><div style="font-size: 13px; color: #4A5A72">Content</div><div class="d" style="font-size: 26px; font-weight: 700">61</div></div>
+<div class="card" style="border-radius: 12px; padding: 14px"><div style="font-size: 13px; color: #4A5A72">Performance</div><div class="d" style="font-size: 26px; font-weight: 700">28</div></div>
+</div>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 40px">
+<div style="display: flex; flex-direction: column; align-items: center"><span class="num">3</span><span style="width: 2px; flex-grow: 1; background: #C9E3D2"></span></div>
+<div class="card" style="flex-grow: 1; margin-bottom: 32px; padding: 40px; display: flex; gap: 48px; align-items: center">
+<div style="width: 440px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">Optimization Center</span><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">On-Page SEO Editor</span><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">Keyword Research</span><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">Content Strategy</span><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">AI Search (GEO)</span></div>
+<h2 class="d" style="margin: 0; font-size: 36px; font-weight: 700">Optimize</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #4A5A72">Work through prioritized recommendations in the Optimization Center, improve pages with the On-Page SEO Editor, and plan new content around the right keywords — for search engines and AI search.</p>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>Highest impact, lowest effort first</div>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>Guidance your writers and developers can follow</div>
+</div>
+<div class="vis" style="font-size: 14px">
+<div class="card" style="border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; border-color: #0E5E2B"><span class="m" style="font-weight: 600; color: #0E5E2B">01</span><span style="flex-grow: 1; font-weight: 500">Consolidate redirect chains</span><span class="m" style="font-size: 12px">▲▲▲</span></div>
+<div class="card" style="border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px"><span class="m" style="font-weight: 600; color: #4A5A72">02</span><span style="flex-grow: 1">Rewrite duplicate titles</span><span class="m" style="font-size: 12px; color: #4A5A72">▲▲</span></div>
+<div class="card" style="border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px"><span class="m" style="font-weight: 600; color: #4A5A72">03</span><span style="flex-grow: 1">Defer non-critical scripts</span><span class="m" style="font-size: 12px; color: #4A5A72">▲▲</span></div>
+<div class="card" style="border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px"><span class="m" style="font-weight: 600; color: #4A5A72">04</span><span style="flex-grow: 1">Add alt text to product images</span><span class="m" style="font-size: 12px; color: #4A5A72">▲</span></div>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 40px">
+<div style="display: flex; flex-direction: column; align-items: center"><span class="num">4</span><span style="width: 2px; flex-grow: 1; background: #C9E3D2"></span></div>
+<div class="card" style="flex-grow: 1; margin-bottom: 32px; padding: 40px; display: flex; gap: 48px; align-items: center">
+<div style="width: 440px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #E4F5E8; color: #0E5E2B">Reports</span></div>
+<h2 class="d" style="margin: 0; font-size: 36px; font-weight: 700">Monitor &amp; Verify</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #4A5A72">Reports track rankings, traffic and search visibility over time, so you can verify which improvements are working and where to focus next.</p>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>Rankings, traffic and visibility trends</div>
+<div class="li"><svg class="s" viewBox="0 0 24 24" style="color: #0E5E2B; margin-top: 4px"><path d="M20 6 9 17l-5-5"></path></svg>See the impact of the changes you make</div>
+</div>
+<div class="vis">
+<div class="card" style="border-radius: 12px; padding: 16px">
+<div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px"><span style="font-weight: 600">Clicks to /blog</span><span class="tag" style="background: #E4F5E8; color: #0E5E2B">Sample data · +62%</span></div>
+<svg width="100%" height="150" viewBox="0 0 600 150" preserveAspectRatio="none" aria-hidden="true"><path d="M0 110 L60 114 L120 108 L180 112 L240 106 L300 104 L360 80 L420 70 L480 58 L540 50 L600 44" fill="none" stroke="#0E5E2B" stroke-width="3" vector-effect="non-scaling-stroke"></path><path d="M300 10V145" stroke="#0E5E2B" stroke-dasharray="3 4"></path><path d="M0 104 H300" stroke="#B8C2BB" stroke-dasharray="6 6"></path></svg>
+<div style="display: flex; justify-content: space-between; font-size: 12px; color: #4A5A72" class="m"><span>baseline</span><span>fix shipped</span><span>+28 days</span></div>
+</div>
+</div>
+</div>
+</div>
+
+<div style="display: flex; gap: 40px">
+<div style="display: flex; flex-direction: column; align-items: center"><span class="num" style="background: #0E5E2B; color: #FFFFFF"><svg class="i" viewBox="0 0 24 24" style="width: 28px; height: 28px"><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5M3 21v-5h5"></path></svg></span></div>
+<div class="card" style="flex-grow: 1; padding: 40px; display: flex; gap: 48px; align-items: center; background: #0E5E2B; border-color: #0E5E2B; color: #FFFFFF">
+<div style="width: 440px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; gap: 8px; flex-wrap: wrap"><span style="padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 700; background: #127136; color: #FFFFFF">All tools, on repeat</span></div>
+<h2 class="d" style="margin: 0; font-size: 36px; font-weight: 700">Improve Continuously</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #DCEFE1">Refine your strategy and scale what works. Regular audits catch new issues, and verified results show you where to invest next — so growth compounds.</p>
+</div>
+<div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; height: 300px">
+<svg width="360" height="280" viewBox="0 0 360 280" fill="none" aria-hidden="true">
+<circle cx="180" cy="140" r="100" stroke="#2F7A4A" stroke-width="2"></circle>
+<path d="M180 40 A100 100 0 0 1 280 140" stroke="#B8EBC5" stroke-width="4" stroke-linecap="round"></path>
+<path d="M270 128 L280 142 L292 130" stroke="#B8EBC5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path>
+<circle cx="180" cy="40" r="26" fill="#0B4A22" stroke="#B8EBC5" stroke-width="2"></circle><text x="180" y="45" text-anchor="middle" fill="#FFFFFF" font-size="13" font-family="Plus Jakarta Sans" font-weight="600">Audit</text>
+<circle cx="280" cy="140" r="26" fill="#0B4A22" stroke="#B8EBC5" stroke-width="2"></circle><text x="280" y="145" text-anchor="middle" fill="#FFFFFF" font-size="12" font-family="Plus Jakarta Sans" font-weight="600">Optimize</text>
+<circle cx="180" cy="240" r="26" fill="#0B4A22" stroke="#B8EBC5" stroke-width="2"></circle><text x="180" y="245" text-anchor="middle" fill="#FFFFFF" font-size="13" font-family="Plus Jakarta Sans" font-weight="600">Verify</text>
+<circle cx="80" cy="140" r="26" fill="#0B4A22" stroke="#B8EBC5" stroke-width="2"></circle><text x="80" y="145" text-anchor="middle" fill="#FFFFFF" font-size="13" font-family="Plus Jakarta Sans" font-weight="600">Learn</text>
+<text x="180" y="136" text-anchor="middle" fill="#B8EBC5" font-size="22" font-family="Plus Jakarta Sans" font-weight="700">Growth</text>
+<text x="180" y="158" text-anchor="middle" fill="#C4E3CC" font-size="12" font-family="Plus Jakarta Sans">compounding</text>
+</svg>
+</div>
+</div>
+</div>
+</section>
+
+<section style="padding: 88px 80px 40px; display: flex; flex-direction: column; gap: 40px">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<span class="eb">Getting Started</span>
+<h2 class="d" style="margin: 0; font-size: 48px; line-height: 1.05; font-weight: 700">What You Need on Day One</h2>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+<div class="card" style="padding: 32px; display: flex; flex-direction: column; gap: 12px"><span class="ic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg></span><div class="d" style="font-size: 22px; font-weight: 700">Your Website Address</div><p style="margin: 0; font-size: 16px; color: #4A5A72; line-height: 1.55">That's enough to run your first audit.</p></div>
+<div class="card" style="padding: 32px; display: flex; flex-direction: column; gap: 12px"><span class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg></span><div class="d" style="font-size: 22px; font-weight: 700">Optional Data Access</div><p style="margin: 0; font-size: 16px; color: #4A5A72; line-height: 1.55">Connect search and analytics for richer results.</p></div>
+<div class="card" style="padding: 32px; display: flex; flex-direction: column; gap: 12px"><span class="ic"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"></circle><path d="M2 21a7 7 0 0 1 14 0M17 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"></path></svg></span><div class="d" style="font-size: 22px; font-weight: 700">Someone to Ship Fixes</div><p style="margin: 0; font-size: 16px; color: #4A5A72; line-height: 1.55">You, a developer or a writer — each task says who.</p></div>
+</div>
+</section>
+
+<section style="flex-grow: 1; padding: 24px 48px 48px; display: flex; flex-direction: column; justify-content: center">
+<div style="position: relative; overflow: hidden; border-radius: 24px; background: #E4F5E8; padding: 40px 48px 48px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px">
+<div style="position: absolute; left: -60px; bottom: -90px; width: 260px; height: 220px; border-radius: 0 180px 0 0; background: #C9EBD2"></div>
+<div style="position: absolute; left: 80px; top: -40px; width: 110px; height: 110px; border-radius: 99px; background: #BFE6C8"></div>
+<div style="position: absolute; right: -40px; bottom: -80px; width: 220px; height: 260px; border-radius: 160px 0 0 0; background: #BFE6C8"></div>
+<div style="position: absolute; right: 150px; top: 20px; width: 70px; height: 70px; border-radius: 99px; background: #D3EFDA"></div>
+<span class="eb" style="position: relative">Get Started</span>
+<h2 class="d" style="position: relative; margin: 0; font-size: 42px; line-height: 1.1; font-weight: 800">Start with Step One Today</h2>
+<p style="position: relative; margin: 0; font-size: 19px; line-height: 1.45; color: #34445E; max-width: 760px">Connect your website and get your first prioritized plan free.</p>
+<div style="position: relative; display: flex; gap: 12px; margin-top: 10px"><a class="btnp" href="12-Sign-Up.html">Get Started Free<svg class="s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a><a class="btns" href="02-Features.html">Explore Features</a></div>
+</div>
+</section>
+
+
+
+<footer style="width: 1440px; height: 320px; box-sizing: border-box; padding: 56px 88px 36px; display: flex; flex-direction: column; justify-content: space-between; background: #0B1F2E; color: #C7D2DC; font-family: 'Plus Jakarta Sans', system-ui, sans-serif">
+<div style="display: flex; justify-content: space-between; gap: 48px">
+<div style="width: 330px; display: flex; flex-direction: column; gap: 18px">
+<a href="01-Home.html" aria-label="AmpliVerify home" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: #FFFFFF">
+<svg width="52" height="44" viewBox="0 0 48 40" fill="none" aria-hidden="true"><path d="M2 38 L19 2 L28 2 L11 38 Z" fill="#1E9C45"></path><path d="M22 16 L33 38 L24 38 L18 25 Z" fill="#2DBE57"></path><path d="M7 31 L21 21 L27 25 L40 10" stroke="#7CD64B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M33 7 L45 5 L43 17 Z" fill="#7CD64B"></path></svg>
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-weight: 800; font-size: 24px; line-height: 1; letter-spacing: 0.01em">AMPLIVERIFY</span><span style="font-weight: 700; font-size: 11px; line-height: 1; letter-spacing: 0.1em; color: #C7D2DC">AUDIT · OPTIMIZE · VERIFY</span></span>
+</a>
+<p style="margin: 0; font-size: 15px; line-height: 1.55">AmpliVerify helps businesses improve search visibility through a structured, engineering-led approach to SEO.</p>
+<div style="display: flex; gap: 14px; font-size: 13px; font-weight: 700">
+<a href="#" aria-label="LinkedIn" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #2A4254; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none">in</a>
+<a href="#" aria-label="X" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #2A4254; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none">X</a>
+<a href="#" aria-label="YouTube" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #2A4254; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg></a>
+<a href="#" aria-label="Instagram" style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid #2A4254; color: #FFFFFF; display: flex; align-items: center; justify-content: center; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="5"></rect><circle cx="12" cy="12" r="3.5"></circle></svg></a>
+</div>
+</div>
+<div style="display: flex; gap: 64px">
+<div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px">
+<span style="font-weight: 700; color: #FFFFFF; margin-bottom: 4px">Product</span>
+<a href="02-Features.html" style="color: #C7D2DC; text-decoration: none">Features</a>
+<a href="04-Pricing.html" style="color: #C7D2DC; text-decoration: none">Pricing</a>
+<a href="03-How-It-Works.html" style="color: #C7D2DC; text-decoration: none">How It Works</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px">
+<span style="font-weight: 700; color: #FFFFFF; margin-bottom: 4px">Resources</span>
+<a href="05-Resources.html" style="color: #C7D2DC; text-decoration: none">Blog</a>
+<a href="05-Resources.html" style="color: #C7D2DC; text-decoration: none">Guides</a>
+<a href="10-Help-Center.html" style="color: #C7D2DC; text-decoration: none">Help Center</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px">
+<span style="font-weight: 700; color: #FFFFFF; margin-bottom: 4px">Company</span>
+<a href="07-About.html" style="color: #C7D2DC; text-decoration: none">About Us</a>
+<a href="08-Careers.html" style="color: #C7D2DC; text-decoration: none">Careers</a>
+<a href="09-Contact.html" style="color: #C7D2DC; text-decoration: none">Contact</a>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px">
+<span style="font-weight: 700; color: #FFFFFF; margin-bottom: 4px">Legal</span>
+<a href="11-Legal.html" style="color: #C7D2DC; text-decoration: none">Privacy Policy</a>
+<a href="11-Legal.html" style="color: #C7D2DC; text-decoration: none">Terms of Service</a>
+<a href="11-Legal.html" style="color: #C7D2DC; text-decoration: none">Cookie Policy</a>
+</div>
+</div>
+<div>
+<a href="12-Sign-Up.html" style="display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 24px; border-radius: 10px; background: #15803D; color: #FFFFFF; font-size: 16px; font-weight: 700; text-decoration: none">Get Started Free<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+</div>
+<div style="display: flex; justify-content: flex-end; font-size: 14px">© 2026 AmpliVerify. All rights reserved.</div>
+</footer>
+
+</div>
+</body></html>

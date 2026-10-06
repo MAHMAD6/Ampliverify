@@ -1,0 +1,27 @@
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
+.tabs { display: flex; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.tabs a { padding: 14px 16px; font-size: 15px; color: var(--heading); border-bottom: 3px solid transparent; }
+.tabs a.on { color: var(--blue); font-weight: 600; border-bottom-color: var(--blue); }
+.filters { display: flex; gap: 12px; padding: 14px 16px; flex-wrap: wrap; align-items: center; }
+.filters > :first-child { flex: 1 1 220px; }
+.filters select { min-width: 160px; }
+.views { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.views a { display: grid; place-items: center; width: 44px; height: 40px; color: var(--muted); }
+.views a.viewOn { background: var(--blue); color: #fff; }
+.body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 0 16px 16px; }
+.drop { display: grid; justify-items: center; align-content: center; gap: 8px; text-align: center; border: 2px dashed var(--line-strong); border-radius: var(--radius); padding: 40px 20px; min-height: 420px; }
+.drop b { font-size: 20px; color: var(--ink); }
+.drop p { font-size: 15px; color: var(--muted); max-width: 520px; }
+.drop span { font-size: 14px; color: var(--heading); }
+.drop small { font-size: 13px; color: var(--muted); }
+.dropIcon, .fileIcon { display: grid; place-items: center; width: 110px; height: 110px; border-radius: 50%; background: #eef2f8; color: #9aa7bc; margin-bottom: 6px; }
+.fileIcon { width: 90px; height: 90px; }
+.details { display: grid; justify-items: center; gap: 8px; background: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 16px; text-align: center; align-content: start; }
+.details b { font-size: 17px; color: var(--ink); }
+.details p { font-size: 14px; color: var(--muted); }
+.details dl { width: 100%; margin: 8px 0; text-align: left; display: grid; gap: 6px; font-size: 13px; }
+.details dl div { display: grid; grid-template-columns: 110px 1fr; }
+.details dt { color: var(--heading); }
+.details dd { margin: 0; color: var(--muted); }
+.actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; width: 100%; }
+@media (max-width: 1100px) { .body { grid-template-columns: minmax(0, 1fr); } }

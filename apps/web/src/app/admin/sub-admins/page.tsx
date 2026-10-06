@@ -1,8 +1,9 @@
 import { UserCog } from 'lucide-react';
-import { PendingScreen } from '@/components/ui/PendingScreen';
+import { AdminRoster } from '@/components/admin/AdminRoster';
+import { SUB_ADMIN_ROLE_KEYS } from '@/lib/admin-data';
 
 export const metadata = { title: 'Sub-Admins' };
 
-export default function Page() {
-  return <PendingScreen title="Sub-Admins" description="Restricted administrators and their scopes." crumbs={[{ label: 'Command Center', href: '/admin' }, { label: 'User Management' }, { label: 'Sub-Admins' }]} icon={<UserCog size={28} />} />;
+export default async function SubAdminsPage({ searchParams }: { searchParams: Promise<{ q?: string; scope?: string; status?: string }> }) {
+  return <AdminRoster kind="Sub-Admin" roleKeys={SUB_ADMIN_ROLE_KEYS} {...await searchParams} emptyIcon={<UserCog size={40} />} />;
 }
