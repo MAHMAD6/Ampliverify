@@ -1,20 +1,17 @@
-import { Swords } from 'lucide-react';
-import { GeoSubPage } from '@/components/app/geo/GeoSubPage';
+import { Users } from 'lucide-react';
+import { StateView } from '@/components/ui/StateView';
+import { GeoShell, GeoTable } from '@/components/app/geo/GeoShell';
 
 export const metadata = { title: 'Competitors · AI Search (GEO)' };
 
-/** Competitor share of voice in AI answers (`geo_competitors`, `geo_competitor_mentions`). */
-export default function Page() {
+/** Competitor visibility in AI answers (`geo_competitors`, `geo_competitor_mentions`). */
+export default async function Page({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period = '30d' } = await searchParams;
   return (
-    <GeoSubPage
-      title="Competitors"
-      description="Compare how often competitors are mentioned and cited in AI answers for your tracked prompts."
-      tableTitle="Competitor Visibility"
-      columns={['Competitor', 'Mentions', 'Share of Voice', 'Citations', 'Platforms', 'Trend']}
-      icon={<Swords size={28} />}
-      emptyTitle="No competitor data yet"
-      emptyText="Add competitors to this project and run prompt checks to compare visibility."
-      action="Add Competitor"
-    />
+    <GeoShell tab="competitors" period={period}>
+      <GeoTable columns={['Competitor', 'Mentions', 'Share of Voice', 'Citations', 'Platforms', 'Trend']}>
+        <StateView kind="empty" compact icon={<Users size={28} />} title="No competitor data yet" description="Add competitors to this project and run prompt checks to compare visibility." />
+      </GeoTable>
+    </GeoShell>
   );
 }

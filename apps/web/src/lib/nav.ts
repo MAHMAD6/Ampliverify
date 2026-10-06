@@ -31,10 +31,9 @@ export const APP_NAV: NavItem[] = [
     href: '/app/geo',
     children: [
       { label: 'Overview', href: '/app/geo' },
-      { label: 'Prompt Tracking', href: '/app/geo/prompts' },
+      { label: 'History', href: '/app/geo/history' },
       { label: 'Competitors', href: '/app/geo/competitors' },
       { label: 'Sources & Citations', href: '/app/geo/citations' },
-      { label: 'History', href: '/app/geo/history' },
     ],
   },
   { key: 'reports', label: 'Reports', href: '/app/reports' },

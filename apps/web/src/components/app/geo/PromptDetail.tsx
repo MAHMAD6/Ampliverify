@@ -219,7 +219,7 @@ export function PromptDetail({ prompt, tab }: { prompt: GeoPromptDetail; tab: Pr
       <PageHeader
         title="Prompt Detail"
         description="View detailed results, history, and source citations for this AI search prompt."
-        crumbs={appCrumbs({ label: 'AI Search (GEO)', href: '/app/geo' }, { label: 'Prompt Tracking', href: '/app/geo/prompts' }, { label: 'Prompt Detail' })}
+        crumbs={appCrumbs({ label: 'AI Search (GEO)', href: '/app/geo' }, { label: 'History', href: '/app/geo/history' }, { label: 'Prompt Detail' })}
         actions={
           <>
             <Button variant="secondary" disabled icon={<Pencil size={16} />}>
