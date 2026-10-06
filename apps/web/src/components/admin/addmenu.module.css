@@ -1,0 +1,8 @@
+.wrap { position: relative; display: inline-block; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 260px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 6px; }
+.item { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 10px; border: 0; background: none; border-radius: 8px; text-align: left; font: inherit; color: var(--heading); cursor: pointer; }
+.item:hover:not(:disabled) { background: var(--surface-alt); }
+.item:disabled { cursor: not-allowed; opacity: 0.7; }
+.item svg { color: var(--blue); margin-top: 2px; flex: none; }
+.item b { display: block; font-size: 15px; }
+.item small { font-size: 13px; color: var(--muted); }

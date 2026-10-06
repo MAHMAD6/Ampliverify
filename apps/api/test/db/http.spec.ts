@@ -181,5 +181,13 @@ describe('HTTP API', () => {
     expect(users.body.data.length).toBeLessThanOrEqual(5);
     const logs = await api().get('/api/v1/admin/audit-logs').set('authorization', admin.bearer).expect(200);
     expect(Array.isArray(logs.body.data)).toBe(true);
+
+    await api().get('/api/v1/admin/module-controls').set('authorization', regular.bearer).expect(403);
+    await api().get('/api/v1/admin/feature-flags').set('authorization', regular.bearer).expect(403);
+    await prisma.moduleControl.create({ data: { moduleKey: 'seo_audit', enabled: true, updatedBy: admin.id } });
+    const modules = await api().get('/api/v1/admin/module-controls').set('authorization', admin.bearer).expect(200);
+    expect(modules.body.data).toEqual([expect.objectContaining({ moduleKey: 'seo_audit', enabled: true, updater: expect.objectContaining({ id: admin.id }) })]);
+    const flags = await api().get('/api/v1/admin/feature-flags').set('authorization', admin.bearer).expect(200);
+    expect(flags.body.data).toEqual([]);
   });
 });

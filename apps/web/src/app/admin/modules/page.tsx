@@ -1,8 +1,76 @@
-import { ToggleLeft } from 'lucide-react';
-import { PendingScreen } from '@/components/ui/PendingScreen';
+import { BarChart3, Briefcase, BookOpen, FileSearch, Folder, KeyRound, LineChart, PenSquare, Sparkles, Lightbulb } from 'lucide-react';
+import { AdminList, StatusPill } from '@/components/admin/AdminList';
+import { Toggle } from '@/components/ui/Toggle';
+import { dateTime, loadModuleControls, matchesQ, userLabel } from '@/lib/admin-data';
 
 export const metadata = { title: 'Module Controls' };
 
-export default function Page() {
-  return <PendingScreen title="Module Controls" description="Enable or disable product modules platform-wide." crumbs={[{ label: 'Command Center', href: '/admin' }, { label: 'System Operations' }, { label: 'Module Controls' }]} icon={<ToggleLeft size={28} />} />;
+/** Platform modules from the design; `key` is the `module_controls.module_key`. */
+const MODULES = [
+  { key: 'seo_audit', name: 'On-Page SEO Audit', category: 'Core', text: 'Analyze website pages for SEO issues and improvement opportunities.', icon: <FileSearch size={18} /> },
+  { key: 'optimization', name: 'Optimization Center', category: 'Core', text: 'Get prioritized recommendations to improve search visibility.', icon: <LineChart size={18} /> },
+  { key: 'seo_editor', name: 'On-Page SEO Editor', category: 'Core', text: 'Create and optimize page content with SEO guidance.', icon: <PenSquare size={18} /> },
+  { key: 'content', name: 'Content Strategy', category: 'Content', text: 'Generate content ideas and topic clusters.', icon: <Lightbulb size={18} /> },
+  { key: 'keywords', name: 'Keyword Research', category: 'Core', text: 'Find and analyze keywords and search intent.', icon: <KeyRound size={18} /> },
+  { key: 'geo', name: 'AI Search (GEO)', category: 'AI', text: 'Optimize content for AI search and generative engine visibility.', icon: <Sparkles size={18} /> },
+  { key: 'reports', name: 'Reports', category: 'Analytics', text: 'Track performance and generate SEO reports.', icon: <BarChart3 size={18} /> },
+  { key: 'workspace', name: 'Projects', category: 'Workspace', text: 'Manage websites, pages, and SEO projects.', icon: <Folder size={18} /> },
+  { key: 'resources', name: 'Resources', category: 'Content', text: 'Manage articles, guides, and downloads.', icon: <BookOpen size={18} /> },
+  { key: 'careers', name: 'Careers', category: 'Content', text: 'Manage job openings and applications.', icon: <Briefcase size={18} /> },
+];
+
+/**
+ * Module Controls (chat design 2026-10-06). Status is live from
+ * `GET /admin/module-controls`; a module with no row is "Not Configured".
+ * Toggling needs the write endpoint (not built), so switches are read-only.
+ * Module availability never changes plan entitlements.
+ */
+export default async function ModuleControlsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; category?: string }> }) {
+  const { q, status, category } = await searchParams;
+  const controls = await loadModuleControls();
+  const byKey = new Map((controls ?? []).map((c) => [c.moduleKey, c]));
+  const statusOf = (k: string) => (!controls ? null : byKey.has(k) ? (byKey.get(k)!.enabled ? 'Enabled' : 'Disabled') : 'Not Configured');
+  const rows = MODULES.filter((m) => matchesQ(q, m.name, m.text) && (!category || m.category === category) && (!status || statusOf(m.key) === status));
+  return (
+    <AdminList
+      section="System Operations"
+      title="Module Controls"
+      description="Enable or disable platform modules for all users. Module availability does not affect plan entitlements."
+      about={{ title: 'Module Controls', text: 'These settings enable or disable modules globally. Plan-based access is managed under Feature Entitlements.' }}
+      basePath="/admin/modules"
+      search="Search modules by name or description..."
+      liveFilters={{ q }}
+      selects={[
+        { label: 'Status', name: 'status', value: status, options: ['All Statuses', 'Enabled', 'Disabled', 'Not Configured'] },
+        { label: 'Category', name: 'category', value: category, options: ['All Categories', 'Core', 'Content', 'AI', 'Analytics', 'Workspace'] },
+      ]}
+      columns={['Module', 'Category', 'Description', 'Status', 'Last Updated', 'Updated By']}
+      rows={rows.map((m) => {
+        const c = byKey.get(m.key);
+        const st = statusOf(m.key);
+        return [
+          <span key="m" style={{ display: 'inline-flex', gap: 10, alignItems: 'center', fontWeight: 600 }}>
+            <span style={{ display: 'grid', placeItems: 'center', width: 34, height: 34, borderRadius: 8, background: 'var(--blue-50)', color: 'var(--blue)' }}>{m.icon}</span>
+            {m.name}
+          </span>,
+          <StatusPill key="c" tone="blue">
+            {m.category}
+          </StatusPill>,
+          m.text,
+          st ? (
+            <span key="s" style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+              <Toggle label={`${m.name} enabled`} checked={st === 'Enabled'} disabled />
+              {st}
+            </span>
+          ) : (
+            '—'
+          ),
+          c ? dateTime(c.updatedAt) : '—',
+          c?.updater ? userLabel(c.updater) : '—',
+        ];
+      })}
+      empty={{ icon: <FileSearch size={40} />, title: 'No modules match your filters', text: 'Clear the filters to see every platform module.' }}
+      footnote={controls ? `Showing ${rows.length} of ${MODULES.length} modules. Changing a module requires confirmation and is audited.` : 'Module status will appear once it can be loaded with your admin permissions.'}
+    />
+  );
 }

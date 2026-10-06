@@ -1,41 +1,27 @@
-import { Newspaper, Plus } from 'lucide-react';
-import { AdminHeader, ListPanel, MetricRow } from '@/components/admin/AdminParts';
-import { ButtonLink } from '@/components/ui';
+import { Newspaper } from 'lucide-react';
+import { ContentList } from '@/components/admin/ContentList';
+import { apiGet } from '@/lib/api';
+import type { ContentSummary } from '@/lib/types';
 
 export const metadata = { title: 'Blog Posts' };
 
-export default function AdminBlogPage() {
+export default async function BlogPostsPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
+  const { tab, q } = await searchParams;
+  const posts = await apiGet<ContentSummary[]>('/public/blog?limit=50');
   return (
-    <>
-      <AdminHeader
-        section="Content Management"
-        title="Blog Posts"
-        description="Create, organize, review, and publish AmpliVerify blog content."
-        actions={
-          <ButtonLink href="/admin/blog/new" icon={<Plus size={16} />}>
-            New Blog Post
-          </ButtonLink>
-        }
-      />
-      <MetricRow
-        items={[
-          { label: 'Total Posts', note: 'No posts yet' },
-          { label: 'Published', note: 'No published posts' },
-          { label: 'Drafts', note: 'No drafts yet' },
-          { label: 'Scheduled', note: 'No scheduled posts' },
-        ]}
-      />
-      <ListPanel
-        title="Blog Posts"
-        description="Post title, author, status, publication date, and actions."
-        search="Search blog posts..."
-        selects={['All statuses', 'All authors', 'Newest first']}
-        columns={['Title', 'Author', 'Status', 'Published', 'Actions']}
-        emptyIcon={<Newspaper size={26} />}
-        emptyTitle="No blog posts yet"
-        emptyText="Start with a new draft. Posts remain unpublished until an authorized administrator explicitly publishes them."
-        action={<ButtonLink href="/admin/blog/new">Create Blog Post</ButtonLink>}
-      />
-    </>
+    <ContentList
+      title="Blog Posts"
+      description="Create, manage, and publish blog posts to share insights, updates, and resources."
+      noun="Blog Post"
+      createHref="/admin/blog/new"
+      icon={<Newspaper size={40} />}
+      items={posts.ok ? posts.data : []}
+      loaded={posts.ok}
+      tab={tab}
+      q={q}
+      basePath="/admin/blog"
+      publicBase="/blog"
+      emptyText="Create your first blog post to share your insights, updates, and resources with your audience."
+    />
   );
 }

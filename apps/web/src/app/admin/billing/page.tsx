@@ -1,62 +1,42 @@
-import { Download, Receipt } from 'lucide-react';
-import { AdminHeader, ListPanel, MetricRow, StatusPanel } from '@/components/admin/AdminParts';
-import { Button, Grid } from '@/components/ui';
+import { AlertCircle, CheckCircle2, Clock3, FileSearch, FileText, RotateCcw, XCircle } from 'lucide-react';
+import { AdminList } from '@/components/admin/AdminList';
 
 export const metadata = { title: 'Billing & Invoices' };
 
-export default function AdminBillingPage() {
+/** Billing & Invoices (chat design 2026-10-06). Provider-backed `invoices`; detail at /admin/billing/invoices/[id]. */
+export default async function BillingInvoicesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab = 'all' } = await searchParams;
   return (
-    <>
-      <AdminHeader
-        section="Billing & Access"
-        title="Billing & Invoices"
-        description="Review invoices, payments, and reconciliation status from authoritative billing records."
-        actions={
-          <Button variant="secondary" icon={<Download size={16} />} disabled>
-            Export
-          </Button>
-        }
-      />
-      <MetricRow
-        items={[
-          { label: 'Invoices', note: 'No invoice data loaded' },
-          { label: 'Paid', note: 'No paid invoices' },
-          { label: 'Open', note: 'No open invoices' },
-          { label: 'Failed / Void', note: 'No failed or void invoices' },
-        ]}
-      />
-      <ListPanel
-        title="Billing & Invoices"
-        description="Billing documents and payment state from provider-confirmed records."
-        search="Search invoice ID, organization, or email..."
-        selects={['All statuses', 'Date range']}
-        columns={['Invoice', 'Organization', 'Status', 'Total', 'Issued', 'Actions']}
-        emptyIcon={<Receipt size={26} />}
-        emptyTitle="No invoices available"
-        emptyText="Invoices will appear when billing activity is available. Amounts, tax, and statuses come directly from the billing provider."
-      />
-      <Grid cols={2} style={{ marginTop: 16 }}>
-        <StatusPanel
-          title="Invoice Actions"
-          description="Available actions depend on provider state and administrator permissions."
-          rows={[
-            ['View invoice', 'Provider-backed document'],
-            ['Download PDF', 'When the provider supplies one'],
-            ['Retry payment', 'Depends on provider state'],
-            ['Void / refund', 'Confirmation required'],
-          ]}
-        />
-        <StatusPanel
-          title="Reconciliation"
-          description="Billing inconsistencies between provider and AmpliVerify records."
-          rows={[
-            ['Unmatched payments', '—'],
-            ['Webhook discrepancies', '—'],
-            ['Refund mismatches', '—'],
-            ['Tax issues', '—'],
-          ]}
-        />
-      </Grid>
-    </>
+    <AdminList
+      section="Billing & Access"
+      title="Billing & Invoices"
+      description="View and manage all billing invoices."
+      metrics={[
+        { label: 'Total Invoices', icon: <FileText size={24} />, tone: 'blue' },
+        { label: 'Paid', icon: <CheckCircle2 size={24} />, tone: 'green' },
+        { label: 'Open', icon: <Clock3 size={24} />, tone: 'amber' },
+        { label: 'Past Due', icon: <AlertCircle size={24} />, tone: 'red' },
+        { label: 'Voided', icon: <XCircle size={24} />, tone: 'purple' },
+        { label: 'Refunded', icon: <RotateCcw size={24} />, tone: 'slate' },
+      ]}
+      tabs={[
+        { key: 'all', label: 'All Invoices' },
+        { key: 'paid', label: 'Paid' },
+        { key: 'open', label: 'Open' },
+        { key: 'past-due', label: 'Past Due' },
+        { key: 'voided', label: 'Voided' },
+        { key: 'refunded', label: 'Refunded' },
+      ]}
+      activeTab={tab}
+      basePath="/admin/billing"
+      search="Search by invoice number, user, account, or email..."
+      selects={[
+        { label: 'Status', options: ['All Statuses'] },
+        { label: 'Plan', options: ['All Plans'] },
+        { label: 'Billing Period', options: ['Select date range'] },
+      ]}
+      columns={['Invoice #', 'Subscriber / Account', 'Plan', 'Amount', 'Status', 'Invoice Date', 'Due Date', 'Paid Date', 'Actions']}
+      empty={{ icon: <FileSearch size={40} />, title: 'No invoices yet', text: 'When invoices are generated for subscriptions, they will appear here.' }}
+    />
   );
 }

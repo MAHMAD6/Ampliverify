@@ -61,36 +61,41 @@ export function appCrumbs(...trail: { label: string; href?: string }[]) {
   return [{ label: 'Dashboard', href: '/app/dashboard', home: true }, ...trail];
 }
 
-/** Super Admin navigation, from the approved admin shell (docs/design/admin-batch*). */
-export const ADMIN_NAV: { section?: string; items: { key: string; label: string; href: string }[] }[] = [
-  { items: [{ key: 'command', label: 'Command Center', href: '/admin' }] },
+/**
+ * Super Admin navigation: collapsible groups from the admin redesign (chat
+ * images 2026-10-06; docs/INPUTS.md). Older content items (categories,
+ * authors, videos, events, case studies) remain routable but are not listed.
+ */
+export type AdminNavGroup = { key: string; label: string; href?: string; items?: { key: string; label: string; href: string }[] };
+
+export const ADMIN_NAV: AdminNavGroup[] = [
+  { key: 'command', label: 'Command Center', href: '/admin' },
   {
-    section: 'User Management',
+    key: 'users-group',
+    label: 'User Management',
     items: [
       { key: 'users', label: 'All Users', href: '/admin/users' },
       { key: 'admins', label: 'Admins', href: '/admin/admins' },
       { key: 'sub-admins', label: 'Sub-Admins', href: '/admin/sub-admins' },
+      { key: 'admin-detail', label: 'Admin / Sub-Admin Detail', href: '/admin/admins/detail' },
       { key: 'roles', label: 'Roles & Permissions', href: '/admin/roles' },
       { key: 'access', label: 'Access Assignments', href: '/admin/access' },
     ],
   },
   {
-    section: 'Content Management',
+    key: 'content-group',
+    label: 'Content Management',
     items: [
       { key: 'content', label: 'Content Overview', href: '/admin/content' },
       { key: 'blog', label: 'Blog Posts', href: '/admin/blog' },
-      { key: 'categories', label: 'Categories & Tags', href: '/admin/categories' },
-      { key: 'authors', label: 'Authors', href: '/admin/authors' },
-      { key: 'videos', label: 'Videos', href: '/admin/videos' },
-      { key: 'events', label: 'Webinars & Events', href: '/admin/events' },
-      { key: 'resources', label: 'Resources & Downloads', href: '/admin/resources' },
-      { key: 'case-studies', label: 'Case Studies', href: '/admin/case-studies' },
+      { key: 'resources', label: 'Resources', href: '/admin/resources' },
       { key: 'media', label: 'Media Library', href: '/admin/media' },
       { key: 'careers', label: 'Careers / Job Openings', href: '/admin/careers' },
     ],
   },
   {
-    section: 'Billing & Access',
+    key: 'billing-group',
+    label: 'Billing & Access',
     items: [
       { key: 'plans', label: 'Plans & Pricing', href: '/admin/plans' },
       { key: 'entitlements', label: 'Feature Entitlements', href: '/admin/entitlements' },
@@ -100,7 +105,8 @@ export const ADMIN_NAV: { section?: string; items: { key: string; label: string;
     ],
   },
   {
-    section: 'System Operations',
+    key: 'ops-group',
+    label: 'System Operations',
     items: [
       { key: 'modules', label: 'Module Controls', href: '/admin/modules' },
       { key: 'flags', label: 'Feature Flags', href: '/admin/flags' },
@@ -108,7 +114,17 @@ export const ADMIN_NAV: { section?: string; items: { key: string; label: string;
       { key: 'health', label: 'System Health', href: '/admin/health' },
       { key: 'activity', label: 'Admin Activity', href: '/admin/activity' },
       { key: 'security', label: 'Security & Access', href: '/admin/security' },
-      { key: 'settings', label: 'Settings', href: '/admin/settings' },
+      { key: 'audit', label: 'Audit Logs', href: '/admin/audit-logs' },
+    ],
+  },
+  {
+    key: 'settings-group',
+    label: 'Settings',
+    items: [
+      { key: 'settings', label: 'General', href: '/admin/settings' },
+      { key: 'settings-notifications', label: 'Notifications', href: '/admin/settings/notifications' },
+      { key: 'settings-security', label: 'Security', href: '/admin/settings/security' },
+      { key: 'settings-appearance', label: 'Appearance', href: '/admin/settings/appearance' },
     ],
   },
 ];

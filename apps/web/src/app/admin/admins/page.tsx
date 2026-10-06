@@ -1,8 +1,9 @@
 import { ShieldCheck } from 'lucide-react';
-import { PendingScreen } from '@/components/ui/PendingScreen';
+import { AdminRoster } from '@/components/admin/AdminRoster';
+import { ADMIN_ROLE_KEYS } from '@/lib/admin-data';
 
 export const metadata = { title: 'Admins' };
 
-export default function Page() {
-  return <PendingScreen title="Admins" description="Platform administrators and their access." crumbs={[{ label: 'Command Center', href: '/admin' }, { label: 'User Management' }, { label: 'Admins' }]} icon={<ShieldCheck size={28} />} />;
+export default async function AdminsPage({ searchParams }: { searchParams: Promise<{ q?: string; scope?: string; status?: string }> }) {
+  return <AdminRoster kind="Admin" roleKeys={ADMIN_ROLE_KEYS} {...await searchParams} emptyIcon={<ShieldCheck size={40} />} />;
 }

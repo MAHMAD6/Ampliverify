@@ -1,43 +1,28 @@
-import { LibraryBig, Plus } from 'lucide-react';
-import { AdminHeader, ListPanel, MetricRow } from '@/components/admin/AdminParts';
-import { ButtonLink } from '@/components/ui';
+import { LibraryBig } from 'lucide-react';
+import { ContentList } from '@/components/admin/ContentList';
+import { apiGet } from '@/lib/api';
+import type { ContentSummary } from '@/lib/types';
 
 export const metadata = { title: 'Resources' };
 
-/** "Resources" in Super Admin are the public Guides (guides table). */
-export default function AdminResourcesPage() {
+/** Resources are guides (`guides` table). */
+export default async function ResourcesPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
+  const { tab, q } = await searchParams;
+  const guides = await apiGet<ContentSummary[]>('/public/guides?limit=50');
   return (
-    <>
-      <AdminHeader
-        section="Content Management"
-        page="Resources"
-        title="Resources & Articles"
-        description="Manage educational resources and reference content available across AmpliVerify."
-        actions={
-          <ButtonLink href="/admin/blog/new?type=guide" icon={<Plus size={16} />}>
-            New Resource
-          </ButtonLink>
-        }
-      />
-      <MetricRow
-        items={[
-          { label: 'Total Resources', note: 'No resources yet' },
-          { label: 'Published', note: 'No published resources' },
-          { label: 'Drafts', note: 'No drafts yet' },
-          { label: 'Archived', note: 'No archived resources' },
-        ]}
-      />
-      <ListPanel
-        title="Resource Library"
-        description="Resource title, type, status, updated date, and actions."
-        search="Search resources..."
-        selects={['All types', 'All statuses', 'Newest first']}
-        columns={['Title', 'Type', 'Status', 'Updated', 'Actions']}
-        emptyIcon={<LibraryBig size={26} />}
-        emptyTitle="No resources yet"
-        emptyText="Create an article or resource when content is ready. Drafts stay private until an authorized administrator publishes them."
-        action={<ButtonLink href="/admin/blog/new?type=guide">Create Resource</ButtonLink>}
-      />
-    </>
+    <ContentList
+      title="Resources"
+      description="Manage guides and downloadable resources to educate and support your audience."
+      noun="Resource"
+      createHref="/admin/blog/new?type=guide"
+      icon={<LibraryBig size={40} />}
+      items={guides.ok ? guides.data : []}
+      loaded={guides.ok}
+      tab={tab}
+      q={q}
+      basePath="/admin/resources"
+      publicBase="/guides"
+      emptyText="Create your first resource to share guides, templates, checklists, and other helpful materials."
+    />
   );
 }

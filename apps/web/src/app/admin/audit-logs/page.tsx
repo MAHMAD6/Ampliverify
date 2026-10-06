@@ -1,87 +1,31 @@
-import { CircleCheck, ScrollText } from 'lucide-react';
-import { Button, EmptyState, KeyValue, Notice, Panel } from '@/components/ui';
-import { AdminHeader, MetricRow } from '@/components/admin/AdminParts';
-import { AuditTable } from '@/components/admin/AuditTable';
-import { filterRecords, isSensitive, loadAudit, type AuditFilters } from '@/lib/audit';
-import s from '@/components/admin/audit.module.css';
+import { FileText, Settings, Shield, User } from 'lucide-react';
+import { AuditList } from '@/components/admin/AuditList';
+import { categoryOf, loadAudit, type AuditFilters } from '@/lib/audit';
 
 export const metadata = { title: 'Audit Logs' };
 
-/**
- * Audit Logs (admin-final-batch1/03): every server-generated audit record
- * (`GET /admin/audit-logs`). The schema records no outcome per event, so
- * "Failed Actions" and the outcome filter are not shown as data.
- */
+/** Audit Logs (chat design 2026-10-06; final-batch1/03). Every server-generated audit record. */
 export default async function AuditLogsPage({ searchParams }: { searchParams: Promise<AuditFilters> }) {
   const filters = await searchParams;
   const audit = await loadAudit();
-  const rows = filterRecords(audit.records, filters);
-  const loaded = audit.ok;
-
+  const n = (cat: string) => (audit.ok ? audit.records.filter((r) => categoryOf(r.eventType) === cat).length : undefined);
   return (
-    <>
-      <AdminHeader
-        section="System Operations"
-        title="Audit Logs"
-        description="Inspect server-generated audit records for consequential and security-relevant actions."
-        actions={
-          <Button variant="outline" disabled title="Exports must themselves be audited; available once the export endpoint exists.">
-            Export Audit Log
-          </Button>
-        }
-      />
-      <div style={{ marginBottom: 16 }}>
-        <Notice tone="neutral" title="Audit integrity:">
-          Records are server-generated, append-only at the database layer, and readable only with the audit permission.
-        </Notice>
-      </div>
-      <MetricRow
-        items={[
-          { label: 'Audit Events', value: loaded ? audit.records.length : undefined, note: loaded ? 'Most recent 500 records' : 'No audit data loaded' },
-          { label: 'Sensitive Changes', value: loaded ? audit.records.filter(isSensitive).length : undefined, note: loaded ? 'User, role and access changes' : 'No sensitive events' },
-          { label: 'Failed Actions', note: 'Outcomes are not recorded yet' },
-          { label: 'Retention', note: 'Not configured' },
-        ]}
-      />
-      <Panel title="Audit Log" description="Search immutable records of security, billing, access, and administrative changes." bodyless>
-        <AuditTable
-          records={rows}
-          filters={filters}
-          actors={audit.actors}
-          detailBase="/admin/audit-logs"
-          searchLabel="Search actor, target, action, or reference..."
-          actorFilter={false}
-          empty={
-            <EmptyState
-              icon={<ScrollText size={26} />}
-              title={audit.records.length && rows.length === 0 ? 'No records match your filters' : 'No audit events available'}
-              description="Server-generated audit events will appear here when available."
-            />
-          }
-        />
-      </Panel>
-      <div className={s.split}>
-        <Panel title="Recorded Event Fields" description="Context captured with every audit record." flushHead>
-          <KeyValue label="Actor" value="User ID and role" />
-          <KeyValue label="Action" value="Normalized event name" />
-          <KeyValue label="Target" value="Resource type and ID" />
-          <KeyValue label="Change" value="Before / after values where applicable" />
-          <KeyValue label="Timestamp" value="Server-generated" />
-        </Panel>
-        <Panel title="Audit Safeguards" description="How evidentiary value is protected." flushHead>
-          <ul className={s.checks}>
-            <li>
-              <CircleCheck size={16} /> Application users cannot edit or delete audit records (database triggers reject it).
-            </li>
-            <li>
-              <CircleCheck size={16} /> Before/after values are recorded for consequential configuration changes.
-            </li>
-            <li>
-              <CircleCheck size={16} /> Reading the log requires the global audit permission.
-            </li>
-          </ul>
-        </Panel>
-      </div>
-    </>
+    <AuditList
+      title="Audit Logs"
+      description="A chronological record of important system events, changes, and administrative actions."
+      about={{ title: 'About Audit Logs', text: 'Key system events and administrative actions. Filter by event type or date range and open any event for its full context, including IP address.' }}
+      metrics={[
+        { label: 'Total Events', icon: <FileText size={24} />, tone: 'blue', value: audit.ok ? audit.records.length : undefined, note: audit.ok ? 'Most recent 500 records' : 'No data available yet' },
+        { label: 'User Events', icon: <User size={24} />, tone: 'green', value: n('tenant') },
+        { label: 'System Events', icon: <Settings size={24} />, tone: 'purple', value: n('system') },
+        { label: 'Security Events', icon: <Shield size={24} />, tone: 'amber', value: n('access') },
+      ]}
+      records={audit.records}
+      actors={audit.actors}
+      filters={filters}
+      basePath="/admin/audit-logs"
+      emptyTitle="No audit log records yet"
+      footnote="Audit records are append-only. Additional details, including IP address and full event context, are in the event detail view."
+    />
   );
 }

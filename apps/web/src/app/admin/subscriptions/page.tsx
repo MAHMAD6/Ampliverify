@@ -1,62 +1,35 @@
-import { CreditCard, RefreshCw } from 'lucide-react';
-import { AdminHeader, ListPanel, MetricRow, StatusPanel } from '@/components/admin/AdminParts';
-import { Button, Grid } from '@/components/ui';
+import { CalendarX2, CheckCircle2, Clock3, Hourglass, Users, XCircle, FileSearch } from 'lucide-react';
+import { AdminList } from '@/components/admin/AdminList';
 
 export const metadata = { title: 'Subscriptions' };
 
-export default function SubscriptionsPage() {
+/** Subscriptions (chat design 2026-10-06). Provider-synchronized `subscriptions`; the admin billing API is not built, so counts read "—" (never a guessed 0). */
+export default async function SubscriptionsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab = 'all' } = await searchParams;
   return (
-    <>
-      <AdminHeader
-        section="Billing & Access"
-        title="Subscriptions"
-        description="Monitor customer subscription lifecycle from billing provider and account records."
-        actions={
-          <Button variant="secondary" icon={<RefreshCw size={16} />} disabled>
-            Refresh Provider Data
-          </Button>
-        }
-      />
-      <MetricRow
-        items={[
-          { label: 'Total Subscriptions', note: 'No subscription data loaded' },
-          { label: 'Active', note: 'No active subscriptions' },
-          { label: 'Past Due', note: 'No past-due subscriptions' },
-          { label: 'Canceled', note: 'No canceled subscriptions' },
-        ]}
-      />
-      <ListPanel
-        title="Subscriptions"
-        description="Subscription state from the billing provider and internal account records."
-        search="Search by organization, email, or subscription ID..."
-        selects={['All statuses', 'All plans', 'All intervals']}
-        columns={['Organization', 'Plan', 'Status', 'Interval', 'Period end', 'Actions']}
-        emptyIcon={<CreditCard size={26} />}
-        emptyTitle="No subscriptions yet"
-        emptyText="Subscription records will appear here after billing activity exists."
-      />
-      <Grid cols={2} style={{ marginTop: 16 }}>
-        <StatusPanel
-          title="Subscription Controls"
-          description="Consequential actions are limited and audited."
-          rows={[
-            ['Change plan', 'Requires confirmation'],
-            ['Cancel subscription', 'Requires confirmation'],
-            ['Resume subscription', 'Depends on provider state'],
-            ['Refund handling', 'Follows the approved billing policy'],
-          ]}
-        />
-        <StatusPanel
-          title="Provider Sync"
-          description="The billing provider is the source of truth for payment state."
-          rows={[
-            ['Last synchronization', 'Not available yet'],
-            ['Webhook health', 'Not available yet'],
-            ['Pending events', '—'],
-            ['Reconciliation issues', '—'],
-          ]}
-        />
-      </Grid>
-    </>
+    <AdminList
+      section="Billing & Access"
+      title="Subscriptions"
+      description="View and manage all AmpliVerify subscriptions."
+      metrics={[
+        { label: 'Total Subscriptions', icon: <Users size={24} />, tone: 'blue' },
+        { label: 'Active', icon: <CheckCircle2 size={24} />, tone: 'green' },
+        { label: 'Trial', icon: <Clock3 size={24} />, tone: 'amber' },
+        { label: 'Pending', icon: <Hourglass size={24} />, tone: 'slate' },
+        { label: 'Canceled', icon: <XCircle size={24} />, tone: 'red' },
+        { label: 'Expired', icon: <CalendarX2 size={24} />, tone: 'slate' },
+      ]}
+      tabs={['all', 'active', 'trial', 'pending', 'canceled', 'expired'].map((k) => ({ key: k, label: k === 'all' ? 'All Subscriptions' : k.charAt(0).toUpperCase() + k.slice(1) }))}
+      activeTab={tab}
+      basePath="/admin/subscriptions"
+      search="Search by user, account, or email..."
+      selects={[
+        { label: 'Plan', options: ['All Plans'] },
+        { label: 'Status', options: ['All Statuses'] },
+        { label: 'Billing Interval', options: ['All Intervals'] },
+      ]}
+      columns={['Subscriber / Account', 'Plan', 'Billing Interval', 'Status', 'Start Date', 'Renewal / End Date', 'Actions']}
+      empty={{ icon: <FileSearch size={40} />, title: 'No subscriptions yet', text: 'When users subscribe to a plan, their subscriptions will appear here.' }}
+    />
   );
 }
