@@ -1,19 +1,17 @@
-import { History } from 'lucide-react';
-import { GeoSubPage } from '@/components/app/geo/GeoSubPage';
+import { TrendingUp } from 'lucide-react';
+import { StateView } from '@/components/ui/StateView';
+import { GeoShell, GeoTable } from '@/components/app/geo/GeoShell';
 
-export const metadata = { title: 'History · AI Search (GEO)' };
+export const metadata = { title: 'Visibility Trends · AI Search (GEO)' };
 
-/** Past prompt checks (`geo_runs`, `geo_platform_results`). */
-export default function Page() {
+/** Visibility Trends tab = the page map's History (`geo_runs`, `geo_visibility_snapshots`). Empty until the GEO API exists. */
+export default async function Page({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  const { period = '30d' } = await searchParams;
   return (
-    <GeoSubPage
-      title="History"
-      description="Every prompt check that has run for this project, with its results and credit usage."
-      tableTitle="Check History"
-      columns={['Run', 'Prompts', 'Platforms', 'Started', 'Status', 'Credits Used']}
-      icon={<History size={28} />}
-      emptyTitle="No checks have run yet"
-      emptyText="Checks appear here once tracked prompts are monitored."
-    />
+    <GeoShell tab="trends" period={period}>
+      <GeoTable columns={['Check', 'Prompts', 'Platforms', 'Visibility Score', 'Started', 'Status', 'Credits Used']}>
+        <StateView kind="empty" compact icon={<TrendingUp size={28} />} title="No visibility history yet" description="Visibility trends appear once prompts have been checked at least twice." />
+      </GeoTable>
+    </GeoShell>
   );
 }

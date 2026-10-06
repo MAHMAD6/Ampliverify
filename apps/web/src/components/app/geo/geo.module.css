@@ -1,0 +1,36 @@
+.period { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding-left: 12px; background: #fff; color: var(--blue); }
+.period select { border: 0; min-width: 150px; }
+.metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.metric { display: flex; gap: 16px; align-items: center; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; min-width: 0; }
+.metric b { display: block; font-size: 26px; color: var(--ink); line-height: 1.2; }
+.metric small { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--blue-600); }
+.metric small svg { color: var(--muted); }
+.metricIcon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; flex: none; }
+.metricIcon[data-tone='purple'] { background: var(--purple-50); color: var(--purple); }
+.metricIcon[data-tone='green'] { background: var(--green-50); color: var(--green); }
+.metricIcon[data-tone='amber'] { background: var(--amber-50); color: #f97316; }
+.metricIcon[data-tone='red'] { background: var(--red-50); color: #e11d48; }
+.tabs { display: flex; background: #fff; border: 1px solid var(--line); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; overflow-x: auto; }
+.tabs a { flex: 1; text-align: center; padding: 12px 14px; font-size: 15px; color: var(--heading); border-bottom: 3px solid var(--line); white-space: nowrap; }
+.tabs a.tabOn { color: var(--blue); font-weight: 600; border-bottom-color: var(--blue); }
+.body { background: #fff; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius) var(--radius); padding: 14px; display: grid; gap: 14px; }
+.filters { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(150px, 1fr)); gap: 12px; }
+.tableWrap { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th { text-align: left; background: var(--surface-alt); padding: 10px 14px; font-size: 14px; color: var(--heading); font-weight: 600; white-space: nowrap; }
+.table td { padding: 10px 14px; border-top: 1px solid var(--line); color: var(--text); }
+.platform { display: flex; gap: 10px; align-items: center; }
+.mono { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--blue-50); color: var(--blue); font-weight: 800; font-size: 13px; }
+.credits { display: flex; gap: 14px; align-items: center; background: var(--blue-50); border-radius: var(--radius-sm); padding: 12px 16px; max-width: 660px; margin: 0 auto; width: 100%; }
+.credits > svg { color: var(--blue); flex: none; }
+.credits span { flex: 1; }
+.credits b { display: block; font-size: 14px; color: var(--ink); }
+.credits small { font-size: 13px; color: var(--muted); }
+.credits a { display: inline-flex; gap: 4px; align-items: center; font-size: 14px; color: var(--blue); font-weight: 600; white-space: nowrap; }
+.features { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; padding: 8px 4px 4px; }
+.feature { display: flex; gap: 14px; align-items: flex-start; }
+.feature b { display: block; font-size: 15px; color: var(--ink); }
+.feature small { font-size: 13px; color: var(--muted); }
+.featureIcon { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%; background: var(--blue-50); color: var(--blue); flex: none; }
+@media (max-width: 1300px) { .metrics, .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .metrics, .features, .filters { grid-template-columns: minmax(0, 1fr); } }

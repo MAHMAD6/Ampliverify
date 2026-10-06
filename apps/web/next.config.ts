@@ -11,10 +11,15 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   async redirects() {
-    return RENAMED.flatMap(([from, to]) => [
-      { source: from, destination: to, permanent: true },
-      { source: `${from}/:path*`, destination: `${to}/:path*`, permanent: true },
-    ]);
+    return [
+      ...RENAMED.flatMap(([from, to]) => [
+        { source: from, destination: to, permanent: true },
+        { source: `${from}/:path*`, destination: `${to}/:path*`, permanent: true },
+      ]),
+      // Prompt Tracking is the AI Search (GEO) Overview's default tab (GEO design, docs/INPUTS.md #67).
+      // Prompt detail pages stay at /app/geo/prompts/[id].
+      { source: '/app/geo/prompts', destination: '/app/geo', permanent: false },
+    ];
   },
 };
 

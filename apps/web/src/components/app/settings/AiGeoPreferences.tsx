@@ -3,7 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import {
+  BarChart3,
+  Bell,
+  Bot,
   ChevronDown,
+  Database,
+  SlidersHorizontal,
+  Target,
   ChevronUp,
   Clock3,
   Coins,
@@ -17,7 +23,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { Button, Select } from '@/components/ui';
+import { Button, ButtonLink, Select } from '@/components/ui';
 import { Toggle } from '@/components/ui/Toggle';
 import s from './ai-geo.module.css';
 
@@ -34,7 +40,12 @@ type Prefs = {
   depth: 'LIGHT' | 'STANDARD' | 'DEEP';
   focus: string[];
   credits: { notifyLow: boolean; monthlyLimit: boolean };
+  tone: string;
+  detail: string;
+  style: string;
 };
+
+type Group = 'providers' | 'behavior' | 'geo' | 'credits';
 
 /** Defaults shown by the design ("Weekly — Recommended", "Standard (Recommended)"); nothing else pre-selected. */
 const DEFAULTS: Prefs = {
@@ -47,7 +58,14 @@ const DEFAULTS: Prefs = {
   depth: 'STANDARD',
   focus: [],
   credits: { notifyLow: false, monthlyLimit: false },
+  tone: '',
+  detail: '',
+  style: '',
 };
+
+const TONES = ['Professional', 'Friendly', 'Conversational', 'Formal'];
+const DETAIL = ['Concise', 'Balanced', 'Detailed'];
+const STYLES = ['Paragraphs', 'Bullet points', 'Mixed'];
 
 const FREQUENCIES: { key: Frequency; label: string; text: string; recommended?: boolean }[] = [
   { key: 'DAILY', label: 'Daily', text: 'More frequent updates (uses more credits)' },
@@ -76,6 +94,42 @@ function Section({ icon, title, text, children, aside }: { icon: React.ReactNode
   );
 }
 
+/** Collapsible preference group (design: AI & GEO Preferences overview, docs/INPUTS.md #66). */
+function Group({ id, icon, title, text, open, onToggle, children }: { id: string; icon: React.ReactNode; title: string; text: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <section className={s.group} aria-labelledby={`grp-${id}`}>
+      <div className={s.groupHead}>
+        <span className={s.groupIcon}>{icon}</span>
+        <div>
+          <h3 id={`grp-${id}`}>{title}</h3>
+          <p>{text}</p>
+        </div>
+        <button type="button" className={s.collapse} aria-expanded={open} aria-controls={`grp-body-${id}`} aria-label={`${open ? 'Collapse' : 'Expand'} ${title}`} onClick={onToggle}>
+          {open ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
+        </button>
+      </div>
+      {open && (
+        <div id={`grp-body-${id}`} className={s.groupBody}>
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EmptyRow({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action: React.ReactNode }) {
+  return (
+    <div className={s.emptyRow}>
+      <span className={s.emptyRowIcon}>{icon}</span>
+      <span className={s.emptyRowText}>
+        <b>{title}</b>
+        <small>{text}</small>
+      </span>
+      {action}
+    </div>
+  );
+}
+
 function ToggleRow({ label, text, checked, onChange }: { label: string; text: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className={s.toggleRow}>
@@ -89,13 +143,17 @@ function ToggleRow({ label, text, checked, onChange }: { label: string; text: st
 }
 
 /**
- * AI & GEO Preferences (chat design 2026-10-06). Tracking platforms come from
+ * AI & GEO Preferences: overview with four collapsible groups (docs/INPUTS.md
+ * #66); "Configure" opens the detailed forms from the earlier design (#64).
+ * Tracking platforms come from
  * the GEO platform registry (`GET /public/geo-platforms`); locations and
  * languages from the shared lists. The form is fully interactive, but there
  * is no preferences API yet, so Save stays disabled and nothing is persisted.
  */
 export function AiGeoPreferences({ platforms, locations, languages }: { platforms: Platform[]; locations: string[]; languages: string[] }) {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
+  const [openGroups, setOpenGroups] = useState<Record<Group, boolean>>({ providers: true, behavior: true, geo: true, credits: true });
+  const [editing, setEditing] = useState<Partial<Record<Group, boolean>>>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -116,212 +174,345 @@ export function AiGeoPreferences({ platforms, locations, languages }: { platform
   const dirty = JSON.stringify(prefs) !== JSON.stringify(DEFAULTS);
   const selected = platforms.filter((p) => prefs.platforms.includes(p.key));
 
+  const open = (key: Group) => setOpenGroups((o) => ({ ...o, [key]: !o[key] }));
+  const configure = (key: Group) => {
+    setEditing((e) => ({ ...e, [key]: true }));
+    setOpenGroups((o) => ({ ...o, [key]: true }));
+  };
+  const anyEditing = Object.values(editing).some(Boolean);
+
   return (
     <>
       <div className={s.titleRow}>
         <div>
-          <h2>
-            AI &amp; GEO Preferences <Info size={18} className={s.info} aria-hidden />
-          </h2>
-          <p>Configure how AI search tracking and analysis work for your projects. These settings apply to new projects by default and can be customized per project.</p>
+          <h2>AI &amp; GEO Preferences</h2>
+          <p>Configure your AI providers, GEO monitoring preferences, and how AI features work across AmpliVerify.</p>
         </div>
-        <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={() => setPrefs(DEFAULTS)} disabled={!dirty}>
-          Restore Defaults
-        </Button>
+        {anyEditing && (
+          <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={() => setPrefs(DEFAULTS)} disabled={!dirty}>
+            Restore Defaults
+          </Button>
+        )}
       </div>
 
-      <div className={s.grid}>
-        <Section
-          icon={<Layers size={22} />}
-          title="Tracking Platforms"
-          text="Select which AI search platforms to track by default."
-          aside={
-            <div className={s.pickerWrap} ref={pickerRef}>
-              <span className={s.count}>{selected.length} selected</span>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-expanded={pickerOpen}
-                aria-haspopup="dialog"
-                disabled={platforms.length === 0}
-                onClick={() => {
-                  setDraft(prefs.platforms);
-                  setPickerOpen((o) => !o);
-                }}
-              >
-                Select Platforms {pickerOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </Button>
-              {pickerOpen && (
-                <div className={s.picker} role="dialog" aria-label="Select AI search platforms">
-                  <div className={s.pickerHead}>
-                    <b>Select AI Search Platforms</b>
-                    <button type="button" aria-label="Close" onClick={() => setPickerOpen(false)}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                  <p>Choose the platforms to track. No account connection is required.</p>
-                  {platforms.map((p) => (
-                    <label key={p.key} className={s.pickItem}>
-                      <input
-                        type="checkbox"
-                        checked={draft.includes(p.key)}
-                        onChange={(e) => setDraft((d) => (e.target.checked ? [...d, p.key] : d.filter((k) => k !== p.key)))}
-                      />
-                      <span className={s.mono}>{p.name.charAt(0)}</span>
-                      {p.name}
-                    </label>
-                  ))}
-                  <div className={s.pickerActions}>
-                    <Button variant="outline" size="sm" onClick={() => setPickerOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        set('platforms', draft);
-                        setPickerOpen(false);
-                      }}
-                    >
-                      Apply ({draft.length} selected)
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          }
+      <div className={s.groups}>
+        <Group
+          id="providers"
+          icon={<Settings size={26} />}
+          title="AI Provider Settings"
+          text="Choose and manage AI providers for content generation, analysis, and recommendations."
+          open={openGroups.providers}
+          onToggle={() => open('providers')}
         >
-          {platforms.length === 0 ? (
-            <div className={s.empty}>No AI search platforms are available yet.</div>
-          ) : selected.length === 0 ? (
-            <div className={s.empty}>
-              <b>No platforms selected yet</b>
-              <small>Choose the AI search platforms you want to track.</small>
+          <EmptyRow
+            icon={<Bot size={30} />}
+            title="No AI providers configured"
+            text="Connect an AI provider to enable AI-powered features."
+            action={
+              <ButtonLink href="/app/settings/integrations" variant="outline">
+                Configure Providers
+              </ButtonLink>
+            }
+          />
+        </Group>
+
+        <Group
+          id="behavior"
+          icon={<SlidersHorizontal size={26} />}
+          title="Default AI Behavior"
+          text="Set how AI should generate content, provide recommendations, and respond."
+          open={openGroups.behavior}
+          onToggle={() => open('behavior')}
+        >
+          {editing.behavior ? (
+            <div className={s.grid}>
+              <Section icon={<FileText size={22} />} title="Writing Style" text="Tone, detail level and output style for AI-generated content.">
+                <div className={s.two}>
+                  <label className={s.field}>
+                    <span>Tone</span>
+                    <Select value={prefs.tone} onChange={(e) => set('tone', e.target.value)}>
+                      <option value="">Select a tone</option>
+                      {TONES.map((t) => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label className={s.field}>
+                    <span>Detail Level</span>
+                    <Select value={prefs.detail} onChange={(e) => set('detail', e.target.value)}>
+                      <option value="">Select a detail level</option>
+                      {DETAIL.map((t) => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label className={s.field}>
+                    <span>Output Style</span>
+                    <Select value={prefs.style} onChange={(e) => set('style', e.target.value)}>
+                      <option value="">Select an output style</option>
+                      {STYLES.map((t) => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </Select>
+                  </label>
+                </div>
+              </Section>
+            <Section icon={<Sparkles size={22} />} title="AI Analysis Preferences" text="Customize how AI analyzes and interprets your results.">
+              <div className={s.two}>
+                <label className={s.field}>
+                  <span>Analysis Depth</span>
+                  <Select value={prefs.depth} onChange={(e) => set('depth', e.target.value as Prefs['depth'])}>
+                    <option value="LIGHT">Light</option>
+                    <option value="STANDARD">Standard (Recommended)</option>
+                    <option value="DEEP">Deep</option>
+                  </Select>
+                  <small>Deeper analysis uses more credits.</small>
+                </label>
+                <fieldset className={s.field}>
+                  <legend>Focus Areas (Select all that apply)</legend>
+                  <div className={s.checks}>
+                    {FOCUS.map((f) => (
+                      <label key={f}>
+                        <input type="checkbox" checked={prefs.focus.includes(f)} onChange={(e) => set('focus', e.target.checked ? [...prefs.focus, f] : prefs.focus.filter((x) => x !== f))} /> {f}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              </div>
+            </Section>
             </div>
           ) : (
-            <ul className={s.chips}>
-              {selected.map((p) => (
-                <li key={p.key}>
-                  <span className={s.mono}>{p.name.charAt(0)}</span>
-                  {p.name}
-                  <button type="button" aria-label={`Remove ${p.name}`} onClick={() => set('platforms', prefs.platforms.filter((k) => k !== p.key))}>
-                    <X size={12} />
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <EmptyRow
+              icon={<FileText size={30} />}
+              title="No default AI behavior set"
+              text="Choose your preferred tone, detail level, and output style."
+              action={
+                <Button variant="outline" onClick={() => configure('behavior')}>
+                  Set Preferences
+                </Button>
+              }
+            />
           )}
-        </Section>
+        </Group>
 
-        <Section icon={<MapPin size={22} />} title="Location & Language" text="Set the default location and language for AI search tracking.">
-          <div className={s.two}>
-            <label className={s.field}>
-              <span>Country / Location</span>
-              <Select value={prefs.location} onChange={(e) => set('location', e.target.value)}>
-                <option value="">Select a country or region</option>
-                {locations.map((l) => (
-                  <option key={l}>{l}</option>
-                ))}
-              </Select>
-              <small>Used to simulate local AI search results.</small>
-            </label>
-            <label className={s.field}>
-              <span>Language</span>
-              <Select value={prefs.language} onChange={(e) => set('language', e.target.value)}>
-                <option value="">Select a language</option>
-                {languages.map((l) => (
-                  <option key={l}>{l}</option>
-                ))}
-              </Select>
-              <small>Used for prompts and result analysis.</small>
-            </label>
-          </div>
-        </Section>
-
-        <Section icon={<Clock3 size={22} />} title="Check Frequency" text="Set how often to run visibility checks for your projects.">
-          <div className={s.radios} role="radiogroup" aria-label="Check frequency">
-            {FREQUENCIES.map((f) => (
-              <label key={f.key} className={s.radio}>
-                <input type="radio" name="frequency" checked={prefs.frequency === f.key} onChange={() => set('frequency', f.key)} />
-                <span>
-                  <b>
-                    {f.label} {f.recommended && <em className={s.badge}>Recommended</em>}
-                  </b>
-                  <small>{f.text}</small>
-                </span>
-              </label>
-            ))}
-          </div>
-        </Section>
-
-        <Section icon={<FileText size={22} />} title="Citations & Sources" text="Choose how to track and analyze citations and sources.">
-          <ToggleRow label="Track citations and sources" text="Identify where your brand is mentioned and linked." checked={prefs.citations.track} onChange={(v) => set('citations', { ...prefs.citations, track: v })} />
-          <ToggleRow label="Track source authority" text="Analyze the authority of citing sources." checked={prefs.citations.authority} onChange={(v) => set('citations', { ...prefs.citations, authority: v })} />
-          <ToggleRow label="Include source snippets" text="Save relevant snippets for each citation." checked={prefs.citations.snippets} onChange={(v) => set('citations', { ...prefs.citations, snippets: v })} />
-        </Section>
-
-        <Section icon={<Users size={22} />} title="Competitor Monitoring" text="Set default preferences for competitor analysis.">
-          <ToggleRow label="Enable competitor monitoring" text="Track competitor visibility and mentions." checked={prefs.competitors.enabled} onChange={(v) => set('competitors', { ...prefs.competitors, enabled: v })} />
-          <ToggleRow label="Include competitor citations" text="Analyze sources citing your competitors." checked={prefs.competitors.citations} onChange={(v) => set('competitors', { ...prefs.competitors, citations: v })} />
-          <ToggleRow label="Compare side-by-side" text="Show direct comparison in results." checked={prefs.competitors.compare} onChange={(v) => set('competitors', { ...prefs.competitors, compare: v })} />
-        </Section>
-
-        <Section icon={<Sparkles size={22} />} title="AI Analysis Preferences" text="Customize how AI analyzes and interprets your results.">
-          <div className={s.two}>
-            <label className={s.field}>
-              <span>Analysis Depth</span>
-              <Select value={prefs.depth} onChange={(e) => set('depth', e.target.value as Prefs['depth'])}>
-                <option value="LIGHT">Light</option>
-                <option value="STANDARD">Standard (Recommended)</option>
-                <option value="DEEP">Deep</option>
-              </Select>
-              <small>Deeper analysis uses more credits.</small>
-            </label>
-            <fieldset className={s.field}>
-              <legend>Focus Areas (Select all that apply)</legend>
-              <div className={s.checks}>
-                {FOCUS.map((f) => (
-                  <label key={f}>
-                    <input type="checkbox" checked={prefs.focus.includes(f)} onChange={(e) => set('focus', e.target.checked ? [...prefs.focus, f] : prefs.focus.filter((x) => x !== f))} /> {f}
+        <Group
+          id="geo"
+          icon={<Target size={26} />}
+          title="GEO Monitoring Preferences"
+          text="Configure default settings for AI search (GEO) monitoring."
+          open={openGroups.geo}
+          onToggle={() => open('geo')}
+        >
+          {editing.geo ? (
+            <div className={s.grid}>
+            <Section
+              icon={<Layers size={22} />}
+              title="Tracking Platforms"
+              text="Select which AI search platforms to track by default."
+              aside={
+                <div className={s.pickerWrap} ref={pickerRef}>
+                  <span className={s.count}>{selected.length} selected</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-expanded={pickerOpen}
+                    aria-haspopup="dialog"
+                    disabled={platforms.length === 0}
+                    onClick={() => {
+                      setDraft(prefs.platforms);
+                      setPickerOpen((o) => !o);
+                    }}
+                  >
+                    Select Platforms {pickerOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </Button>
+                  {pickerOpen && (
+                    <div className={s.picker} role="dialog" aria-label="Select AI search platforms">
+                      <div className={s.pickerHead}>
+                        <b>Select AI Search Platforms</b>
+                        <button type="button" aria-label="Close" onClick={() => setPickerOpen(false)}>
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p>Choose the platforms to track. No account connection is required.</p>
+                      {platforms.map((p) => (
+                        <label key={p.key} className={s.pickItem}>
+                          <input
+                            type="checkbox"
+                            checked={draft.includes(p.key)}
+                            onChange={(e) => setDraft((d) => (e.target.checked ? [...d, p.key] : d.filter((k) => k !== p.key)))}
+                          />
+                          <span className={s.mono}>{p.name.charAt(0)}</span>
+                          {p.name}
+                        </label>
+                      ))}
+                      <div className={s.pickerActions}>
+                        <Button variant="outline" size="sm" onClick={() => setPickerOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            set('platforms', draft);
+                            setPickerOpen(false);
+                          }}
+                        >
+                          Apply ({draft.length} selected)
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              }
+            >
+              {platforms.length === 0 ? (
+                <div className={s.empty}>No AI search platforms are available yet.</div>
+              ) : selected.length === 0 ? (
+                <div className={s.empty}>
+                  <b>No platforms selected yet</b>
+                  <small>Choose the AI search platforms you want to track.</small>
+                </div>
+              ) : (
+                <ul className={s.chips}>
+                  {selected.map((p) => (
+                    <li key={p.key}>
+                      <span className={s.mono}>{p.name.charAt(0)}</span>
+                      {p.name}
+                      <button type="button" aria-label={`Remove ${p.name}`} onClick={() => set('platforms', prefs.platforms.filter((k) => k !== p.key))}>
+                        <X size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+            <Section icon={<MapPin size={22} />} title="Location & Language" text="Set the default location and language for AI search tracking.">
+              <div className={s.two}>
+                <label className={s.field}>
+                  <span>Country / Location</span>
+                  <Select value={prefs.location} onChange={(e) => set('location', e.target.value)}>
+                    <option value="">Select a country or region</option>
+                    {locations.map((l) => (
+                      <option key={l}>{l}</option>
+                    ))}
+                  </Select>
+                  <small>Used to simulate local AI search results.</small>
+                </label>
+                <label className={s.field}>
+                  <span>Language</span>
+                  <Select value={prefs.language} onChange={(e) => set('language', e.target.value)}>
+                    <option value="">Select a language</option>
+                    {languages.map((l) => (
+                      <option key={l}>{l}</option>
+                    ))}
+                  </Select>
+                  <small>Used for prompts and result analysis.</small>
+                </label>
+              </div>
+            </Section>
+            <Section icon={<Clock3 size={22} />} title="Check Frequency" text="Set how often to run visibility checks for your projects.">
+              <div className={s.radios} role="radiogroup" aria-label="Check frequency">
+                {FREQUENCIES.map((f) => (
+                  <label key={f.key} className={s.radio}>
+                    <input type="radio" name="frequency" checked={prefs.frequency === f.key} onChange={() => set('frequency', f.key)} />
+                    <span>
+                      <b>
+                        {f.label} {f.recommended && <em className={s.badge}>Recommended</em>}
+                      </b>
+                      <small>{f.text}</small>
+                    </span>
                   </label>
                 ))}
               </div>
-            </fieldset>
-          </div>
-        </Section>
+            </Section>
+            <Section icon={<FileText size={22} />} title="Citations & Sources" text="Choose how to track and analyze citations and sources.">
+              <ToggleRow label="Track citations and sources" text="Identify where your brand is mentioned and linked." checked={prefs.citations.track} onChange={(v) => set('citations', { ...prefs.citations, track: v })} />
+              <ToggleRow label="Track source authority" text="Analyze the authority of citing sources." checked={prefs.citations.authority} onChange={(v) => set('citations', { ...prefs.citations, authority: v })} />
+              <ToggleRow label="Include source snippets" text="Save relevant snippets for each citation." checked={prefs.citations.snippets} onChange={(v) => set('citations', { ...prefs.citations, snippets: v })} />
+            </Section>
+            <Section icon={<Users size={22} />} title="Competitor Monitoring" text="Set default preferences for competitor analysis.">
+              <ToggleRow label="Enable competitor monitoring" text="Track competitor visibility and mentions." checked={prefs.competitors.enabled} onChange={(v) => set('competitors', { ...prefs.competitors, enabled: v })} />
+              <ToggleRow label="Include competitor citations" text="Analyze sources citing your competitors." checked={prefs.competitors.citations} onChange={(v) => set('competitors', { ...prefs.competitors, citations: v })} />
+              <ToggleRow label="Compare side-by-side" text="Show direct comparison in results." checked={prefs.competitors.compare} onChange={(v) => set('competitors', { ...prefs.competitors, compare: v })} />
+            </Section>
+            <Section icon={<FileText size={22} />} title="Default Settings for New Projects" text="These preferences will be applied to all new projects. You can override them in each project.">
+              <div className={s.defaults}>
+                <Settings size={20} />
+                <span>
+                  <b>Using global defaults</b>
+                  <small>These settings will be applied to new projects until you customize them.</small>
+                </span>
+                <Link href="/app/settings/project-defaults" className={s.review}>
+                  Review Defaults
+                </Link>
+              </div>
+            </Section>
+            </div>
+          ) : (
+            <EmptyRow
+              icon={<BarChart3 size={30} />}
+              title="No GEO preferences set"
+              text="Choose your preferred monitoring frequency and search sources."
+              action={
+                <Button variant="outline" onClick={() => configure('geo')}>
+                  Configure GEO
+                </Button>
+              }
+            />
+          )}
+        </Group>
 
-        <Section icon={<Coins size={22} />} title="Credit Usage Controls" text="Set limits and notifications for credit usage.">
-          <div className={s.two}>
-            <ToggleRow label="Notify when credits are low" text="Get notified when your credit balance is running low." checked={prefs.credits.notifyLow} onChange={(v) => set('credits', { ...prefs.credits, notifyLow: v })} />
-            <ToggleRow label="Set monthly credit limit" text="Pause tracking when the monthly limit is reached." checked={prefs.credits.monthlyLimit} onChange={(v) => set('credits', { ...prefs.credits, monthlyLimit: v })} />
-          </div>
-        </Section>
-
-        <Section icon={<FileText size={22} />} title="Default Settings for New Projects" text="These preferences will be applied to all new projects. You can override them in each project.">
-          <div className={s.defaults}>
-            <Settings size={20} />
-            <span>
-              <b>Using global defaults</b>
-              <small>These settings will be applied to new projects until you customize them.</small>
-            </span>
-            <Link href="/app/settings/project-defaults" className={s.review}>
-              Review Defaults
-            </Link>
-          </div>
-        </Section>
+        <Group
+          id="credits"
+          icon={<Database size={26} />}
+          title="Usage &amp; Credit Preferences"
+          text="Set credit usage preferences and alerts."
+          open={openGroups.credits}
+          onToggle={() => open('credits')}
+        >
+          {editing.credits ? (
+            <div className={s.grid}>
+            <Section icon={<Coins size={22} />} title="Credit Usage Controls" text="Set limits and notifications for credit usage.">
+              <div className={s.two}>
+                <ToggleRow label="Notify when credits are low" text="Get notified when your credit balance is running low." checked={prefs.credits.notifyLow} onChange={(v) => set('credits', { ...prefs.credits, notifyLow: v })} />
+                <ToggleRow label="Set monthly credit limit" text="Pause tracking when the monthly limit is reached." checked={prefs.credits.monthlyLimit} onChange={(v) => set('credits', { ...prefs.credits, monthlyLimit: v })} />
+              </div>
+            </Section>
+            </div>
+          ) : (
+            <EmptyRow
+              icon={<Bell size={30} />}
+              title="No credit preferences set"
+              text="Configure usage limits and notifications to stay in control."
+              action={
+                <Button variant="outline" onClick={() => configure('credits')}>
+                  Set Preferences
+                </Button>
+              }
+            />
+          )}
+        </Group>
       </div>
 
-      <div className={s.footer}>
-        <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={() => setPrefs(DEFAULTS)} disabled={!dirty}>
-          Reset to Defaults
-        </Button>
-        <span className={s.unsaved}>
-          <Info size={14} /> Preferences can’t be saved yet; changes here are not stored.
-        </span>
-        <Button variant="secondary" onClick={() => setPrefs(DEFAULTS)} disabled={!dirty}>
-          Cancel
-        </Button>
-        <Button disabled>Save Changes</Button>
-      </div>
+      {anyEditing && (
+        <div className={s.footer}>
+          <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={() => setPrefs(DEFAULTS)} disabled={!dirty}>
+            Reset to Defaults
+          </Button>
+          <span className={s.unsaved}>
+            <Info size={14} /> Preferences can’t be saved yet; changes here are not stored.
+          </span>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setPrefs(DEFAULTS);
+              setEditing({});
+            }}
+          >
+            Cancel
+          </Button>
+          <Button disabled>Save Changes</Button>
+        </div>
+      )}
     </>
   );
 }

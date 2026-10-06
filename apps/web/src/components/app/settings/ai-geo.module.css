@@ -55,3 +55,20 @@
 
 @media (max-width: 1200px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 640px) { .two, .checks { grid-template-columns: minmax(0, 1fr); } .titleRow { flex-direction: column; } }
+
+.groups { display: grid; gap: 14px; }
+.group { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; padding: 16px 18px; }
+.groupHead { display: flex; gap: 16px; align-items: flex-start; }
+.groupHead > div { flex: 1; min-width: 0; }
+.groupHead h3 { font-size: 19px; color: var(--blue); }
+.groupHead p { font-size: 14px; color: var(--muted); }
+.groupIcon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--blue-50); color: var(--blue); flex: none; }
+.collapse { background: none; border: 0; color: var(--blue); cursor: pointer; padding: 4px; }
+.groupBody { margin: 12px 0 0 80px; }
+.emptyRow { display: flex; align-items: center; gap: 18px; background: var(--surface-alt); border-radius: var(--radius-sm); padding: 16px 20px; }
+.emptyRowIcon { flex: 1 1 0; display: flex; justify-content: flex-end; color: var(--heading); }
+.emptyRowText { flex: 2 1 0; min-width: 0; }
+.emptyRowText b { display: block; font-size: 15px; color: var(--ink); }
+.emptyRowText small { font-size: 14px; color: var(--muted); }
+.emptyRow > a, .emptyRow > button { flex: none; min-width: 180px; }
+@media (max-width: 900px) { .groupBody { margin-left: 0; } .emptyRow { flex-wrap: wrap; } .emptyRowIcon { flex: none; } }
