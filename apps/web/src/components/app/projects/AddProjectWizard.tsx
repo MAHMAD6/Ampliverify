@@ -42,17 +42,20 @@ export function AddProjectWizard({
   workspaces,
   integrations,
   disabled,
+  initialDomain = '',
 }: {
   workspaces: { id: string; name: string }[];
   integrations: { key: string; name: string }[];
   disabled: boolean;
+  /** Prefill from sign-up ("Website to audit"). */
+  initialDomain?: string;
 }) {
   const [state, action, pending] = useActionState<CreateProjectState, FormData>(createProject, {});
   const [dismissed, setDismissed] = useState<CreateProjectState | null>(null);
   const [step, setStep] = useState(0);
   const [workspaceId, setWorkspaceId] = useState(workspaces[0]?.id ?? '');
   const [name, setName] = useState('');
-  const [domain, setDomain] = useState('');
+  const [domain, setDomain] = useState(initialDomain);
   const [goal, setGoal] = useState<Goal | null>(null);
 
   const host = domain.trim() ? normalizeHost(domain) : null;

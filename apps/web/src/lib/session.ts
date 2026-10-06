@@ -1,13 +1,27 @@
 import 'server-only';
+import { cache } from 'react';
+import { headers } from 'next/headers';
+import { auth } from './auth';
+
+/** The Better Auth session for this request, or null. Memoized per request. */
+export const getSession = cache(async () => {
+  try {
+    return await auth.api.getSession({ headers: await headers() });
+  } catch {
+    return null;
+  }
+});
 
 /**
- * Returns the Better Auth API bearer token for the current request, or null.
- *
- * Sign-in is not wired yet (the auth screens have not been supplied), so this
- * always returns null and authenticated pages render their signed-out /
- * empty states. Once Better Auth runs in this app, read the session here and
- * return its API JWT (audience BETTER_AUTH_AUDIENCE).
+ * Short-lived API bearer JWT (jwt plugin; audience BETTER_AUTH_AUDIENCE) for
+ * the signed-in user, or null. Minted once per request.
  */
-export async function getAccessToken(): Promise<string | null> {
-  return null;
-}
+export const getAccessToken = cache(async (): Promise<string | null> => {
+  if (!(await getSession())) return null;
+  try {
+    const { token } = await auth.api.getToken({ headers: await headers() });
+    return token ?? null;
+  } catch {
+    return null;
+  }
+});

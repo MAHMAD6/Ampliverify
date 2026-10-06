@@ -34,18 +34,29 @@ Node.js ≥ 22.12 · NestJS 11 · Prisma 6 · PostgreSQL 16 · Next.js 16 / Reac
 ## Getting started
 
 ```bash
-cp apps/api/.env.example apps/api/.env        # fill in Better Auth + AUTH_SYNC_SECRET
-docker compose up -d postgres                  # or any PostgreSQL 16
+cp apps/api/.env.example apps/api/.env         # API: database, Better Auth issuer/audience/JWKS URL, AUTH_SYNC_SECRET
+cp apps/web/.env.example apps/web/.env.local   # web: API_URL, Better Auth secret + database, same AUTH_SYNC_SECRET
+docker compose up -d postgres                   # or any PostgreSQL 16
+createdb ampliverify_auth                       # Better Auth's own database (AUTH_DATABASE_URL)
 npm install
-npm run db:deploy                              # applies migrations (incl. RBAC/feature registries)
-npm run dev:api                                # http://localhost:4000/api/v1
-cp apps/web/.env.example apps/web/.env.local   # API_URL
-npm run dev:web                                # http://localhost:3000 (site), /app, /admin
+npm run db:deploy                               # API migrations (incl. RBAC/feature registries)
+npm run auth:migrate --workspace apps/web       # Better Auth tables (user, session, account, verification, jwks)
+npm run dev:api                                 # http://localhost:4000/api/v1
+npm run dev:web                                 # http://localhost:3000 (site), /app, /admin
 ```
 
-Sign-in is not wired into the web app yet (no auth screens have been supplied). Until it is, authenticated pages render their signed-out and empty states. The hook point is `apps/web/src/lib/session.ts`.
+### Sign-in
 
-First Super Admin: provision the user through `POST /api/v1/internal/auth/users/sync`, then run this once:
+Better Auth runs inside the web app at `/api/auth` (`apps/web/src/lib/auth.ts`):
+
+- **Credentials and sessions** live in Better Auth's own database (`AUTH_DATABASE_URL`), separate from the API database. Passwords never reach the API.
+- **API tokens:** the jwt plugin mints 15-minute EdDSA bearer tokens for API calls (`lib/session.ts`) and serves `/api/auth/jwks`, which the API verifies. The web `BETTER_AUTH_ISSUER`/`BETTER_AUTH_AUDIENCE` must equal the API's, and the API's `BETTER_AUTH_JWKS_URL` must point at the web origin.
+- **Provisioning:** every Better Auth user create/update is synced into the API (`POST /internal/auth/users/sync`, `AUTH_SYNC_SECRET`). `/auth/continue` repeats the sync after each sign-in and, on first sign-in, creates the user's organization and default workspace.
+- **Route gate:** `/app` and `/admin` redirect to `/login` without a session cookie (`src/proxy.ts`). Permissions are always enforced by the API.
+- **Email:** email/password requires verification. **No email provider is wired yet** (`lib/auth-email.ts`); sending fails loudly. For local testing set `AUTH_EMAIL_LOG_LINKS=true` to print verification and reset links to the server log. This only works when `BETTER_AUTH_URL` is localhost.
+- **Social:** Google and Microsoft buttons are enabled when their client id and secret are set.
+
+First Super Admin: sign up and verify the account, then take its Better Auth user id (`select id from "user" where email = '…'` in the auth database) and run this once:
 
 ```bash
 psql "$DATABASE_URL" -v auth_subject='BETTER_AUTH_USER_ID' -f apps/api/scripts/bootstrap-super-admin.sql

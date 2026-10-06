@@ -8,8 +8,8 @@ import type { IntegrationProvider } from '@/lib/types';
 
 export const metadata = { title: 'Add Project' };
 
-export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ created?: string }> }) {
-  const { created } = await searchParams;
+export default async function NewProjectPage({ searchParams }: { searchParams: Promise<{ created?: string; domain?: string }> }) {
+  const { created, domain } = await searchParams;
   const [workspaces, integrations] = await Promise.all([
     apiGet<{ id: string; name: string }[]>('/user/workspaces', { auth: true }),
     apiList<IntegrationProvider>('/public/integrations'),
@@ -42,7 +42,7 @@ export default async function NewProjectPage({ searchParams }: { searchParams: P
               <Notice tone="amber">You need a workspace before you can add a project.</Notice>
             </div>
           )}
-          <AddProjectWizard workspaces={list} integrations={integrations.map((i) => ({ key: i.key, name: i.name }))} disabled={!workspaces.ok || list.length === 0} />
+          <AddProjectWizard workspaces={list} integrations={integrations.map((i) => ({ key: i.key, name: i.name }))} disabled={!workspaces.ok || list.length === 0} initialDomain={domain?.slice(0, 253)} />
         </>
       )}
     </>
