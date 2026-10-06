@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, CircleUserRound, LogOut, Rocket, Settings, ShieldCheck } from 'lucide-react';
+import { SignOutButton } from '../public/auth/AuthForms';
 import s from './shell.module.css';
 
 export function AccountMenu({ name, email, initials, adminLink }: { name?: string | null; email?: string | null; initials?: string; adminLink?: boolean }) {
@@ -41,9 +42,15 @@ export function AccountMenu({ name, email, initials, adminLink }: { name?: strin
               <ShieldCheck size={16} /> Super Admin
             </Link>
           )}
-          <button role="menuitem" disabled title="Sign-in is not connected yet">
-            <LogOut size={16} /> Sign out
-          </button>
+          {email ? (
+            <SignOutButton>
+              <LogOut size={16} /> Sign out
+            </SignOutButton>
+          ) : (
+            <Link href="/login" role="menuitem">
+              <LogOut size={16} /> Sign in
+            </Link>
+          )}
         </div>
       )}
     </div>

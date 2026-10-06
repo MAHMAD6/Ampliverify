@@ -96,7 +96,7 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 
 - Admin batch 4 (see #7).
 - User-app screens still without a design: the page-map sub-pages (Keyword Overview/Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices) and the `[id]` detail pages for audit, optimize and editor.
-- Better Auth is not yet wired into the web app, so the sign-in screens (#80) cannot submit.
+- Auth emails (verification, password reset) need an email provider (`apps/web/src/lib/auth-email.ts`); none has been chosen.
 - Job applications (#85) need a public submit endpoint with résumé upload, validation and malware scanning before the form can be enabled.
 - Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
 - The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.

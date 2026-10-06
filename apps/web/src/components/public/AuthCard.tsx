@@ -26,12 +26,3 @@ export function AuthCard({ eyebrow, title, lead, cardTitle, cardText, children }
     </>
   );
 }
-
-/** Shown under auth forms until Better Auth is connected to the web app. */
-export function AuthPending() {
-  return (
-    <p className={s.pending} style={{ marginTop: 14 }}>
-      Account access is being set up. These actions become available once sign-in is enabled.
-    </p>
-  );
-}

@@ -29,8 +29,8 @@ Visual system: public-website-v2 (green, Plus Jakarta Sans, `components/public/s
 | Application Success | `/careers/[slug]/applied?receipt=` | public-careers-application/02 | Renders only for a receipt the API confirms. Today it always returns 404, so success is never faked. Makes no promise about interviews or response times. |
 | Contact | `/contact` | public-website-v2/Contact | Form; **send disabled** (no storage) |
 | Legal | `/legal` (`/legal/{privacy,terms,cookies}` redirect to anchors) | public-auth/05, public-system-pages/01–02, public-website-v2/Legal | Section structure; policy text pending approval |
-| Log In / Forgot / Reset / Verify Email | `/login`, `/forgot-password`, `/reset-password`, `/verify-email` | public-auth/01–04 | Forms; submit disabled until Better Auth is wired into the web app |
-| Sign Up | `/signup` (`?website=&plan=`) | public-website-v2/Sign Up | Plans from the API; submit disabled |
+| Log In / Forgot / Reset / Verify Email | `/login` (`?next=`), `/forgot-password`, `/reset-password?token=`, `/verify-email?email=` | public-auth/01–04 | **Live** (Better Auth): sign-in with keep-me-signed-in, unverified-email notice, reset request (same response for unknown emails), reset with token, resend verification. Google/Microsoft enabled only when configured. |
+| Sign Up | `/signup` (`?website=&plan=`) | public-website-v2/Sign Up | **Live** (Better Auth). Adds a Full name field (Better Auth and the API profile need one). The website is carried through email verification to Add Project. A plan chosen on Pricing is acknowledged but not applied (no checkout); the plan picker is omitted. |
 | 404 / 500 / Maintenance | `not-found`, `error.tsx`, `/maintenance` | public-system-pages/03–05 | Static |
 
 ## User app (`/app`)
@@ -125,6 +125,6 @@ Collapsible sidebar, with groups defined in `ADMIN_NAV` (`lib/nav.ts`). List scr
 
 ## Cross-cutting
 
-- **Sign-in is not wired.** `apps/web/src/lib/session.ts` returns no token, so authenticated pages show their signed-out and empty states. Sign-in screens exist (public-auth) but submit is disabled. Connecting Better Auth there makes every "Live" screen above work end to end.
+- **Sign-in** is Better Auth (see README → Sign-in). `/app` and `/admin` require a session. Pages read the API with a short-lived Better Auth JWT, so every "Live" screen above works end to end. First sign-in creates the user's organization and workspace (`/auth/continue`).
 - **Admin access** is enforced by the API (global permissions), not by the web app.
 - **Brand:** the green "A" mark, made transparent (`assets/brand/ampliverify-mark-transparent.png`), with the Ampli/Verify wordmark. The tagline is "AUDIT · OPTIMIZE · VERIFY" in the app and "SEO ENGINEERING" on the public site and in Super Admin.
