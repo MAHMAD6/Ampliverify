@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
-import { BrainCircuit, Cloud, Globe, Plug } from 'lucide-react';
-import { Hero, NumberedList } from '@/components/public/Hero';
-import { Badge } from '@/components/ui';
+import { BrainCircuit, Check, Cloud, Globe, Plug } from 'lucide-react';
+import { CheckList, CtaBand, PageHero } from '@/components/public/Blocks';
 import { apiList } from '@/lib/api';
 import type { IntegrationProvider } from '@/lib/types';
-import s from '@/components/public/public.module.css';
+import s from '@/components/public/site.module.css';
 
 export const metadata: Metadata = { title: 'Integrations' };
 
@@ -15,59 +14,51 @@ const CATEGORIES = [
   { icon: <Cloud size={22} />, title: 'Storage & Delivery', text: 'Approved storage and delivery services for generated assets and reports.' },
 ];
 
+/** Integrations (public-batch1/02, restyled to the v2 public theme). Providers are live from the registry. */
 export default async function IntegrationsPage() {
   const providers = await apiList<IntegrationProvider>('/public/integrations');
   return (
     <>
-      <Hero eyebrow="Integrations" title="Connect the data sources AmpliVerify supports">
-        Integrations improve analysis and workflow. Only connections that are available in production are listed as available.
-      </Hero>
+      <PageHero eyebrow="Integrations" title="Connect the Data Sources You Already Use" lead="Integrations improve analysis and workflow. Only connections available in production are listed." />
       <section className={s.section}>
         <div className={s.container}>
-          <div className={s.cards}>
+          <div className={s.grid4}>
             {CATEGORIES.map((c) => (
-              <div key={c.title} className={s.cardx}>
-                <div className={s.iconbox}>{c.icon}</div>
-                <h3>{c.title}</h3>
-                <p>{c.text}</p>
+              <div key={c.title} className={s.card}>
+                <span className={s.icon}>{c.icon}</span>
+                <h3 className={s.cardTitle}>{c.title}</h3>
+                <p className={s.cardText}>{c.text}</p>
               </div>
             ))}
           </div>
-          <div className={s.twocol} style={{ marginTop: 56 }}>
+          <div className={s.split} style={{ marginTop: 64 }}>
             <div>
               <div className={s.eyebrow}>How integrations work</div>
-              <h2 className={s.h2}>Secure connections, clear permissions</h2>
+              <h2 className={s.h2}>Secure Connections, Clear Permissions</h2>
               <p className={s.lead}>You always see what you are connecting, what data is accessed, and why the connection is needed.</p>
-              <NumberedList
-                items={[
-                  { title: 'Choose a supported integration', text: 'Pick from the integrations available for your workspace.' },
-                  { title: 'Authorize securely', text: 'Connect with OAuth or an approved credential flow — never by pasting unnecessary secrets.' },
-                  { title: 'Use only required scopes', text: 'Only the minimum permissions needed for the feature are requested.' },
-                  { title: 'Disconnect when needed', text: 'Remove a connection at any time from Settings.' },
-                ]}
-              />
+              <CheckList items={['Choose a supported integration', 'Authorize securely with OAuth or an approved credential flow', 'Only the minimum permissions are requested', 'Disconnect at any time from Settings']} />
             </div>
             <div className={s.mock}>
-              <div className={s.eyebrow}>Integration status</div>
-              <h3 style={{ fontSize: 22, color: '#173a63', margin: '10px 0 14px' }}>Available integrations</h3>
+              <b>Available integrations</b>
               {providers.length === 0 ? (
-                <p style={{ fontSize: 15, color: '#748394', lineHeight: 1.6 }}>
+                <p className={s.cardText} style={{ marginTop: 10 }}>
                   No integrations are available to connect yet. Supported providers will be listed here as they become available.
                 </p>
               ) : (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {providers.map((p) => (
-                    <div key={p.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', border: '1px solid #e0e8e4', borderRadius: 12, padding: '12px 14px' }}>
-                      <strong style={{ color: '#173a63' }}>{p.name}</strong>
-                      <Badge tone="green">Available</Badge>
-                    </div>
-                  ))}
-                </div>
+                providers.map((p) => (
+                  <div key={p.key} className={s.mockRow}>
+                    <b>{p.name}</b>
+                    <span className={s.badge}>
+                      <Check size={12} /> Available
+                    </span>
+                  </div>
+                ))
               )}
             </div>
           </div>
         </div>
       </section>
+      <CtaBand title="Ready to Connect Your Website?" text="Start free and connect your data sources in minutes." />
     </>
   );
 }

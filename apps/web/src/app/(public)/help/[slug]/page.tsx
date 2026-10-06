@@ -22,7 +22,7 @@ export default async function HelpArticlePage({ params }: Props) {
   const article = await load((await params).slug);
   return (
     <ArticleLayout
-      align="left"
+      cover={false}
       category={article.category?.name ?? 'Help Article'}
       title={article.title}
       summary={article.excerpt}
