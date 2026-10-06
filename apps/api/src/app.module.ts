@@ -12,11 +12,14 @@ import { ProjectsModule } from './projects/projects.module';
 import { AdminModule } from './admin/admin.module';
 import { JwksAuthGuard } from './auth/jwks-auth.guard';
 import { HealthController } from './health.controller';
+import { StorageModule } from './storage/storage.module';
+import { PublicContentModule } from './public-content/public-content.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     PrismaModule,
+    StorageModule,
     UsersModule,
     AuthModule,
     OrganizationsModule,
@@ -24,6 +27,7 @@ import { HealthController } from './health.controller';
     AuditModule,
     ProjectsModule,
     AdminModule,
+    PublicContentModule,
   ],
   controllers: [HealthController],
   providers: [
