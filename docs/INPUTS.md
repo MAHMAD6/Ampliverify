@@ -1,7 +1,8 @@
 # Input file register
 
 Every file supplied for this project, where it lives in the repository, and how
-it was used. Update this register whenever new inputs arrive.
+it was used. Update this register whenever new inputs arrive. Which route
+implements each screen is tracked in [SCREENS.md](./SCREENS.md).
 
 Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 
@@ -27,12 +28,28 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 18 | Embroidered logo, "SEO Engineering" (WebP) | `40bac6472a00` | `assets/brand/merch/embroidered-logo-seo-engineering.webp` | Committed. Brand reference: "SEO Engineering" tagline lockup. |
 | 19 | Cap mockup, "SEO Engineering" (WebP) | `938386dede0c` | `assets/brand/merch/cap-seo-engineering.webp` | Committed. Brand / merchandise reference. |
 | 20 | Jacket mockup, "SEO Engineering" + `www.ampliverify.com` (WebP) | `c773a7464940` | `assets/brand/merch/jacket-seo-engineering.webp` | Committed. Brand reference. Confirms the public domain `ampliverify.com`. |
+| 21 | AI Search (GEO) Monitoring screen (WebP) | `56a76d7b12fb` | `docs/design/user-app/ai-search-geo-monitoring.webp` | Committed. Implemented at `/app/geo`. Its sidebar shows an older nav order; #17 wins. |
+| 22 | "A" mark (PNG, 512×512, re-encoded) | `84737ecd3528` | — | Not committed: same artwork as #2. A transparent version made from #2 is `assets/brand/ampliverify-mark-transparent.png` (used by the web app). |
+| 23 | Settings → Integrations (PNG) | `f7ecbd2fea57` | `docs/design/user-settings/Integrations.png` | Committed. Implemented at `/app/settings/integrations`. |
+| 24 | Keyword Research — Explorer with details drawer (WebP) | `dac6343a2791` | `docs/design/user-app/keyword-research.webp` | Committed. Implemented at `/app/keywords`. |
+| 25 | Keyword Research — Explorer, alternate (WebP) | `ea267174bd1f` | `docs/design/user-app/keyword-research-alt.webp` | Committed. Header actions (Saved Keywords / Export / Search) taken from this and #26–28. |
+| 26 | Keyword Research — Questions (WebP) | `046331c2457a` | `docs/design/user-app/keyword-research-questions.webp` | Committed. `/app/keywords/questions`. |
+| 27 | Keyword Research — Competitor Keywords (WebP) | `249482c06d27` | `docs/design/user-app/keyword-research-competitor.webp` | Committed. `/app/keywords/competitors`. |
+| 28 | Keyword Research — SERP Analysis (WebP) | `2b0d45876c28` | `docs/design/user-app/keyword-research-serp.webp` | Committed. `/app/keywords/serp`. |
+| 29 | AmpliVerify wordmark, no tagline (WebP) | `e54dd8ee40b2` | `assets/brand/ampliverify-wordmark.webp` | Committed. Brand reference. |
+| 30 | My Projects, early version (WebP) | `c1e553b13ea6` | `docs/design/user-app/my-projects.webp` | Committed. Superseded by #31–32. |
+| 31 | My Projects — populated list with row menu (chat image) | — | — | **Shared in chat only; no file was saved.** Implemented at `/app/projects`. Please re-upload as a file to archive it. |
+| 32 | My Projects — empty state (chat image) | — | — | **Shared in chat only.** Implemented at `/app/projects` (no projects). Please re-upload. |
+| 33 | Settings → Notifications, hi-res (chat image) | — | — | **Shared in chat only.** Same screen as #12 `Notifications.png`. |
+| 34 | On-Page SEO Editor (chat image) | — | — | **Shared in chat only.** Implemented at `/app/editor`. Please re-upload. |
+| 35 | Optimization Center (chat image) | — | — | **Shared in chat only.** Implemented at `/app/optimization`. Please re-upload. |
 
 ## Not yet supplied / known gaps
 
 - Admin batch 4 (see #7).
 - Super Admin screens referenced in the navigation but not yet mocked: Command Center, All Users, Admins, Sub-Admins, Roles & Permissions, Access Assignments, Module Controls, Feature Flags, Usage & Costs, System Health, Admin Activity, Security & Access, Settings.
-- User-app SEO module screens (projects, audits, editor, keywords, AI Search / GEO, reports).
+- User-app screens still without a design: Dashboard, On-Page SEO Audit, Content Strategy, Reports, Usage & Credits, Settings → Workspace / Project Defaults / AI & GEO Preferences.
+- Sign-in / sign-up screens (needed to wire Better Auth into the web app).
 - Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
 - The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.
 - The public Contact page and the user Help & Support page imply contact-form and support-ticket storage. The database guide defines neither, so no tables exist for them yet.
