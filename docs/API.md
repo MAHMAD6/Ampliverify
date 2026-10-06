@@ -21,6 +21,21 @@ All routes are under `/api/v1`. Every route requires a Better Auth bearer JWT un
 | GET | `/health` | Process liveness only. Database and provider readiness belong to the operations batch. |
 | POST | `/internal/auth/users/sync` | Server-to-server only. Requires the `X-Auth-Sync-Secret` header. Provisions or updates a user from Better Auth. |
 
+## Public content (no auth)
+
+Every endpoint applies the publication rule: `status = PUBLISHED AND published_at <= now()`. Careers also require `show_on_careers_page` and a future (or missing) application deadline. Only public fields are returned. Bodies are markdown read from content storage (`STORAGE_DIR` locally).
+
+| Method | Route | Notes |
+|---|---|---|
+| GET | `/public/plans` | Active, public plans with active prices and entitlements |
+| GET | `/public/blog?q=&category=&limit=` | Newest first, max 50 |
+| GET | `/public/blog/:slug` | Includes `body`, tags and author |
+| GET | `/public/guides`, `/public/guides/:slug` | Same shape as blog |
+| GET | `/public/help`, `/public/help/:slug` | Same shape as blog |
+| GET | `/public/careers`, `/public/careers/:slug` | Detail includes `description` |
+| GET | `/public/categories?type=BLOG\|GUIDE\|HELP` | |
+| GET | `/public/integrations` | Active integration providers |
+
 ## Current user / tenant
 
 | Method | Route | Permission |
@@ -35,7 +50,7 @@ All routes are under `/api/v1`. Every route requires a Better Auth bearer JWT un
 
 | Method | Route | Permission |
 |---|---|---|
-| GET | `/user/projects` | Returns only projects covered by `project.read` |
+| GET | `/user/projects` | Returns only projects covered by `project.read`; each includes `primaryDomain` |
 | POST | `/user/projects` | `project.create` at workspace scope |
 | GET | `/user/projects/:id` | `project.read` |
 | PATCH | `/user/projects/:id` | `project.update` (status `ARCHIVED` instead of hard delete) |

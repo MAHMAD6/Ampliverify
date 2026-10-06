@@ -9,11 +9,13 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "build": "npm run build --workspace apps/api",
+    "build": "npm run build --workspace apps/api && npm run build --workspace apps/web",
     "test": "npm run test --workspace apps/api",
     "test:db": "npm run test:db --workspace apps/api",
-    "typecheck": "npm run typecheck --workspace apps/api",
+    "typecheck": "npm run typecheck --workspace apps/api && npm run typecheck --workspace apps/web",
     "db:migrate": "npm run db:migrate --workspace apps/api",
-    "db:deploy": "npm run db:deploy --workspace apps/api"
+    "db:deploy": "npm run db:deploy --workspace apps/api",
+    "dev:api": "npm run start:dev --workspace apps/api",
+    "dev:web": "npm run dev --workspace apps/web"
   }
 }
