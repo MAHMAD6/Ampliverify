@@ -80,4 +80,24 @@ export class PublicContentController {
   integrations() {
     return this.content.listIntegrations();
   }
+
+  @Get('videos')
+  videos(@Query('limit', new DefaultValuePipe(24), ParseIntPipe) limit?: number) {
+    return this.content.listVideos(limit);
+  }
+
+  @Get('events')
+  events(@Query('limit', new DefaultValuePipe(24), ParseIntPipe) limit?: number) {
+    return this.content.listEvents(limit);
+  }
+
+  @Get('case-studies')
+  caseStudies(@Query('limit', new DefaultValuePipe(24), ParseIntPipe) limit?: number) {
+    return this.content.listCaseStudies(limit);
+  }
+
+  @Get('case-studies/:slug')
+  caseStudy(@Param('slug') slug: string) {
+    return this.content.getCaseStudy(slug);
+  }
 }

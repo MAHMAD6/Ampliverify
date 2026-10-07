@@ -258,7 +258,9 @@ export class KeywordsService {
     await this.projects.requireProject(actorId, projectId, 'keyword.read');
     const clusters = await this.prisma.keywordCluster.findMany({ where: { projectId }, orderBy: { createdAt: 'desc' }, include: { items: { include: { keyword: true } } } });
     const metrics = await this.metricsFor([...new Set(clusters.flatMap((c) => c.items.map((i) => i.keywordId)))]);
-    return clusters.map((c) => {
+    return clusters
+      .sort((a, b) => b.items.length - a.items.length || b.createdAt.getTime() - a.createdAt.getTime())
+      .map((c) => {
       const kws = c.items.map((i) => ({ id: i.keywordId, keyword: i.keyword.normalizedTerm, score: i.score ? Number(i.score) : null, ...(metrics.get(i.keywordId) ?? { searchVolume: null, difficulty: null, cpc: null }) }));
       const diffs = kws.map((k) => k.difficulty).filter((d): d is number => d !== null);
       return {

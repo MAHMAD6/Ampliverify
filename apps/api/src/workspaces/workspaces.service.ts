@@ -187,16 +187,24 @@ export class WorkspacesService implements OnModuleInit {
     const membership = await this.prisma.workspaceMembership.findFirst({ where: { workspaceId, userId: memberId, status: 'ACTIVE' } });
     if (!membership) throw new NotFoundException({ code: 'MEMBER_NOT_FOUND', message: 'Member not found.' });
     const current = await this.prisma.roleAssignment.findMany({ where: { userId: memberId, workspaceId, scopeType: 'WORKSPACE', revokedAt: null }, include: { role: true } });
-    if (current.some((a) => a.role.key === roleKey) && current.length === 1) return { userId: memberId, role: roleKey };
-    if (roleKey === 'MEMBER' && current.some((a) => a.role.key === 'OWNER') && (await this.ownerCount(workspaceId, ws.organizationId)) <= 1) {
+    const orgOwner = await this.prisma.roleAssignment.findFirst({ where: { userId: memberId, organizationId: ws.organizationId, scopeType: 'ORGANIZATION', revokedAt: null, role: { key: 'OWNER' } } });
+    const isOwner = !!orgOwner || current.some((a) => a.role.key === 'OWNER');
+    if ((roleKey === 'OWNER') === isOwner && (roleKey === 'OWNER' || current.some((a) => a.role.key === 'MEMBER'))) return { userId: memberId, role: roleKey };
+    if (roleKey === 'MEMBER' && isOwner && (await this.ownerCount(workspaceId, ws.organizationId)) <= 1) {
       throw new ConflictException({ code: 'LAST_OWNER', message: 'A workspace needs at least one owner.' });
+    }
+    if (roleKey === 'MEMBER' && orgOwner) {
+      // Organization-wide ownership can only be narrowed here when the organization has a single workspace.
+      const workspaces = await this.prisma.workspace.count({ where: { organizationId: ws.organizationId, deletedAt: null } });
+      if (workspaces > 1) throw new ConflictException({ code: 'ORGANIZATION_OWNER', message: 'This person owns the whole organization. Remove organization ownership first.' });
     }
     const role = await this.prisma.role.findUniqueOrThrow({ where: { key: roleKey } });
     await this.prisma.$transaction(async (tx) => {
-      await tx.roleAssignment.updateMany({ where: { id: { in: current.map((c) => c.id) } }, data: { revokedAt: new Date(), revokedBy: userId } });
-      await tx.roleAssignment.create({ data: { userId: memberId, roleId: role.id, scopeType: 'WORKSPACE', organizationId: ws.organizationId, workspaceId, createdBy: userId } });
+      const revoke = [...current.map((c) => c.id), ...(roleKey === 'MEMBER' && orgOwner ? [orgOwner.id] : [])];
+      await tx.roleAssignment.updateMany({ where: { id: { in: revoke } }, data: { revokedAt: new Date(), revokedBy: userId } });
+      await tx.roleAssignment.create({ data: { userId: memberId, roleId: role.id, scopeType: 'WORKSPACE', workspaceId, createdBy: userId } });
       await this.auditLog.record(
-        { actorUserId: userId, organizationId: ws.organizationId, workspaceId, action: 'workspace.member.role', targetType: 'user', targetId: memberId, beforeState: { roles: current.map((c) => c.role.key) }, afterState: { role: roleKey }, requestMeta: meta },
+        { actorUserId: userId, organizationId: ws.organizationId, workspaceId, action: 'workspace.member.role', targetType: 'user', targetId: memberId, beforeState: { roles: [...current.map((c) => c.role.key), ...(orgOwner ? ['OWNER (organization)'] : [])] }, afterState: { role: roleKey }, requestMeta: meta },
         tx,
       );
     });
@@ -208,7 +216,9 @@ export class WorkspacesService implements OnModuleInit {
     const ws = self ? await this.rbac.requireWorkspace(userId, workspaceId, 'workspace.read') : await this.rbac.requireWorkspace(userId, workspaceId, 'workspace.member.manage');
     const membership = await this.prisma.workspaceMembership.findFirst({ where: { workspaceId, userId: memberId, status: 'ACTIVE' } });
     if (!membership) throw new NotFoundException({ code: 'MEMBER_NOT_FOUND', message: 'Member not found.' });
-    const isOwner = await this.prisma.roleAssignment.count({ where: { userId: memberId, workspaceId, revokedAt: null, role: { key: 'OWNER' } } });
+    const isOwner = await this.prisma.roleAssignment.count({
+      where: { userId: memberId, revokedAt: null, role: { key: 'OWNER' }, OR: [{ workspaceId }, { organizationId: ws.organizationId, scopeType: 'ORGANIZATION' }] },
+    });
     if (isOwner && (await this.ownerCount(workspaceId, ws.organizationId)) <= 1) {
       throw new ConflictException({ code: 'LAST_OWNER', message: 'Transfer ownership before the last owner leaves.' });
     }
@@ -332,7 +342,7 @@ export class WorkspacesService implements OnModuleInit {
       });
       const existing = await tx.roleAssignment.findFirst({ where: { userId, roleId: role.id, workspaceId: inv.workspaceId, scopeType: 'WORKSPACE', revokedAt: null } });
       if (!existing) {
-        await tx.roleAssignment.create({ data: { userId, roleId: role.id, scopeType: 'WORKSPACE', organizationId: inv.workspace.organizationId, workspaceId: inv.workspaceId, createdBy: inv.invitedBy } });
+        await tx.roleAssignment.create({ data: { userId, roleId: role.id, scopeType: 'WORKSPACE', workspaceId: inv.workspaceId, createdBy: inv.invitedBy } });
       }
       await tx.workspaceInvitation.update({ where: { id: inv.id }, data: { status: 'ACCEPTED', acceptedAt: new Date(), acceptedBy: userId } });
       await this.auditLog.record({ actorUserId: userId, organizationId: inv.workspace.organizationId, workspaceId: inv.workspaceId, action: 'workspace.invitation.accept', targetType: 'workspace_invitation', targetId: inv.id, afterState: { roleKey: inv.roleKey }, requestMeta: meta }, tx);

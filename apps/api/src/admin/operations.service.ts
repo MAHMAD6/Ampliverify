@@ -125,7 +125,7 @@ export class OperationsService {
     await this.rbac.assertGlobalPermission(userId, 'system.manage');
     const validate = EDITABLE_SETTINGS[key];
     if (!validate) throw new BadRequestException({ code: 'UNKNOWN_SETTING', message: 'This setting cannot be edited.' });
-    if (!validate(value)) throw new BadRequestException({ code: 'SETTING_INVALID', message: 'The value is not valid for this setting.' });
+    if (value === undefined || !validate(value)) throw new BadRequestException({ code: 'SETTING_INVALID', message: 'The value is not valid for this setting.' });
     if (key === SETTING.defaultPlanCode && value) {
       const plan = await this.prisma.plan.findUnique({ where: { code: String(value) } });
       if (!plan) throw new BadRequestException({ code: 'PLAN_NOT_FOUND', message: 'Unknown plan code.' });

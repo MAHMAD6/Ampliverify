@@ -854,6 +854,9 @@ model ProjectDataSource {
   workspaceIntegrationId String           @map("workspace_integration_id") @db.Uuid
   sourceType             String           @map("source_type")
   status                 ConnectionStatus @default(PENDING)
+  /// Source selection, e.g. Search Console property or GA4 property id.
+  configJson             Json?            @map("config_json")
+  lastSyncAt             DateTime?        @map("last_sync_at") @db.Timestamptz(6)
   createdAt              DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
 
   project              Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)

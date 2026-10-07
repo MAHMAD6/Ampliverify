@@ -45,7 +45,7 @@ export async function startApp(env: Record<string, string> = {}) {
 
   const { AppModule } = await import('../../src/app.module');
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app: INestApplication = moduleRef.createNestApplication({ logger: ['error'] });
+  const app: INestApplication = moduleRef.createNestApplication({ logger: ['error'], rawBody: true });
   configureApp(app, app.get(ConfigService));
   await app.init();
   const prisma: PrismaClient = createPrisma();

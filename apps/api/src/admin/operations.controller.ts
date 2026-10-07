@@ -6,7 +6,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
-  IsDefined,
+  Allow,
   IsEnum,
   IsIn,
   IsInt,
@@ -90,7 +90,8 @@ class UpdateFlagDto {
 }
 
 class SettingDto {
-  @IsDefined()
+  /** Any JSON value, including null (validated per key by the service). */
+  @Allow()
   value: unknown;
 }
 

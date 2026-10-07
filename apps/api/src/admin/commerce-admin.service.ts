@@ -283,7 +283,7 @@ export class CommerceAdminService {
       const entry = await this.credits.applyEntry(tx, {
         workspaceId: adj.workspaceId,
         delta: adj.amount,
-        reason: new Prisma.Decimal(adj.amount).isNegative() ? 'ADJUSTMENT_DEBIT' : 'ADJUSTMENT_CREDIT',
+        reason: adj.reversesAdjustmentId ? 'REVERSAL' : new Prisma.Decimal(adj.amount).isNegative() ? 'ADJUSTMENT_DEBIT' : 'ADJUSTMENT_CREDIT',
         referenceType: 'credit_adjustment',
         referenceId: adj.id,
         idempotencyKey: `adjustment:${adj.id}`,
@@ -295,6 +295,7 @@ export class CommerceAdminService {
         where: { id },
         data: { status: 'APPLIED', approvedBy: userId, approvedAt: new Date(), ledgerEntryId: entry.id, balanceBefore: before, balanceAfter: after },
       });
+      if (adj.reversesAdjustmentId) await tx.creditAdjustment.update({ where: { id: adj.reversesAdjustmentId }, data: { status: 'REVERSED' } });
       await this.auditLog.record(
         { actorUserId: userId, actorRole: 'admin', organizationId: adj.workspace.organizationId, workspaceId: adj.workspaceId, action: 'credit.adjustment.apply', targetType: 'credit_adjustment', targetId: id, beforeState: { balance: before.toString() }, afterState: { balance: after.toString() }, requestMeta: meta },
         tx,
@@ -303,30 +304,21 @@ export class CommerceAdminService {
     });
   }
 
-  /** Reverses an applied adjustment with an opposite, linked adjustment. */
+  /**
+   * Requests the reversal of an applied adjustment: an opposite, linked
+   * CORRECTION that goes through the same two-person review. Approving it
+   * marks the original REVERSED.
+   */
   async reverseAdjustment(userId: string, id: string, note: string, meta?: RequestMeta) {
     await this.guard(userId, 'credit.adjust');
     const adj = await this.prisma.creditAdjustment.findUnique({ where: { id }, include: { workspace: true, reversedBy: true } });
     if (!adj) throw new NotFoundException({ code: 'ADJUSTMENT_NOT_FOUND', message: 'Adjustment not found.' });
     if (adj.status !== 'APPLIED' || adj.reversedBy) throw new ConflictException({ code: 'ADJUSTMENT_NOT_REVERSIBLE', message: 'Only applied adjustments can be reversed, once.' });
     return this.prisma.$transaction(async (tx) => {
-      const amount = new Prisma.Decimal(adj.amount).negated();
       const reversal = await tx.creditAdjustment.create({
-        data: { workspaceId: adj.workspaceId, type: 'CORRECTION', amount, reasonCode: 'REVERSAL', internalNote: note || `Reversal of ${adj.id}`, requestedBy: userId, approvedBy: userId, approvedAt: new Date(), status: 'APPLIED', reversesAdjustmentId: adj.id },
+        data: { workspaceId: adj.workspaceId, type: 'CORRECTION', amount: new Prisma.Decimal(adj.amount).negated(), reasonCode: 'REVERSAL', internalNote: note || `Reversal of ${adj.id}`, requestedBy: userId, reversesAdjustmentId: adj.id },
       });
-      const entry = await this.credits.applyEntry(tx, {
-        workspaceId: adj.workspaceId,
-        delta: amount,
-        reason: 'REVERSAL',
-        referenceType: 'credit_adjustment',
-        referenceId: reversal.id,
-        idempotencyKey: `adjustment-reversal:${adj.id}`,
-        createdBy: userId,
-        allowNegative: true,
-      });
-      await tx.creditAdjustment.update({ where: { id: reversal.id }, data: { ledgerEntryId: entry.id } });
-      await tx.creditAdjustment.update({ where: { id: adj.id }, data: { status: 'REVERSED' } });
-      await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', organizationId: adj.workspace.organizationId, workspaceId: adj.workspaceId, action: 'credit.adjustment.reverse', targetType: 'credit_adjustment', targetId: adj.id, reason: note, requestMeta: meta }, tx);
+      await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', organizationId: adj.workspace.organizationId, workspaceId: adj.workspaceId, action: 'credit.adjustment.reverse.request', targetType: 'credit_adjustment', targetId: adj.id, afterState: { reversalId: reversal.id }, reason: note, requestMeta: meta }, tx);
       return reversal;
     });
   }

@@ -187,6 +187,7 @@ export class PublicContentService {
         code: true,
         name: true,
         description: true,
+        isFeatured: true,
         prices: {
           where: { active: true },
           select: { billingInterval: true, currency: true, amountMinor: true },
@@ -219,6 +220,44 @@ export class PublicContentService {
       select: { key: true, name: true },
       orderBy: { name: 'asc' },
     });
+  }
+
+  listVideos(limit?: number) {
+    return this.prisma.cmsVideo.findMany({
+      where: this.live(),
+      select: { slug: true, title: true, description: true, videoUrl: true, thumbnailId: true, durationSec: true, publishedAt: true },
+      orderBy: { publishedAt: 'desc' },
+      take: this.take(limit),
+    });
+  }
+
+  /** Upcoming and recent published events (webinars). */
+  listEvents(limit?: number) {
+    return this.prisma.cmsEvent.findMany({
+      where: this.live(),
+      select: { slug: true, title: true, summary: true, eventType: true, startsAt: true, endsAt: true, timezone: true, locationText: true, registrationUrl: true },
+      orderBy: { startsAt: 'desc' },
+      take: this.take(limit),
+    });
+  }
+
+  listCaseStudies(limit?: number) {
+    return this.prisma.caseStudy.findMany({
+      where: this.live(),
+      select: { slug: true, title: true, customerName: true, industry: true, summary: true, coverMediaId: true, resultsJson: true, publishedAt: true },
+      orderBy: { publishedAt: 'desc' },
+      take: this.take(limit),
+    });
+  }
+
+  async getCaseStudy(slug: string) {
+    const row = await this.prisma.caseStudy.findFirst({
+      where: { slug, ...this.live() },
+      select: { slug: true, title: true, customerName: true, industry: true, summary: true, coverMediaId: true, resultsJson: true, seoTitle: true, metaDescription: true, publishedAt: true, updatedAt: true, bodyRef: true },
+    });
+    if (!row) throw this.notFound();
+    const { bodyRef, ...rest } = row;
+    return { ...rest, body: await this.storage.readText(bodyRef) };
   }
 
   private notFound() {

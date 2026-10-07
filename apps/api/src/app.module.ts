@@ -27,6 +27,10 @@ import { GeoModule } from './geo/geo.module';
 import { KeywordsModule } from './keywords/keywords.module';
 import { ContentModule } from './content/content.module';
 import { EditorModule } from './editor/editor.module';
+import { ReportsModule } from './reports/reports.module';
+import { IntegrationsModule } from './integrations/integrations.module';
+import { CmsModule } from './cms/cms.module';
+import { InsightsModule } from './insights/insights.module';
 
 @Module({
   imports: [
@@ -54,6 +58,10 @@ import { EditorModule } from './editor/editor.module';
     KeywordsModule,
     ContentModule,
     EditorModule,
+    ReportsModule,
+    IntegrationsModule,
+    CmsModule,
+    InsightsModule,
   ],
   controllers: [HealthController],
   providers: [

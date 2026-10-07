@@ -186,7 +186,9 @@ describe('HTTP API', () => {
     await api().get('/api/v1/admin/feature-flags').set('authorization', regular.bearer).expect(403);
     await prisma.moduleControl.create({ data: { moduleKey: 'seo_audit', enabled: true, updatedBy: admin.id } });
     const modules = await api().get('/api/v1/admin/module-controls').set('authorization', admin.bearer).expect(200);
-    expect(modules.body.data).toEqual([expect.objectContaining({ moduleKey: 'seo_audit', enabled: true, updater: expect.objectContaining({ id: admin.id }) })]);
+    // Every known module is listed; ones without a control row default to enabled.
+    expect(modules.body.data).toEqual(expect.arrayContaining([expect.objectContaining({ moduleKey: 'seo_audit', enabled: true, updater: expect.objectContaining({ id: admin.id }) })]));
+    expect(modules.body.data.every((m: { enabled: boolean }) => m.enabled)).toBe(true);
     const flags = await api().get('/api/v1/admin/feature-flags').set('authorization', admin.bearer).expect(200);
     expect(flags.body.data).toEqual([]);
   });

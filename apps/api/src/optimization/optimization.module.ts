@@ -8,5 +8,6 @@ import { OptimizationService } from './optimization.service';
   imports: [ProjectsModule, AuditsModule],
   controllers: [OptimizationController],
   providers: [OptimizationService],
+  exports: [OptimizationService],
 })
 export class OptimizationModule {}
