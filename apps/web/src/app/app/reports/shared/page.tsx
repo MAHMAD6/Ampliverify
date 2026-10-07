@@ -1,22 +1,22 @@
 import { Share2 } from 'lucide-react';
-import { DataTable, PageHeader, Panel } from '@/components/ui';
-import { StateView } from '@/components/ui/StateView';
+import { PageHeader, Panel } from '@/components/ui';
 import { ReportsTabs } from '@/components/app/reports/ReportsTabs';
+import { ReportsTable } from '@/components/app/reports/ReportsTable';
 import { appCrumbs } from '@/lib/nav';
+import { apiGet } from '@/lib/api';
+import type { ReportRow } from '@/lib/app-types';
 
 export const metadata = { title: 'Shared Reports' };
 
-/** Reports shared by link or with people (`report_shares`). */
-export default function SharedReportsPage() {
+/** Reports with an active share link; open one to copy a new link or revoke access. */
+export default async function SharedReportsPage() {
+  const res = await apiGet<ReportRow[]>('/user/reports/shared', { auth: true });
   return (
     <>
       <PageHeader title="Shared Reports" description="Reports you have shared and their access links." crumbs={appCrumbs({ label: 'Reports', href: '/app/reports' }, { label: 'Shared' })} />
       <ReportsTabs active="shared" />
-      <Panel title="Shared Links" bodyless>
-        <DataTable
-          columns={['Report', 'Shared With', 'Access', 'Expires', 'Views', 'Actions']}
-          empty={<StateView kind="empty" compact icon={<Share2 size={28} />} title="No shared reports" description="Reports you share will be listed here so you can review or revoke access." />}
-        />
+      <Panel title={<span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Share2 size={18} /> Shared reports</span>} bodyless>
+        <ReportsTable reports={res.ok ? res.data : []} emptyText="Open a report and create a share link to see it here." />
       </Panel>
     </>
   );
