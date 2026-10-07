@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
@@ -38,5 +38,10 @@ export class ProjectsController {
     @Req() request: Request,
   ) {
     return this.projects.update(actor.userId, id, dto, requestMeta(request));
+  }
+
+  @Delete(':id')
+  remove(@CurrentActor() actor: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Req() request: Request) {
+    return this.projects.remove(actor.userId, id, requestMeta(request));
   }
 }

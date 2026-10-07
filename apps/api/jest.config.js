@@ -20,7 +20,7 @@ module.exports = {
       globalSetup: '<rootDir>/test/db/global-setup.ts',
       // Booting the full Nest app (and generating RSA keys) can exceed Jest's
       // 5 s default on a cold ts-jest cache.
-      testTimeout: 60000,
+      setupFilesAfterEnv: ['<rootDir>/test/db/setup.ts'],
     },
   ],
 };

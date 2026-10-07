@@ -1,10 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipStatus, ScopeType } from '@prisma/client';
+import { MembershipStatus, Prisma, ScopeType } from '@prisma/client';
 import { Db, PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RbacService } from '../rbac/rbac.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { slugCandidate, slugify } from '../common/utils/slug';
+import { CreditsService } from '../commerce/credits.service';
+import { SETTING, SettingsService } from '../commerce/settings.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 
@@ -16,6 +18,8 @@ export class OrganizationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly rbac: RbacService,
+    private readonly credits: CreditsService,
+    private readonly settings: SettingsService,
   ) {}
 
   async listOrganizationsForUser(userId: string) {
@@ -138,7 +142,7 @@ export class OrganizationsService {
     });
   }
 
-  /** Workspace + creator membership + empty credit wallet (balance 0). */
+  /** Workspace + creator membership + credit wallet, with the platform's signup grant (if configured). */
   private async createWorkspaceRecords(
     tx: Db,
     actorId: string,
@@ -153,6 +157,18 @@ export class OrganizationsService {
       data: { userId: actorId, workspaceId: workspace.id, status: MembershipStatus.ACTIVE },
     });
     await tx.creditWallet.create({ data: { workspaceId: workspace.id } });
+    const grant = Number(await this.settings.get<number>(SETTING.signupCredits, 0, tx));
+    if (grant > 0) {
+      await this.credits.applyEntry(tx as Prisma.TransactionClient, {
+        workspaceId: workspace.id,
+        delta: grant,
+        reason: 'PROMOTIONAL',
+        referenceType: 'workspace',
+        referenceId: workspace.id,
+        idempotencyKey: `signup-grant:${workspace.id}`,
+        createdBy: actorId,
+      });
+    }
     return workspace;
   }
 

@@ -14,6 +14,11 @@ import { JwksAuthGuard } from './auth/jwks-auth.guard';
 import { HealthController } from './health.controller';
 import { StorageModule } from './storage/storage.module';
 import { PublicContentModule } from './public-content/public-content.module';
+import { JobsModule } from './jobs/jobs.module';
+import { CommerceModule } from './commerce/commerce.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AuditsModule } from './audits/audits.module';
+import { OptimizationModule } from './optimization/optimization.module';
 
 @Module({
   imports: [
@@ -28,6 +33,11 @@ import { PublicContentModule } from './public-content/public-content.module';
     ProjectsModule,
     AdminModule,
     PublicContentModule,
+    JobsModule,
+    CommerceModule,
+    NotificationsModule,
+    AuditsModule,
+    OptimizationModule,
   ],
   controllers: [HealthController],
   providers: [

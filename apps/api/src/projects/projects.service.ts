@@ -3,6 +3,7 @@ import { Project } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RbacService } from '../rbac/rbac.service';
 import { AuditService } from '../audit/audit.service';
+import { EntitlementsService } from '../commerce/entitlements.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { normalizeHost } from '../common/utils/domain';
 import { slugify } from '../common/utils/slug';
@@ -35,6 +36,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly rbac: RbacService,
     private readonly audit: AuditService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async listAccessible(userId: string) {
@@ -74,6 +76,8 @@ export class ProjectsService {
       organizationId: workspace.organizationId,
       workspaceId: workspace.id,
     });
+
+    await this.entitlements.assertProjectLimit(workspace.id);
 
     const name = dto.name.trim();
     const host = dto.domain === undefined || dto.domain.trim() === '' ? null : normalizeHost(dto.domain);
@@ -145,6 +149,39 @@ export class ProjectsService {
         tx,
       );
       return saved;
+    });
+  }
+
+  /**
+   * Resolves a live project and asserts `permissionKey` on its scope. Used by
+   * every project-scoped module (audits, keywords, GEO, reports…).
+   */
+  async requireProject(userId: string, projectId: string, permissionKey: string) {
+    const project = await this.getOrThrow(projectId);
+    await this.rbac.assertPermission(userId, permissionKey, this.scopeOf(project));
+    return project;
+  }
+
+  /** Soft delete (`deleted_at`); data is retained for the grace period, then purged by operations. */
+  async remove(actorId: string, projectId: string, requestMeta?: RequestMeta) {
+    const project = await this.getOrThrow(projectId);
+    await this.rbac.assertPermission(actorId, 'project.delete', this.scopeOf(project));
+    return this.prisma.$transaction(async (tx) => {
+      await tx.project.update({ where: { id: project.id }, data: { deletedAt: new Date(), status: 'ARCHIVED' } });
+      await this.audit.record(
+        {
+          actorUserId: actorId,
+          organizationId: project.organizationId,
+          workspaceId: project.workspaceId,
+          action: 'project.delete',
+          targetType: 'project',
+          targetId: project.id,
+          beforeState: this.auditState(project),
+          requestMeta,
+        },
+        tx,
+      );
+      return { id: project.id, deleted: true };
     });
   }
 

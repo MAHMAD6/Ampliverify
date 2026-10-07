@@ -6,6 +6,9 @@ import { OrganizationsService } from '../../src/organizations/organizations.serv
 import { ProjectsService } from '../../src/projects/projects.service';
 import { UsersService } from '../../src/users/users.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { SettingsService } from '../../src/commerce/settings.service';
+import { CreditsService } from '../../src/commerce/credits.service';
+import { EntitlementsService } from '../../src/commerce/entitlements.service';
 
 export function testDatabaseUrl() {
   const url = process.env.TEST_DATABASE_URL;
@@ -21,12 +24,18 @@ export function createServices(prisma: PrismaClient) {
   const db = prisma as PrismaService;
   const audit = new AuditService(db);
   const rbac = new RbacService(db, audit);
+  const settings = new SettingsService(db);
+  const credits = new CreditsService(db, settings);
+  const entitlements = new EntitlementsService(db, settings);
   return {
     audit,
     rbac,
+    settings,
+    credits,
+    entitlements,
     users: new UsersService(db, audit),
-    organizations: new OrganizationsService(db, audit, rbac),
-    projects: new ProjectsService(db, rbac, audit),
+    organizations: new OrganizationsService(db, audit, rbac, credits, settings),
+    projects: new ProjectsService(db, rbac, audit, entitlements),
   };
 }
 
