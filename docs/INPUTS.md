@@ -91,6 +91,11 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 | 85 | `careers_application_batch.zip` | — | `docs/design/public-careers-application/` | Committed. Job Detail + Application, Application Success. |
 | 86 | `Ampliverify_Pages_Remaining.mhtml`, `Database-Design.mhtml` (ChatGPT exports) | — | — | **Not committed** (contain account details). Read as reference only. GEO guidance adopted: keep "last checked" separate from the reporting range; show no trends before two checks; opportunities must be actionable. |
 | 87 | `Video-Editor.txt` | — | — | Unrelated to AmpliVerify; not used. |
+| 88 | `Content/AmpliVerify_SEO_Audit_Guide.pdf` | — | `docs/AmpliVerify_SEO_Audit_Guide.pdf` | Committed. Reference for the SEO audit engine (issue catalogue, checks, severities). |
+| 89 | `Branding/AmpliVerify_Coding_Only_Pack.zip` | — | `assets/brand/pack/` | Committed. Developer brand pack: primary and monochrome logos, icon set and favicon (16–1024 px), web header logos, Open Graph image, brand guide. The other branding zips (social, print, embroidery vendor packs, standard sizes) are supersets or non-web deliverables and are not committed. |
+| 90 | User-app screen PNGs from `Ampliverify.zip` (Dashboard, Project Overview, Auditor, Optimization Center, On-Page Editor, Content Strategy, Keyword Explorer and tabs, AI Search (GEO), Prompt Details, Reports, Report History/Detail, Usage & Credits, Settings pages, Publish Connector, Add Page, side menu) | — | `docs/design/user-app-screens/` | Committed as WebP, max 1600 px wide. Previously "not archived (chat images)" (#83, #84 and others). |
+| 91 | Super Admin screen PNGs from `Ampliverify.zip` (`SuperAdmin/*.png`, `Super-Admin-Dash.png`) | — | `docs/design/admin-screens/` | Committed as WebP, max 1600 px wide. Previously "not archived (chat images)" (#76). |
+| 92 | `Batch2A_Separated_3840x2160.zip`, `AmpliVerify_Keyword_Research_Readability_Enhanced_3344x1882.zip`, `Backend_Dev/BATCH1_QA_REPORT.md`, `Backend_Dev/.env.txt` | — | — | Not committed: hi-res duplicates of archived boards; QA report already under `docs/reference/backend-batch1-original/`; `.env.txt` holds local secrets. |
 
 ## Not yet supplied / known gaps
 
