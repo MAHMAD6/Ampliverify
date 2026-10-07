@@ -40,5 +40,7 @@ export default async function globalSetup() {
     cwd: join(__dirname, '..', '..'),
     env: { ...process.env, DATABASE_URL: url },
     stdio: 'pipe',
+    // npx is a .cmd shim on Windows, which execFileSync cannot spawn directly.
+    shell: process.platform === 'win32',
   });
 }
