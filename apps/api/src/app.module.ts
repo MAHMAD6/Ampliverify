@@ -22,6 +22,11 @@ import { OptimizationModule } from './optimization/optimization.module';
 import { BillingModule } from './billing/billing.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { SupportModule } from './support/support.module';
+import { AiModule } from './ai/ai.module';
+import { GeoModule } from './geo/geo.module';
+import { KeywordsModule } from './keywords/keywords.module';
+import { ContentModule } from './content/content.module';
+import { EditorModule } from './editor/editor.module';
 
 @Module({
   imports: [
@@ -44,6 +49,11 @@ import { SupportModule } from './support/support.module';
     BillingModule,
     WorkspacesModule,
     SupportModule,
+    AiModule,
+    GeoModule,
+    KeywordsModule,
+    ContentModule,
+    EditorModule,
   ],
   controllers: [HealthController],
   providers: [
