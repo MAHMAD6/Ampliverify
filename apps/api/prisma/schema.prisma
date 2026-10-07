@@ -466,6 +466,8 @@ model User {
   email       String     @unique @db.Citext
   displayName String?    @map("display_name")
   status      UserStatus @default(ACTIVE)
+  /// Personal privacy choices (product usage analytics, product communications).
+  privacyJson Json?      @map("privacy_json")
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt   DateTime?  @map("deleted_at") @db.Timestamptz(6)
@@ -502,6 +504,10 @@ model User {
   adjustmentsAsked  CreditAdjustment[]             @relation("AdjustmentRequester")
   adjustmentsSigned CreditAdjustment[]             @relation("AdjustmentApprover")
   overridesCreated  WorkspaceEntitlementOverride[]
+  invitationsSent   WorkspaceInvitation[]          @relation("InvitationSender")
+  dataExports       DataExportRequest[]
+  supportTickets    SupportTicket[]
+  supportMessages   SupportTicketMessage[]
 
   @@index([status])
   @@map("users")
@@ -614,6 +620,12 @@ model Workspace {
   /// Unique within the organization.
   slug           String          @db.Citext
   status         WorkspaceStatus @default(ACTIVE)
+  /// IANA timezone used for schedules and reports.
+  timezone       String          @default("UTC")
+  /// BCP 47 language for reports and AI output.
+  language       String          @default("en")
+  /// Workspace preferences: AI & GEO defaults, data retention, sharing policy.
+  settingsJson   Json?           @map("settings_json")
   createdBy      String          @map("created_by") @db.Uuid
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -636,6 +648,9 @@ model Workspace {
   integrations         WorkspaceIntegration[]
   notificationPrefs    NotificationPreference[]
   notifications        Notification[]
+  invitations          WorkspaceInvitation[]
+  dataExports          DataExportRequest[]
+  supportTickets       SupportTicket[]
 
   @@unique([organizationId, slug])
   /// Target of the projects composite FK (project org must match workspace org).
@@ -1685,6 +1700,8 @@ model Plan {
   status       PlanStatus @default(DRAFT)
   /// Whether the public Pricing page may list this plan.
   isPublic     Boolean    @default(false) @map("is_public")
+  /// Highlighted ("Most Popular") on pricing pages.
+  isFeatured   Boolean    @default(false) @map("is_featured")
   displayOrder Int        @default(0) @map("display_order")
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -2460,4 +2477,185 @@ model IdempotencyKey {
 
   @@index([expiresAt])
   @@map("idempotency_keys")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Additions beyond the database guide (see docs/DATA_MODEL.md → "Additions").
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+
+  @@map("invitation_status")
+}
+
+/// Pending invitation to join a workspace with a role. Only the token hash is stored.
+model WorkspaceInvitation {
+  id          String           @id @default(uuid()) @db.Uuid
+  workspaceId String           @map("workspace_id") @db.Uuid
+  email       String           @db.Citext
+  roleKey     String           @map("role_key")
+  tokenHash   String           @unique @map("token_hash")
+  status      InvitationStatus @default(PENDING)
+  invitedBy   String           @map("invited_by") @db.Uuid
+  acceptedBy  String?          @map("accepted_by") @db.Uuid
+  expiresAt   DateTime         @map("expires_at") @db.Timestamptz(6)
+  acceptedAt  DateTime?        @map("accepted_at") @db.Timestamptz(6)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  inviter   User      @relation("InvitationSender", fields: [invitedBy], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, status])
+  @@index([email, status])
+  @@map("workspace_invitations")
+}
+
+/// Workspace data export (Settings → Data & Privacy). The file lives in content storage.
+model DataExportRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  requestedBy String    @map("requested_by") @db.Uuid
+  status      RunStatus @default(QUEUED)
+  fileRef     String?   @map("file_ref")
+  sizeBytes   BigInt?   @map("size_bytes")
+  error       String?
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  requester User      @relation(fields: [requestedBy], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("data_export_requests")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
+
+  @@map("ticket_status")
+}
+
+/// Public Contact page submissions.
+model ContactSubmission {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  email     String       @db.Citext
+  company   String?
+  topic     String
+  message   String
+  status    TicketStatus @default(OPEN)
+  ipHash    String?      @map("ip_hash")
+  handledBy String?      @map("handled_by") @db.Uuid
+  handledAt DateTime?    @map("handled_at") @db.Timestamptz(6)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("contact_submissions")
+}
+
+/// In-app support requests (Help & Support).
+model SupportTicket {
+  id          String       @id @default(uuid()) @db.Uuid
+  workspaceId String       @map("workspace_id") @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  subject     String
+  category    String
+  priority    String       @default("NORMAL")
+  status      TicketStatus @default(OPEN)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  messages  SupportTicketMessage[]
+
+  @@index([workspaceId, status])
+  @@index([status, updatedAt(sort: Desc)])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id           String   @id @default(uuid()) @db.Uuid
+  ticketId     String   @map("ticket_id") @db.Uuid
+  authorUserId String?  @map("author_user_id") @db.Uuid
+  isStaff      Boolean  @default(false) @map("is_staff")
+  body         String
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User?         @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@map("support_ticket_messages")
+}
+
+/// Admin Content Management: videos.
+model CmsVideo {
+  id          String        @id @default(uuid()) @db.Uuid
+  title       String
+  slug        String        @unique @db.Citext
+  description String?
+  videoUrl    String        @map("video_url")
+  thumbnailId String?       @map("thumbnail_id") @db.Uuid
+  durationSec Int?          @map("duration_sec")
+  status      PublishStatus @default(DRAFT)
+  publishedAt DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("cms_videos")
+}
+
+/// Admin Content Management: webinars and events.
+model CmsEvent {
+  id              String        @id @default(uuid()) @db.Uuid
+  title           String
+  slug            String        @unique @db.Citext
+  summary         String?
+  eventType       String        @default("WEBINAR") @map("event_type")
+  startsAt        DateTime      @map("starts_at") @db.Timestamptz(6)
+  endsAt          DateTime?     @map("ends_at") @db.Timestamptz(6)
+  timezone        String        @default("UTC")
+  locationText    String?       @map("location_text")
+  registrationUrl String?       @map("registration_url")
+  status          PublishStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, startsAt])
+  @@map("cms_events")
+}
+
+/// Admin Content Management: case studies. Body is markdown in content storage.
+model CaseStudy {
+  id              String        @id @default(uuid()) @db.Uuid
+  title           String
+  slug            String        @unique @db.Citext
+  customerName    String        @map("customer_name")
+  industry        String?
+  summary         String?
+  bodyRef         String        @map("body_ref")
+  coverMediaId    String?       @map("cover_media_id") @db.Uuid
+  /// Customer-approved results only: `[{ label, value }]`.
+  resultsJson     Json?         @map("results_json")
+  seoTitle        String?       @map("seo_title")
+  metaDescription String?       @map("meta_description")
+  status          PublishStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@map("case_studies")
 }

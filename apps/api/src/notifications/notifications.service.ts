@@ -15,6 +15,7 @@ export const NOTIFICATION_EVENTS = [
   { key: 'billing.payment_failed', label: 'Payment failed', description: 'A subscription payment did not go through.', defaultEmail: true },
   { key: 'billing.invoice_paid', label: 'Invoice paid', description: 'A payment was received.', defaultEmail: false },
   { key: 'workspace.member_joined', label: 'Member joined', description: 'Someone joined your workspace.', defaultEmail: false },
+  { key: 'support.reply', label: 'Support reply', description: 'Our team replied to your support request.', defaultEmail: true },
   { key: 'task.assigned', label: 'Task assigned', description: 'An optimization task was assigned to you.', defaultEmail: true },
 ] as const;
 

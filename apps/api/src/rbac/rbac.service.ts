@@ -82,6 +82,16 @@ export class RbacService {
     }
   }
 
+  /** Resolves a live workspace and asserts `permissionKey` on it. */
+  async requireWorkspace(userId: string, workspaceId: string, permissionKey: string) {
+    const workspace = await this.prisma.workspace.findFirst({ where: { id: workspaceId, deletedAt: null } });
+    if (!workspace) {
+      throw new NotFoundException({ code: 'WORKSPACE_NOT_FOUND', message: 'Workspace not found.' });
+    }
+    await this.assertPermission(userId, permissionKey, { organizationId: workspace.organizationId, workspaceId: workspace.id });
+    return workspace;
+  }
+
   assertGlobalPermission(userId: string, permissionKey: string) {
     return this.assertPermission(userId, permissionKey, {});
   }

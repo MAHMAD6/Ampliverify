@@ -19,6 +19,9 @@ import { CommerceModule } from './commerce/commerce.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditsModule } from './audits/audits.module';
 import { OptimizationModule } from './optimization/optimization.module';
+import { BillingModule } from './billing/billing.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   imports: [
@@ -38,6 +41,9 @@ import { OptimizationModule } from './optimization/optimization.module';
     NotificationsModule,
     AuditsModule,
     OptimizationModule,
+    BillingModule,
+    WorkspacesModule,
+    SupportModule,
   ],
   controllers: [HealthController],
   providers: [
