@@ -61,31 +61,68 @@ export function qs(params: Record<string, string | number | undefined | null>) {
 
 export type MutationResult<T> =
   | { ok: true; data: T }
-  | { ok: false; reason: 'unauthenticated' | 'forbidden' | 'not_found' | 'invalid' | 'conflict' | 'unavailable'; message?: string };
+  | { ok: false; reason: 'unauthenticated' | 'forbidden' | 'not_found' | 'invalid' | 'conflict' | 'unavailable'; message?: string; code?: string };
 
 /** Authenticated write. Returns the API's error message for display. */
-export async function apiSend<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<MutationResult<T>> {
+export async function apiSend<T>(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body?: unknown): Promise<MutationResult<T>> {
   const token = await getAccessToken();
   if (!token) return { ok: false, reason: 'unauthenticated', message: 'Please sign in to continue.' };
   try {
     const res = await fetch(`${API_URL}/api/v1${path}`, {
       method,
-      headers: { 'content-type': 'application/json', accept: 'application/json', authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
+      headers: { ...(body !== undefined ? { 'content-type': 'application/json' } : {}), accept: 'application/json', authorization: `Bearer ${token}` },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       cache: 'no-store',
     });
-    const payload = (await res.json().catch(() => null)) as Envelope<T> | null;
-    if (res.ok && payload) return { ok: true, data: payload.data };
-    const message = payload?.error?.message;
-    const reason =
-      res.status === 401 ? 'unauthenticated'
-      : res.status === 403 ? 'forbidden'
-      : res.status === 404 ? 'not_found'
-      : res.status === 409 ? 'conflict'
-      : res.status === 400 ? 'invalid'
-      : 'unavailable';
-    return { ok: false, reason, message };
+    return toMutation<T>(res);
   } catch {
     return { ok: false, reason: 'unavailable', message: 'The service is unavailable. Please try again.' };
   }
+}
+
+/** Authenticated multipart upload (media library, applications). */
+export async function apiForm<T>(path: string, form: FormData, { auth = true }: { auth?: boolean } = {}): Promise<MutationResult<T>> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (auth) {
+    const token = await getAccessToken();
+    if (!token) return { ok: false, reason: 'unauthenticated', message: 'Please sign in to continue.' };
+    headers.authorization = `Bearer ${token}`;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/v1${path}`, { method: 'POST', headers, body: form, cache: 'no-store' });
+    return toMutation<T>(res);
+  } catch {
+    return { ok: false, reason: 'unavailable', message: 'The service is unavailable. Please try again.' };
+  }
+}
+
+/** Unauthenticated JSON POST for public forms (contact). */
+export async function apiPublicPost<T>(path: string, body: unknown): Promise<MutationResult<T>> {
+  try {
+    const res = await fetch(`${API_URL}/api/v1${path}`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
+    return toMutation<T>(res);
+  } catch {
+    return { ok: false, reason: 'unavailable', message: 'The service is unavailable. Please try again.' };
+  }
+}
+
+/** Raw authenticated GET (file downloads proxied by the web app). */
+export async function apiRaw(path: string) {
+  const token = await getAccessToken();
+  if (!token) return null;
+  return fetch(`${API_URL}/api/v1${path}`, { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
+}
+
+async function toMutation<T>(res: Response): Promise<MutationResult<T>> {
+  const payload = (await res.json().catch(() => null)) as Envelope<T> | null;
+  if (res.ok && payload) return { ok: true, data: payload.data };
+  const message = payload?.error?.message;
+  const reason =
+    res.status === 401 ? 'unauthenticated'
+    : res.status === 403 ? 'forbidden'
+    : res.status === 404 ? 'not_found'
+    : res.status === 409 ? 'conflict'
+    : res.status === 400 || res.status === 402 || res.status === 422 || res.status === 429 ? 'invalid'
+    : 'unavailable';
+  return { ok: false, reason, message: message ?? (res.status === 503 ? 'This feature is not available yet.' : undefined), code: payload?.error?.code };
 }

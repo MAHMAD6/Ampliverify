@@ -6,12 +6,12 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import s from './shell.module.css';
 
-export function AppShell({ me, projects, selectedId, children }: { me: Me | null; projects: Project[]; selectedId?: string; children: ReactNode }) {
+export function AppShell({ me, projects, selectedId, unread = 0, children }: { me: Me | null; projects: Project[]; selectedId?: string; unread?: number; children: ReactNode }) {
   return (
     <div className={s.app}>
       <Sidebar items={APP_NAV} />
       <div className={s.main}>
-        <Topbar me={me} projects={projects} selectedId={selectedId} />
+        <Topbar me={me} projects={projects} selectedId={selectedId} unread={unread} />
         <main className={s.content}>
           {!me && (
             <div style={{ marginBottom: 20 }}>

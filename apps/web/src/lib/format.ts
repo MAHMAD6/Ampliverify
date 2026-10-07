@@ -37,3 +37,31 @@ export function markdownHeadings(markdown: string | null) {
 export function slugifyHeading(text: string) {
   return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
+
+export function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return EMPTY;
+  return new Date(iso).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' });
+}
+
+export function formatNumber(n: number | string | null | undefined, digits = 0) {
+  if (n === null || n === undefined || n === '') return EMPTY;
+  return Number(n).toLocaleString('en-US', { maximumFractionDigits: digits });
+}
+
+/** "seo.audit_run" → "SEO audit runs" for usage tables. */
+export function featureLabel(key: string) {
+  const known: Record<string, string> = {
+    'seo.audit_run': 'Audit pages',
+    'geo.check': 'AI search checks',
+    'keywords.lookup': 'Keyword lookups',
+    'ai.action': 'AI-assisted actions',
+    'limit.audit_runs': 'Audit pages',
+    'limit.geo_queries': 'AI search checks',
+    'limit.keyword_lookups': 'Keyword lookups',
+    'limit.ai_actions': 'AI-assisted actions',
+    'limit.projects': 'Projects',
+    'limit.team_members': 'Team members',
+    'credits.monthly_grant': 'Monthly credits',
+  };
+  return known[key] ?? humanize(key.replace(/[._]/g, ' '));
+}

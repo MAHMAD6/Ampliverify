@@ -301,3 +301,9 @@
   .kv { grid-template-columns: 1fr; gap: 2px; }
   .pageTitle { font-size: 26px; }
 }
+
+/* ── Action feedback (components/ui/actions.tsx) ─────────────────────── */
+.actionWrap { display: inline-flex; flex-direction: column; gap: 4px; }
+.actionError { color: var(--red, #dc2626); font-size: 13px; margin: 4px 0 0; }
+.actionSuccess { color: var(--green, #16a34a); font-size: 13px; margin: 4px 0 0; }
+.formActions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
