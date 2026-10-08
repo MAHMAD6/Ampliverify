@@ -11,9 +11,9 @@ export async function generateMetadata({ params }: { params: Promise<{ tab: stri
   return { title: tab ? `${tab.label} · Keyword Research` : 'Keyword Research' };
 }
 
-export default async function KeywordTabPage({ params, searchParams }: { params: Promise<{ tab: string }>; searchParams: Promise<{ saved?: string }> }) {
+export default async function KeywordTabPage({ params, searchParams }: { params: Promise<{ tab: string }>; searchParams: Promise<{ saved?: string; list?: string }> }) {
   const tab = find((await params).tab);
   if (!tab) notFound();
-  const saved = (await searchParams).saved === 'true';
-  return <KeywordPage tabKey={tab.key as TabKey} saved={saved} />;
+  const sp = await searchParams;
+  return <KeywordPage tabKey={tab.key as TabKey} saved={sp.saved === 'true'} listId={sp.list} />;
 }

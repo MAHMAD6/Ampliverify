@@ -205,9 +205,6 @@ export function KeywordDetailsPanel({ detail, onClose }: { detail: KeywordDetail
         <h3 style={{ fontSize: 24, fontWeight: 800, overflowWrap: 'anywhere' }}>{detail.keyword}</h3>
         <IntentBadge intent={detail.intent} full />
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          <button className={p.chip} style={{ background: 'none' }} aria-label="Favorite" disabled title="Saving keywords is not available yet">
-            <Star size={18} />
-          </button>
           <button className={p.chip} style={{ background: 'none' }} aria-label="More" onClick={onClose}>
             <MoreVertical size={18} />
           </button>

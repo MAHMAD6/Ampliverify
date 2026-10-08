@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { BookmarkCheck, ChevronRight, Compass, HelpCircle, Layers, ListChecks, Network, Search, Swords } from 'lucide-react';
 import { Card, Grid, IconCircle, PageHeader, Panel, type Tone } from '@/components/ui';
 import { StateView } from '@/components/ui/StateView';
+import { getAppContext } from '@/lib/project';
+import { apiGet } from '@/lib/api';
+import { formatDateTime } from '@/lib/format';
 
 export const metadata = { title: 'Keyword Research' };
 
@@ -16,8 +19,14 @@ const TOOLS: { title: string; text: string; href: string; icon: React.ReactNode;
   { title: 'Saved Keywords', text: 'Every keyword you have saved, across lists.', href: '/app/keywords/lists?saved=true', icon: <BookmarkCheck size={22} />, tone: 'slate' },
 ];
 
-/** Keyword Research overview (`/keywords` in the navigation page map; no screen design supplied). */
-export default function KeywordOverviewPage() {
+/** Keyword Research overview: tools and the project's recent research. */
+type Recent = { id: string; query: string; tool: string; countryCode: string; locale: string; resultCount: number | null; createdAt: string };
+const TOOL_HREF: Record<string, string> = { EXPLORER: 'explorer', RELATED: 'related', QUESTIONS: 'questions', COMPETITOR: 'competitors', SERP: 'serp' };
+
+export default async function KeywordOverviewPage() {
+  const { selectedProject } = await getAppContext();
+  const recent = selectedProject ? await apiGet<Recent[]>(`/user/projects/${selectedProject.id}/keywords/research`, { auth: true }) : null;
+  const rows = recent?.ok ? recent.data : [];
   return (
     <>
       <PageHeader title="Keyword Research" description="Research keywords, analyze search intent and competition, and manage the keywords you save for your projects." />
@@ -38,7 +47,22 @@ export default function KeywordOverviewPage() {
         ))}
       </Grid>
       <Panel title="Recent Research">
-        <StateView kind="empty" compact icon={<Search size={30} />} title="No keyword research yet" description="Searches you run in any research tool will be listed here." />
+        {rows.length ? (
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>
+            {rows.slice(0, 15).map((r) => (
+              <li key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 14 }}>
+                <Link href={`/app/keywords/${TOOL_HREF[r.tool] ?? 'explorer'}`} style={{ color: 'var(--blue)' }}>
+                  {r.query}
+                </Link>
+                <span style={{ color: 'var(--muted)' }}>
+                  {r.tool.toLowerCase()} · {r.locale}-{r.countryCode} · {r.resultCount ?? 0} results · {formatDateTime(r.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <StateView kind="empty" compact icon={<Search size={30} />} title="No keyword research yet" description="Searches you run in any research tool will be listed here." />
+        )}
       </Panel>
     </>
   );
