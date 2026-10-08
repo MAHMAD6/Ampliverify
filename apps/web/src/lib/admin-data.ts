@@ -42,7 +42,7 @@ export function matchesQ(q: string | undefined, ...values: (string | null | unde
   return !t || values.some((v) => v?.toLowerCase().includes(t));
 }
 
-export type ModuleControlRow = { moduleKey: string; enabled: boolean; updatedAt: string; updater: { id: string; email: string; displayName: string | null } | null };
+export type ModuleControlRow = { moduleKey: string; enabled: boolean; updatedAt: string | null; updater: { id: string; email: string; displayName: string | null } | null };
 export type FeatureFlagRow = { id: string; key: string; enabled: boolean; description: string; environment: string; updatedAt: string; rules: { scopeType: string; scopeValue: string; percentage: string | null }[] };
 
 export async function loadModuleControls() {

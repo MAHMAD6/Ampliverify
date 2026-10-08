@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import { PlatformService } from '../platform/platform.service';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, SubscriptionStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -60,6 +61,7 @@ export class BillingService implements OnModuleInit {
     private readonly notifications: NotificationsService,
     private readonly stripe: StripeClient,
     private readonly config: ConfigService,
+    private readonly platform: PlatformService,
   ) {}
 
   onModuleInit() {
@@ -424,6 +426,12 @@ export class BillingService implements OnModuleInit {
           title: type === 'invoice.paid' ? 'Payment received' : 'Payment failed',
           body: type === 'invoice.paid' ? 'Thank you — your invoice has been paid.' : 'We could not collect your subscription payment. Update your payment method to avoid interruption.',
         });
+      }
+      if (type === 'invoice.payment_failed') {
+        const ws = await this.prisma.workspace.findUnique({ where: { id: workspaceId }, select: { name: true } });
+        void this.platform.alertStaff('payment_failed', `Payment failed: ${ws?.name ?? workspaceId}`, `Stripe invoice ${obj.id} for workspace ${ws?.name ?? workspaceId} failed to collect.
+
+See Super Admin → Billing & Invoices.`);
       }
     }
   }

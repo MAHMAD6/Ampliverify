@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { PlatformModule } from './platform/platform.module';
+import { PlatformGuard } from './platform/platform.guard';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
@@ -62,12 +64,18 @@ import { InsightsModule } from './insights/insights.module';
     IntegrationsModule,
     CmsModule,
     InsightsModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
   providers: [
     {
       provide: APP_GUARD,
       useClass: JwksAuthGuard,
+    },
+    // After authentication: maintenance mode and admin MFA.
+    {
+      provide: APP_GUARD,
+      useClass: PlatformGuard,
     },
   ],
 })

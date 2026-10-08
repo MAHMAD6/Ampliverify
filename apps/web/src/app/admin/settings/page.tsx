@@ -1,44 +1,81 @@
-import { Box, Database, Download, Settings, SlidersHorizontal } from 'lucide-react';
-import { SettingsCard, SettingsShell } from '@/components/admin/AdminSettings';
+import { Coins, Globe2, KeyRound, Settings } from 'lucide-react';
+import { Field, Input, Notice, Select, SettingRow, Textarea } from '@/components/ui';
+import { Toggle } from '@/components/ui/Toggle';
+import { ApiForm } from '@/components/ui/actions';
+import { loadSettings, SettingsGrid, SettingsSection, SettingsShell } from '@/components/admin/AdminSettings';
 
 export const metadata = { title: 'General · Settings' };
 
-export default function GeneralSettingsPage() {
+type General = { platformName?: string; platformUrl?: string; supportEmail?: string; defaultTimezone?: string; defaultLanguage?: string; allowSignup?: boolean; maintenanceMode?: boolean; maintenanceMessage?: string; lowCreditThreshold?: number };
+
+const TIMEZONES = ['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Sao_Paulo', 'Europe/London', 'Europe/Berlin', 'Europe/Paris', 'Europe/Madrid', 'Africa/Johannesburg', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney'];
+const LANGUAGES = [
+  ['en', 'English'],
+  ['es', 'Spanish'],
+  ['fr', 'French'],
+  ['de', 'German'],
+  ['pt', 'Portuguese'],
+  ['it', 'Italian'],
+];
+
+/** General platform settings (`platform.general`). */
+export default async function GeneralSettingsPage() {
+  const settings = await loadSettings();
+  const g = settings?.value<General>('platform.general', {}) ?? {};
   return (
-    <SettingsShell
-      tab="general"
-      about={{ title: 'About Settings', text: 'These settings control platform-wide preferences and configurations. Only users with appropriate permissions can view and manage them.' }}
-      footer="These settings will be applied across the platform where applicable once platform settings can be saved."
-    >
-      <SettingsCard
-        icon={<Settings size={24} />}
-        tone="blue"
-        title="Platform Information"
-        description="Basic platform details and branding information used across the platform."
-        rows={[{ label: 'Organization Name' }, { label: 'Platform Name', value: 'AmpliVerify' }, { label: 'Platform URL' }, { label: 'Support Email' }, { label: 'Default Time Zone' }]}
-      />
-      <SettingsCard
-        icon={<SlidersHorizontal size={24} />}
-        tone="green"
-        title="Default Settings"
-        description="Default preferences for new users and content."
-        rows={[{ label: 'Default User Role' }, { label: 'Default Language' }, { label: 'Default Date Format' }, { label: 'Default Time Format' }, { label: 'Items Per Page' }]}
-      />
-      <SettingsCard
-        icon={<Box size={24} />}
-        tone="purple"
-        title="Project & Audit Settings"
-        description="Default settings for projects, audits, and reports."
-        rows={[{ label: 'Default Project Status' }, { label: 'Default Audit Type' }, { label: 'Default Report Visibility' }, { label: 'Allow User Signup' }, { label: 'Maintenance Mode' }]}
-      />
-      <SettingsCard
-        icon={<Database size={24} />}
-        tone="amber"
-        title="Data & Retention"
-        description="Data retention and cleanup settings."
-        rows={[{ label: 'Activity Log Retention' }, { label: 'Session Log Retention' }, { label: 'Deleted Content Retention' }, { label: 'Inactive Account Retention' }]}
-      />
-      <SettingsCard icon={<Download size={24} />} tone="blue" title="Export Preferences" description="Default export settings for data and reports." rows={[{ label: 'Default Export Format' }, { label: 'Include Audit Details' }]} wide />
+    <SettingsShell tab="general" about={{ title: 'About Settings', text: 'These settings control platform-wide behavior. Every change is recorded in the audit log with its before and after values.' }}>
+      {!settings ? (
+        <Notice tone="neutral">Settings could not be loaded with your permissions.</Notice>
+      ) : (
+        <ApiForm method="PUT" path="/admin/settings/platform.general" wrap="value" submitLabel="Save General Settings" successMessage="Settings saved.">
+          <SettingsGrid>
+            <SettingsSection icon={<Settings size={24} />} tone="blue" title="Platform Information" description="Shown on the website contact page and used as the reply address for staff alerts.">
+              <Field label="Platform name" htmlFor="g-name">
+                <Input id="g-name" name="platformName" maxLength={80} defaultValue={g.platformName ?? 'AmpliVerify'} />
+              </Field>
+              <Field label="Platform URL" htmlFor="g-url">
+                <Input id="g-url" name="platformUrl" type="url" maxLength={200} defaultValue={g.platformUrl ?? ''} placeholder="https://ampliverify.com" />
+              </Field>
+              <Field label="Support email" htmlFor="g-mail" hint="Also receives staff alerts (see Notifications).">
+                <Input id="g-mail" name="supportEmail" type="email" maxLength={254} defaultValue={g.supportEmail ?? ''} placeholder="support@yourcompany.com" />
+              </Field>
+            </SettingsSection>
+            <SettingsSection icon={<Globe2 size={24} />} tone="green" title="New Workspace Defaults" description="Applied when a workspace is created; owners can change them later.">
+              <Field label="Default time zone" htmlFor="g-tz">
+                <Select id="g-tz" name="defaultTimezone" defaultValue={g.defaultTimezone ?? 'UTC'}>
+                  {TIMEZONES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Default language" htmlFor="g-lang">
+                <Select id="g-lang" name="defaultLanguage" defaultValue={g.defaultLanguage ?? 'en'}>
+                  {LANGUAGES.map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </SettingsSection>
+            <SettingsSection icon={<KeyRound size={24} />} tone="purple" title="Access" description="Who can sign up and use the product.">
+              <SettingRow title="Allow new sign-ups" description="When off, only people with a pending workspace invitation can create an account." control={<Toggle label="Allow new sign-ups" name="allowSignup" defaultChecked={g.allowSignup !== false} />} />
+              <SettingRow title="Maintenance mode" description="Product pages refuse requests for everyone except platform administrators. The public website stays up." control={<Toggle label="Maintenance mode" name="maintenanceMode" defaultChecked={g.maintenanceMode === true} />} />
+              <Field label="Maintenance message" htmlFor="g-mm">
+                <Textarea id="g-mm" name="maintenanceMessage" rows={2} maxLength={300} defaultValue={g.maintenanceMessage ?? ''} placeholder="AmpliVerify is undergoing scheduled maintenance. Please try again shortly." />
+              </Field>
+            </SettingsSection>
+            <SettingsSection icon={<Coins size={24} />} tone="amber" title="Credits" description="Credit balance warnings for workspaces.">
+              <Field label="Low-credit warning threshold" htmlFor="g-low" hint="Owners are notified and the dashboard warns when the balance falls to or below this. 0 = off.">
+                <Input id="g-low" name="lowCreditThreshold" type="number" data-type="number" min={0} step={1} defaultValue={g.lowCreditThreshold ?? 0} />
+              </Field>
+            </SettingsSection>
+          </SettingsGrid>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 12 }}>{settings.updated('platform.general')}</p>
+        </ApiForm>
+      )}
     </SettingsShell>
   );
 }

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { PlatformService } from '../platform/platform.service';
 import { ConfigService } from '@nestjs/config';
 import { ApplicationStatus, JobStatus, Prisma, WorkArrangement } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
@@ -64,6 +65,7 @@ export class CareersService implements OnModuleInit {
     private readonly storage: ContentStorageService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
+    private readonly platform: PlatformService,
   ) {}
 
   onModuleInit() {
@@ -338,6 +340,7 @@ export class CareersService implements OnModuleInit {
         .send({ to: email, subject: `We received your application for ${job.title}`, text: `Hi ${input.firstName.trim()},\n\nThank you for applying for ${job.title} at AmpliVerify. Your reference is ${app.id.slice(0, 8).toUpperCase()}.\n\nThe AmpliVerify team` })
         .catch((e) => this.logger.warn(`Application confirmation email failed: ${e}`));
     }
+    void this.platform.alertStaff('application', `New application: ${job.title}`, `${input.firstName.trim()} ${input.lastName.trim()} <${email}> applied for ${job.title}.\n\nReview it in Super Admin → Careers → Applications.`);
     return { received: true, receipt: app.id };
   }
 

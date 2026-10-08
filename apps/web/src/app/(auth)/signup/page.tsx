@@ -6,6 +6,7 @@ import { TrendArt } from '@/components/public/Blocks';
 import { SignupForm } from '@/components/public/auth/AuthForms';
 import { apiList } from '@/lib/api';
 import { enabledSocialProviders } from '@/lib/auth';
+import { getPlatformInfo } from '@/lib/platform';
 import type { PublicPlan } from '@/lib/types';
 import s from '@/components/public/site.module.css';
 import a from '@/components/public/auth.module.css';
@@ -16,11 +17,12 @@ export const metadata: Metadata = { title: 'Start Free' };
  * Sign Up (public-website-v2/12). Website and plan prefill from the Home and
  * Pricing CTAs. Better Auth creates the account and sends the verification
  * link; the website is carried through it to Add Project. A plan chosen on
- * Pricing is acknowledged but not applied, because checkout is not built.
+ * Pricing is subscribed to from Billing & Plan after sign-in (Stripe
+ * Checkout needs a workspace). When sign-up is closed, only invited people
+ * can create an account (enforced by the auth server).
  */
 export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ website?: string; plan?: string }> }) {
-  const { website, plan } = await searchParams;
-  const plans = await apiList<PublicPlan>('/public/plans');
+  const [{ website, plan }, plans, platform] = await Promise.all([searchParams, apiList<PublicPlan>('/public/plans'), getPlatformInfo()]);
   const selected = plan ? plans.find((p) => p.code === plan) : undefined;
   return (
     <div className={a.split}>
@@ -65,6 +67,11 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
             Start Your Free Audit
           </h2>
           <p className={s.cardText}>Create your account in under a minute.</p>
+          {!platform.allowSignup && (
+            <p className={s.notice} style={{ marginTop: 12 }}>
+              Sign-up is currently by invitation only. If you were invited, use the email address your invitation was sent to.
+            </p>
+          )}
           <div style={{ display: 'grid', gap: 10, marginTop: 20 }}>
             <SignupForm
               website={website}
@@ -72,7 +79,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
               footer={
                 selected && (
                   <p className={s.pending}>
-                    You chose the <b>{selected.name}</b> plan. Your account starts without a paid plan; you can subscribe from Billing &amp; Plan once checkout is available.
+                    You chose the <b>{selected.name}</b> plan. After you sign in, subscribe to it from Billing &amp; Plan.
                   </p>
                 )
               }

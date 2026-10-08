@@ -78,6 +78,7 @@ export class JwksAuthGuard implements CanActivate {
       userId: user.id,
       authSubject: user.authSubject,
       email: user.email,
+      mfa: payload.twoFactorEnabled === true,
     };
     return true;
   }

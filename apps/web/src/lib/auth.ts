@@ -4,9 +4,10 @@ import { nextCookies } from 'better-auth/next-js';
 import { jwt } from 'better-auth/plugins/jwt';
 import { twoFactor } from 'better-auth/plugins/two-factor';
 import { passkey } from '@better-auth/passkey';
-import { Pool } from 'pg';
+import { authPool } from './auth-db';
 import { sendAuthEmail } from './auth-email';
-import { syncUserToApi } from './auth-sync';
+import { APIError } from 'better-auth/api';
+import { canRegister, syncUserToApi } from './auth-sync';
 
 const baseURL = (process.env.BETTER_AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
@@ -36,7 +37,7 @@ export const authOptions = {
   appName: 'AmpliVerify',
   baseURL,
   secret: process.env.BETTER_AUTH_SECRET,
-  database: new Pool({ connectionString: process.env.AUTH_DATABASE_URL }),
+  database: authPool,
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
@@ -57,7 +58,13 @@ export const authOptions = {
   socialProviders,
   databaseHooks: {
     user: {
-      create: { after: async (user) => syncUserToApi(user) },
+      create: {
+        // Super Admin → Settings can close sign-up; invited people can still join.
+        before: async (user) => {
+          if (!(await canRegister(user.email))) throw new APIError('FORBIDDEN', { message: 'New sign-ups are currently closed. Ask a workspace owner for an invitation.' });
+        },
+        after: async (user) => syncUserToApi(user),
+      },
       update: { after: async (user) => syncUserToApi(user) },
     },
   },
@@ -67,6 +74,8 @@ export const authOptions = {
         issuer: process.env.BETTER_AUTH_ISSUER ?? baseURL,
         audience: process.env.BETTER_AUTH_AUDIENCE ?? 'ampliverify-api',
         expirationTime: '15m',
+        // The API reads `twoFactorEnabled` to enforce "Require MFA for admins".
+        definePayload: ({ user }) => ({ id: user.id, email: user.email, name: user.name, twoFactorEnabled: (user as { twoFactorEnabled?: boolean }).twoFactorEnabled === true }),
       },
     }),
     // TOTP authenticator apps with backup codes (Settings → Account → Security).

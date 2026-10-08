@@ -53,8 +53,8 @@ export async function startApp(env: Record<string, string> = {}) {
 
   const api = () => request(app.getHttpServer());
 
-  const token = (sub: string) =>
-    new SignJWT({}).setProtectedHeader({ alg: 'RS256', kid: 'test' }).setSubject(sub).setIssuer(ISSUER).setAudience(AUDIENCE).setIssuedAt().setExpirationTime('10m').sign(pair.privateKey);
+  const token = (sub: string, claims: Record<string, unknown> = {}) =>
+    new SignJWT(claims).setProtectedHeader({ alg: 'RS256', kid: 'test' }).setSubject(sub).setIssuer(ISSUER).setAudience(AUDIENCE).setIssuedAt().setExpirationTime('10m').sign(pair.privateKey);
 
   async function provision(label: string): Promise<TestUser> {
     const authSubject = `auth|${uniq(label)}`;

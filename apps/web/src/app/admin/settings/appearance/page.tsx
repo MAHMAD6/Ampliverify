@@ -1,62 +1,63 @@
 import Image from 'next/image';
-import { Eye, Globe, LayoutPanelLeft, Palette, Stamp } from 'lucide-react';
-import { SettingsCard, SettingsShell } from '@/components/admin/AdminSettings';
-import { Button } from '@/components/ui';
-
-const change = (
-  <Button size="sm" variant="secondary" disabled title="The approved brand assets are locked">
-    Change
-  </Button>
-);
+import { Eye, Palette, Stamp } from 'lucide-react';
+import { FactRows, SettingsGrid, SettingsSection, SettingsShell } from '@/components/admin/AdminSettings';
 
 export const metadata = { title: 'Appearance · Settings' };
 
-/** Appearance (admin-final-batch2/03, in the card style of the newer Settings designs). The approved logo is locked. */
+const Swatch = ({ color, name }: { color: string; name: string }) => (
+  <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+    <span style={{ width: 18, height: 18, borderRadius: 4, background: color, border: '1px solid var(--line)' }} /> {name}
+  </span>
+);
+
+/**
+ * Appearance (admin-final-batch2/03). The approved AmpliVerify brand (logo,
+ * mark, palette, name and tagline) is fixed by the brand guidelines, so this
+ * tab documents it rather than offering edits.
+ */
 export default function AppearanceSettingsPage() {
   return (
     <SettingsShell
       tab="appearance"
-      about={{ title: 'Branding rule', text: 'Use the exact approved AmpliVerify logo. Do not recolor, redraw, or substitute it. Only supported customization is exposed.' }}
-      footer="Appearance changes apply to supported interfaces once appearance settings can be saved."
+      about={{ title: 'Branding rule', text: 'Use the exact approved AmpliVerify logo. Do not recolor, redraw, or substitute it. Brand assets are fixed by the brand guidelines.' }}
+      footer="Brand asset changes go through the brand owner and a release, not this console."
     >
-      <SettingsCard icon={<Palette size={24} />} tone="blue" title="Theme & Visual Style" description="Supported platform appearance defaults." rows={[{ label: 'Default mode', select: true }, { label: 'Primary color' }, { label: 'Secondary color' }, { label: 'Accent color' }]} />
-      <SettingsCard
-        icon={<Stamp size={24} />}
-        tone="green"
-        title="Branding"
-        description="Product identity shown across supported interfaces."
-        rows={[
-          {
-            label: 'Platform logo',
-            value: (
-              <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
-                <Image src="/brand/mark-transparent.png" alt="Approved AmpliVerify mark" width={26} height={26} /> {change}
-              </span>
-            ),
-          },
-          {
-            label: 'Favicon',
-            value: (
-              <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
-                Approved asset {change}
-              </span>
-            ),
-          },
-          { label: 'Brand name', value: 'AmpliVerify' },
-          { label: 'Tagline', value: 'SEO Engineering' },
-        ]}
-      />
-      <SettingsCard icon={<LayoutPanelLeft size={24} />} tone="purple" title="Layout & Navigation" description="Supported shell preferences." rows={[{ label: 'Default sidebar state', select: true }, { label: 'Show module icons', toggle: true }, { label: 'Compact navigation', toggle: true }]} />
-      <SettingsCard icon={<Globe size={24} />} tone="amber" title="Login & Public Pages" description="Branding on authentication and public experiences." rows={[{ label: 'Show logo on login', toggle: true }, { label: 'Show product name', toggle: true }, { label: 'Show tagline', toggle: true }]} />
-      <SettingsCard icon={<Eye size={24} />} tone="blue" title="Preview" description="How the approved branding appears in the app header." wide>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--navy-900)', color: '#fff' }}>
-          <Image src="/brand/mark-transparent.png" alt="" width={32} height={32} />
-          <span>
-            <b style={{ display: 'block', letterSpacing: 0.5 }}>AMPLIVERIFY</b>
-            <small style={{ opacity: 0.75, letterSpacing: 1 }}>SEO ENGINEERING</small>
-          </span>
-        </div>
-      </SettingsCard>
+      <SettingsGrid>
+        <SettingsSection icon={<Stamp size={24} />} tone="green" title="Branding" description="Product identity shown across the product and website.">
+          <FactRows
+            rows={[
+              [
+                'Platform logo',
+                <span key="l" style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
+                  <Image src="/brand/mark-transparent.png" alt="Approved AmpliVerify mark" width={26} height={26} /> Approved asset
+                </span>,
+              ],
+              ['Favicon', 'Approved asset'],
+              ['Brand name', 'AmpliVerify'],
+              ['Tagline', 'SEO Engineering'],
+            ]}
+          />
+        </SettingsSection>
+        <SettingsSection icon={<Palette size={24} />} tone="blue" title="Theme & Visual Style" description="The approved palette used by every interface.">
+          <FactRows
+            rows={[
+              ['Mode', 'Light'],
+              ['Primary', <Swatch key="p" color="var(--blue)" name="AmpliVerify blue" />],
+              ['Navigation', <Swatch key="n" color="var(--navy-900)" name="Navy" />],
+              ['Accent', <Swatch key="a" color="var(--green)" name="Verify green" />],
+            ]}
+          />
+        </SettingsSection>
+        <SettingsSection icon={<Eye size={24} />} tone="purple" title="Preview" description="How the approved branding appears in the app header." wide>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '14px 16px', border: '1px solid var(--line)', borderRadius: 10, background: 'var(--navy-900)', color: '#fff' }}>
+            <Image src="/brand/mark-transparent.png" alt="" width={32} height={32} />
+            <span>
+              <b style={{ display: 'block', letterSpacing: 0.5 }}>AMPLIVERIFY</b>
+              <small style={{ opacity: 0.75, letterSpacing: 1 }}>SEO ENGINEERING</small>
+            </span>
+          </div>
+        </SettingsSection>
+      </SettingsGrid>
     </SettingsShell>
   );
 }

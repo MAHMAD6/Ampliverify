@@ -150,8 +150,17 @@ export class OrganizationsService {
     name: string,
     slug = slugify(name, 'workspace'),
   ) {
+    // Platform defaults (Super Admin → Settings → General) for new workspaces.
+    const defaults = await this.settings.get<{ defaultTimezone?: string; defaultLanguage?: string } | null>(SETTING.general, null, tx);
     const workspace = await tx.workspace.create({
-      data: { organizationId, name, slug, createdBy: actorId },
+      data: {
+        organizationId,
+        name,
+        slug,
+        createdBy: actorId,
+        ...(defaults?.defaultTimezone ? { timezone: defaults.defaultTimezone } : {}),
+        ...(defaults?.defaultLanguage ? { language: defaults.defaultLanguage } : {}),
+      },
     });
     await tx.workspaceMembership.create({
       data: { userId: actorId, workspaceId: workspace.id, status: MembershipStatus.ACTIVE },

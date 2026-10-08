@@ -86,7 +86,7 @@ const LOGIN_ERRORS: Record<string, string> = {
   TOKEN_EXPIRED: 'That link has expired. Request a new one.',
 };
 
-export function LoginForm({ next, error: initialError, providers }: { next?: string; error?: string; providers: Provider[] }) {
+export function LoginForm({ next, error: initialError, providers, passkeys = true }: { next?: string; error?: string; providers: Provider[]; passkeys?: boolean }) {
   const router = useRouter();
   const { pending, error, setError, notice, setNotice, run } = useSubmit();
   const target = continueUrl({ next: safeNext(next) });
@@ -133,21 +133,23 @@ export function LoginForm({ next, error: initialError, providers }: { next?: str
       <button type="submit" className={s.btn} disabled={pending}>
         {pending ? 'Signing in…' : 'Sign In'}
       </button>
-      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--mute)' }}>OR</div>
-      <button
-        type="button"
-        className={s.btnOutline}
-        disabled={pending}
-        onClick={() =>
-          run(async () => {
-            const res = await authClient.signIn.passkey();
-            if (res?.error) return setError('Passkey sign-in was not completed.');
-            router.push(target);
-          })
-        }
-      >
-        Sign in with a passkey
-      </button>
+      {(passkeys || providers.length > 0) && <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--mute)' }}>OR</div>}
+      {passkeys && (
+        <button
+          type="button"
+          className={s.btnOutline}
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const res = await authClient.signIn.passkey();
+              if (res?.error) return setError('Passkey sign-in was not completed.');
+              router.push(target);
+            })
+          }
+        >
+          Sign in with a passkey
+        </button>
+      )}
       <SocialButtons providers={providers} callbackURL={target} />
     </form>
   );

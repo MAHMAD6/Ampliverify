@@ -105,6 +105,18 @@ class UserStatusDto {
   reason: string;
 }
 
+class RevokeSessionsDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  reason: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  sessionId?: string;
+}
+
 class IncidentDto {
   @IsString()
   @MinLength(3)
@@ -175,6 +187,26 @@ export class OperationsController {
   @Get('users/:id/detail')
   userDetail(@CurrentActor() actor: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.ops.userDetail(actor.userId, id);
+  }
+
+  @Get('me')
+  me(@CurrentActor() actor: AuthenticatedActor) {
+    return this.ops.myPermissions(actor.userId);
+  }
+
+  @Post('users/:id/sessions/revoke')
+  revokeSessions(@CurrentActor() actor: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RevokeSessionsDto, @Req() req: Request) {
+    return this.ops.revokeSessions(actor.userId, id, dto.reason, dto.sessionId, requestMeta(req));
+  }
+
+  @Get('invitations')
+  invitations(@CurrentActor() actor: AuthenticatedActor, @Query('status') status?: string) {
+    return this.ops.invitations(actor.userId, status && ['PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED'].includes(status) ? status : undefined);
+  }
+
+  @Get('suspensions')
+  suspensions(@CurrentActor() actor: AuthenticatedActor) {
+    return this.ops.suspensions(actor.userId);
   }
 
   @Post('users/:id/status')

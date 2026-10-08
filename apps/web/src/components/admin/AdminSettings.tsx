@@ -1,25 +1,43 @@
+import 'server-only';
 import type { ReactNode } from 'react';
-import { Info, Pencil } from 'lucide-react';
-import { Button, TabNav } from '../ui';
-import { Toggle } from '../ui/Toggle';
+import { Info } from 'lucide-react';
+import { TabNav } from '../ui';
 import { AdminHeader } from './AdminParts';
+import { adminGet, dateTime } from '@/lib/admin-data';
 import s from './settings.module.css';
 
-export type SettingsTab = 'general' | 'notifications' | 'security' | 'appearance';
+export type SettingsTab = 'general' | 'billing' | 'notifications' | 'security' | 'appearance';
 
 export const SETTINGS_TABS: { key: SettingsTab; label: string; href: string }[] = [
   { key: 'general', label: 'General', href: '/admin/settings' },
+  { key: 'billing', label: 'Credits & Billing', href: '/admin/settings/billing' },
   { key: 'notifications', label: 'Notifications', href: '/admin/settings/notifications' },
   { key: 'security', label: 'Security', href: '/admin/settings/security' },
   { key: 'appearance', label: 'Appearance', href: '/admin/settings/appearance' },
 ];
 
+export type SettingRow = { key: string; value: unknown; updatedAt: string | null; updatedBy: string | null };
+
+/** All editable platform settings (`GET /admin/settings`), or null when the API refuses. */
+export async function loadSettings() {
+  const rows = await adminGet<SettingRow[]>('/admin/settings');
+  if (!rows) return null;
+  return {
+    rows,
+    value: <T,>(key: string, fallback: T) => ((rows.find((r) => r.key === key)?.value ?? fallback) as T),
+    updated: (key: string) => {
+      const at = rows.find((r) => r.key === key)?.updatedAt;
+      return at ? `Last saved ${dateTime(at)}` : 'Not saved yet — defaults apply';
+    },
+  };
+}
+
 /**
  * Platform Settings (chat designs 2026-10-06; admin-final-batch1/04 and
- * batch2/01-03). There is no platform-settings API yet, so every value reads
- * "—" / Off and Edit stays disabled; nothing pretends to persist.
+ * batch2/01-03). Each tab edits one `system_settings` key through the audited
+ * admin API; only settings the platform actually applies are offered.
  */
-export function SettingsShell({ tab, about, footer, children }: { tab: SettingsTab; about: { title: string; text: string }; footer: string; children: ReactNode }) {
+export function SettingsShell({ tab, about, footer, children }: { tab: SettingsTab; about: { title: string; text: string }; footer?: string; children: ReactNode }) {
   return (
     <>
       <div className={s.head}>
@@ -27,7 +45,7 @@ export function SettingsShell({ tab, about, footer, children }: { tab: SettingsT
           section="Settings"
           page={SETTINGS_TABS.find((t) => t.key === tab)!.label}
           title="Settings"
-          description="Manage platform settings and preferences. Use the tabs below to configure general settings, notifications, security, and appearance."
+          description="Manage platform settings and preferences. Use the tabs below to configure general settings, credits, notifications, security, and appearance."
         />
         <aside className={s.about}>
           <Info size={22} />
@@ -38,18 +56,23 @@ export function SettingsShell({ tab, about, footer, children }: { tab: SettingsT
         </aside>
       </div>
       <TabNav tabs={SETTINGS_TABS} active={tab} />
-      <div className={s.grid}>{children}</div>
-      <p className={s.footer}>
-        <Info size={18} /> {footer}
-      </p>
+      <div style={{ marginTop: 14 }}>{children}</div>
+      {footer && (
+        <p className={s.footer}>
+          <Info size={18} /> {footer}
+        </p>
+      )}
     </>
   );
 }
 
-export type Row = { label: string; value?: ReactNode; toggle?: boolean; select?: boolean };
+/** Two-column grid of setting sections. */
+export function SettingsGrid({ children }: { children: ReactNode }) {
+  return <div className={s.grid}>{children}</div>;
+}
 
-/** A settings card: icon, title, Edit (disabled until the settings API exists) and label/value rows. */
-export function SettingsCard({ icon, tone, title, description, rows, wide, children }: { icon: ReactNode; tone: string; title: string; description: string; rows?: Row[]; wide?: boolean; children?: ReactNode }) {
+/** A settings section: icon, title, description and its fields. */
+export function SettingsSection({ icon, tone, title, description, wide, children }: { icon: ReactNode; tone: string; title: string; description: string; wide?: boolean; children: ReactNode }) {
   return (
     <section className={`${s.card} ${wide ? s.wide : ''}`}>
       <header className={s.cardHead}>
@@ -60,93 +83,22 @@ export function SettingsCard({ icon, tone, title, description, rows, wide, child
           <h2>{title}</h2>
           <p>{description}</p>
         </div>
-        <Button variant="outline" size="sm" icon={<Pencil size={14} />} disabled title="Platform settings can’t be edited yet.">
-          Edit
-        </Button>
       </header>
-      {rows && (
-        <dl className={s.rows}>
-          {rows.map((r) => (
-            <div key={r.label}>
-              <dt>{r.label}</dt>
-              <dd>{r.toggle ? <OffToggle label={r.label} /> : r.select ? <span className={s.select}>{r.value ?? '—'}</span> : (r.value ?? '—')}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      {children}
+      <div style={{ display: 'grid', gap: 12 }}>{children}</div>
     </section>
   );
 }
 
-export function OffToggle({ label }: { label: string }) {
+/** Read-only facts (behavior that is fixed by the platform, not configurable). */
+export function FactRows({ rows }: { rows: [ReactNode, ReactNode][] }) {
   return (
-    <span className={s.toggle}>
-      <Toggle label={label} disabled />
-      <span className={s.off}>Off</span>
-    </span>
-  );
-}
-
-/** Event × channel matrix (notifications). All channels Off until configured. */
-export function ChannelTable({ events, recipients = true, status = true }: { events: string[]; recipients?: boolean; status?: boolean }) {
-  return (
-    <div className={s.tableWrap}>
-      <table className={s.table}>
-        <thead>
-          <tr>
-            <th>Event</th>
-            <th>In-App</th>
-            <th>Email</th>
-            {recipients && <th>Recipients</th>}
-            {status && <th>Status</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {events.map((e) => (
-            <tr key={e}>
-              <td>{e}</td>
-              <td>
-                <Toggle label={`${e} in-app`} disabled />
-              </td>
-              <td>
-                <Toggle label={`${e} email`} disabled />
-              </td>
-              {recipients && <td>—</td>}
-              {status && (
-                <td>
-                  <span className={s.off}>Off</span>
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-export function SimpleTable({ columns, rows }: { columns: string[]; rows: ReactNode[][] }) {
-  return (
-    <div className={s.tableWrap}>
-      <table className={s.table}>
-        <thead>
-          <tr>
-            {columns.map((c) => (
-              <th key={c}>{c}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i}>
-              {r.map((c, j) => (
-                <td key={j}>{c}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <dl className={s.rows}>
+      {rows.map(([label, value], i) => (
+        <div key={i}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

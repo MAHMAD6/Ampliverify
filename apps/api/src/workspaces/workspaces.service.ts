@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
+import { PlatformService } from '../platform/platform.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RbacService } from '../rbac/rbac.service';
 import { AuditService } from '../audit/audit.service';
@@ -34,7 +35,6 @@ export type WorkspaceSettings = {
   projectDefaults?: { crawlScope?: 'PAGE' | 'SITE'; maxPages?: number; auditMode?: 'SEO' | 'GEO' | 'BOTH'; auditFrequency?: 'MANUAL' | 'WEEKLY' | 'MONTHLY'; reportFrequency?: 'NONE' | 'WEEKLY' | 'MONTHLY' };
 };
 
-const INVITE_TTL_DAYS = 7;
 const hash = (token: string) => createHash('sha256').update(token).digest('hex');
 
 /**
@@ -53,6 +53,7 @@ export class WorkspacesService implements OnModuleInit {
     private readonly jobs: JobsService,
     private readonly storage: ContentStorageService,
     private readonly config: ConfigService,
+    private readonly platform: PlatformService,
   ) {}
 
   onModuleInit() {
@@ -249,6 +250,7 @@ export class WorkspacesService implements OnModuleInit {
     const ws = await this.rbac.requireWorkspace(userId, workspaceId, 'workspace.member.manage');
     if (!TENANT_ROLES.includes(roleKey)) throw new BadRequestException({ code: 'INVALID_ROLE', message: 'Role must be OWNER or MEMBER.' });
     const normalized = email.trim().toLowerCase();
+    const ttlDays = await this.platform.invitationTtlDays();
     const existingMember = await this.prisma.workspaceMembership.findFirst({ where: { workspaceId, status: 'ACTIVE', user: { email: normalized } } });
     if (existingMember) throw new ConflictException({ code: 'ALREADY_MEMBER', message: 'This person is already a member.' });
 
@@ -268,7 +270,7 @@ export class WorkspacesService implements OnModuleInit {
     const invitation = await this.prisma.$transaction(async (tx) => {
       await tx.workspaceInvitation.updateMany({ where: { workspaceId, email: normalized, status: 'PENDING' }, data: { status: 'REVOKED' } });
       const inv = await tx.workspaceInvitation.create({
-        data: { workspaceId, email: normalized, roleKey, tokenHash: hash(token), invitedBy: userId, expiresAt: new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000) },
+        data: { workspaceId, email: normalized, roleKey, tokenHash: hash(token), invitedBy: userId, expiresAt: new Date(Date.now() + ttlDays * 86_400_000) },
       });
       await this.auditLog.record({ actorUserId: userId, organizationId: ws.organizationId, workspaceId, action: 'workspace.invitation.create', targetType: 'workspace_invitation', targetId: inv.id, afterState: { email: normalized, roleKey }, requestMeta: meta }, tx);
       return inv;
@@ -282,7 +284,7 @@ export class WorkspacesService implements OnModuleInit {
         await this.email.send({
           to: normalized,
           subject: `${inviter?.displayName ?? inviter?.email ?? 'A teammate'} invited you to ${ws.name} on AmpliVerify`,
-          text: `You have been invited to join the "${ws.name}" workspace on AmpliVerify as ${roleKey === 'OWNER' ? 'an owner' : 'a member'}.\n\nAccept the invitation: ${acceptUrl}\n\nThis link expires in ${INVITE_TTL_DAYS} days.`,
+          text: `You have been invited to join the "${ws.name}" workspace on AmpliVerify as ${roleKey === 'OWNER' ? 'an owner' : 'a member'}.\n\nAccept the invitation: ${acceptUrl}\n\nThis link expires in ${ttlDays} days.`,
         });
         emailed = true;
       } catch {
@@ -462,13 +464,15 @@ export class WorkspacesService implements OnModuleInit {
 
   async createTicket(userId: string, input: { workspaceId: string; subject: string; category: string; priority?: string; message: string }, meta?: RequestMeta) {
     const ws = await this.rbac.requireWorkspace(userId, input.workspaceId, 'workspace.read');
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const t = await tx.supportTicket.create({
         data: { workspaceId: input.workspaceId, userId, subject: input.subject.trim(), category: input.category, priority: input.priority ?? 'NORMAL', messages: { create: { authorUserId: userId, body: input.message.trim() } } },
       });
       await this.auditLog.record({ actorUserId: userId, organizationId: ws.organizationId, workspaceId: ws.id, action: 'support.ticket.create', targetType: 'support_ticket', targetId: t.id, requestMeta: meta }, tx);
       return t;
     });
+    void this.platform.alertStaff('support', `New support request: ${created.subject}`, `${created.category} · ${created.priority}\nWorkspace: ${ws.name}\n\n${input.message.trim()}\n\nReply from Super Admin → Support.`);
+    return created;
   }
 
   async replyTicket(userId: string, ticketId: string, body: string) {

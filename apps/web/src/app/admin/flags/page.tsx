@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Flag, Plus } from 'lucide-react';
 import { ButtonLink } from '@/components/ui';
 import { AdminList, StatusPill } from '@/components/admin/AdminList';
@@ -35,7 +36,9 @@ export default async function FeatureFlagsPage({ searchParams }: { searchParams:
       selects={[{ label: 'Status', name: 'status', value: status, options: ['All Statuses', 'Enabled', 'Disabled', 'Limited Rollout'] }]}
       columns={['Flag', 'Environment', 'Description', 'Status', 'Rollout / Audience', 'Last Updated']}
       rows={rows.map((f) => [
-        <code key="k">{f.key}</code>,
+        <Link key="k" href={`/admin/flags/${f.id}`} style={{ color: 'var(--blue)', fontWeight: 600 }}>
+          <code>{f.key}</code>
+        </Link>,
         f.environment,
         f.description,
         <StatusPill key="s" tone={f.enabled ? (f.rules.length ? 'amber' : 'green') : 'slate'}>

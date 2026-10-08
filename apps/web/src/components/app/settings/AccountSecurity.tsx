@@ -58,7 +58,7 @@ export function ProfileForm({ name, email }: { name: string; email: string }) {
 }
 
 /** Password, MFA (TOTP + backup codes), passkeys and active sessions via Better Auth. */
-export function AccountSecurity({ twoFactorEnabled }: { twoFactorEnabled: boolean }) {
+export function AccountSecurity({ twoFactorEnabled, passkeysAllowed = true }: { twoFactorEnabled: boolean; passkeysAllowed?: boolean }) {
   const router = useRouter();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [passkeys, setPasskeys] = useState<Passkey[]>([]);
@@ -200,7 +200,7 @@ export function AccountSecurity({ twoFactorEnabled }: { twoFactorEnabled: boolea
         </div>
       )}
 
-      <SettingRow
+      {passkeysAllowed && <SettingRow
         title="Passkeys"
         description="Sign in with your device’s fingerprint, face or screen lock."
         control={
@@ -211,7 +211,7 @@ export function AccountSecurity({ twoFactorEnabled }: { twoFactorEnabled: boolea
             </Button>
           </div>
         }
-      />
+      />}
       {passkeys.length > 0 && (
         <ul style={{ listStyle: 'none', margin: '0 0 12px', padding: 0, display: 'grid', gap: 6 }}>
           {passkeys.map((p) => (

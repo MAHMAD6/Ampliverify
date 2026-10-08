@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
+import { PlatformService } from '../platform/platform.service';
 import { TicketStatus } from '@prisma/client';
 import { Request } from 'express';
 import { createHash } from 'crypto';
@@ -43,6 +44,7 @@ export class SupportController {
     private readonly auditLog: AuditService,
     private readonly notifications: NotificationsService,
     private readonly email: EmailService,
+    private readonly platform: PlatformService,
   ) {}
 
   @Public()
@@ -58,6 +60,7 @@ export class SupportController {
     const row = await this.prisma.contactSubmission.create({
       data: { name: dto.name.trim(), email: dto.email.trim(), company: dto.company?.trim() || null, topic: dto.topic, message: dto.message.trim(), ipHash },
     });
+    void this.platform.alertStaff('contact', `Contact form: ${dto.topic.toLowerCase()} from ${row.name}`, `From: ${row.name} <${row.email}>${row.company ? `\nCompany: ${row.company}` : ''}\nTopic: ${dto.topic}\n\n${row.message}\n\nReference ${row.id.slice(0, 8).toUpperCase()} · Super Admin → Support → Contact.`);
     return { received: true, reference: row.id.slice(0, 8).toUpperCase() };
   }
 

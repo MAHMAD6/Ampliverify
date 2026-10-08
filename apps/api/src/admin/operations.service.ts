@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RbacService } from '../rbac/rbac.service';
 import { AuditService } from '../audit/audit.service';
 import { SETTING, SettingsService } from '../commerce/settings.service';
+import { PlatformService } from '../platform/platform.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 
 /** Settings an administrator may edit, with light shape validation. */
@@ -31,6 +32,7 @@ export class OperationsService {
     private readonly auditLog: AuditService,
     private readonly settings: SettingsService,
     private readonly config: ConfigService,
+    private readonly platform: PlatformService,
   ) {}
 
   // ── Module controls & feature flags ────────────────────────────────────
@@ -133,6 +135,7 @@ export class OperationsService {
     return this.prisma.$transaction(async (tx) => {
       const before = await tx.systemSetting.findUnique({ where: { key } });
       const saved = await this.settings.set(key, (value ?? Prisma.JsonNull) as Prisma.InputJsonValue, userId, tx);
+      this.platform.invalidate(key);
       await this.auditLog.record(
         { actorUserId: userId, actorRole: 'admin', action: 'settings.update', targetType: 'system_setting', targetId: null, beforeState: { key, value: (before?.valueJson ?? null) as Prisma.InputJsonValue }, afterState: { key, value: value as Prisma.InputJsonValue }, requestMeta: meta },
         tx,
@@ -142,6 +145,53 @@ export class OperationsService {
   }
 
   // ── Users & workspaces ─────────────────────────────────────────────────
+
+  /** The caller's platform (GLOBAL) permission keys, so the console can show only permitted actions. */
+  async myPermissions(userId: string) {
+    const rows = await this.prisma.roleAssignment.findMany({
+      where: { userId, scopeType: 'GLOBAL', revokedAt: null },
+      select: { role: { select: { key: true, permissions: { select: { permission: { select: { key: true } } } } } } },
+    });
+    return { userId, roles: [...new Set(rows.map((r) => r.role.key))], permissions: [...new Set(rows.flatMap((r) => r.role.permissions.map((p) => p.permission.key)))].sort() };
+  }
+
+  /**
+   * Authorizes and audits revoking a user's sign-in sessions. The sessions
+   * live in the auth server's database, which deletes them after this
+   * succeeds; the returned auth subject identifies them there.
+   */
+  async revokeSessions(userId: string, targetId: string, reason: string, sessionId?: string, meta?: RequestMeta) {
+    await this.rbac.assertGlobalPermission(userId, 'user.manage');
+    const target = await this.prisma.user.findUnique({ where: { id: targetId }, select: { id: true, authSubject: true, email: true } });
+    if (!target) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found.' });
+    await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', action: sessionId ? 'user.session.revoke' : 'user.sessions.revoke_all', targetType: 'user', targetId, afterState: sessionId ? { sessionId } : { all: true }, reason, requestMeta: meta });
+    return { authSubject: target.authSubject, email: target.email };
+  }
+
+  async invitations(userId: string, status?: string) {
+    await this.rbac.assertGlobalPermission(userId, 'user.read');
+    return this.prisma.workspaceInvitation.findMany({
+      where: status ? { status: status as never } : {},
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      select: { id: true, email: true, roleKey: true, status: true, expiresAt: true, acceptedAt: true, createdAt: true, workspace: { select: { id: true, name: true } }, inviter: { select: { email: true, displayName: true } } },
+    });
+  }
+
+  /** Suspended users with the audited reason, actor and time of their latest suspension. */
+  async suspensions(userId: string) {
+    await this.rbac.assertGlobalPermission(userId, 'user.read');
+    const users = await this.prisma.user.findMany({ where: { status: 'SUSPENDED' }, select: { id: true, email: true, displayName: true, authSubject: true, updatedAt: true }, take: 500 });
+    const events = users.length
+      ? await this.prisma.auditLog.findMany({ where: { eventType: 'user.suspend', targetType: 'user', targetId: { in: users.map((u) => u.id) } }, orderBy: { createdAt: 'desc' } })
+      : [];
+    const actors = await this.prisma.user.findMany({ where: { id: { in: [...new Set(events.map((e) => e.actorUserId).filter((x): x is string => !!x))] } }, select: { id: true, email: true, displayName: true } });
+    return users.map((u) => {
+      const e = events.find((x) => x.targetId === u.id);
+      const by = actors.find((a) => a.id === e?.actorUserId);
+      return { ...u, reason: e?.reason ?? null, suspendedAt: e?.createdAt ?? u.updatedAt, suspendedBy: by ? (by.displayName ?? by.email) : null };
+    });
+  }
 
   async setUserStatus(userId: string, targetId: string, status: UserStatus, reason: string, meta?: RequestMeta) {
     await this.rbac.assertGlobalPermission(userId, 'user.manage');
@@ -263,6 +313,7 @@ export class OperationsService {
     await this.rbac.assertGlobalPermission(userId, 'system.manage');
     const incident = await this.prisma.systemIncident.create({ data: { title: input.title, publicSummary: input.publicSummary ?? null } });
     await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', action: 'system.incident.create', targetType: 'system_incident', targetId: incident.id, afterState: { title: input.title }, requestMeta: meta });
+    void this.platform.alertStaff('incident', `Incident opened: ${input.title}`, `${input.publicSummary ?? ''}\n\nTrack it in Super Admin → System Health.`);
     return incident;
   }
 

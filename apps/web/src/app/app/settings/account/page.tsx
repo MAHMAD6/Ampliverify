@@ -3,13 +3,14 @@ import { AccountSecurity, ProfileForm } from '@/components/app/settings/AccountS
 import { getAppContext } from '@/lib/project';
 import { getSession } from '@/lib/session';
 import { apiGet } from '@/lib/api';
+import { getPlatformInfo } from '@/lib/platform';
 import type { WorkspaceView } from '@/lib/app-types';
 
 export const metadata = { title: 'Account · Settings' };
 
 /** Profile, password, MFA, passkeys and sessions (Better Auth), plus workspace locale. */
 export default async function AccountSettingsPage() {
-  const [{ me, workspaceId }, session] = await Promise.all([getAppContext(), getSession()]);
+  const [{ me, workspaceId }, session, platform] = await Promise.all([getAppContext(), getSession(), getPlatformInfo()]);
   const ws = workspaceId ? await apiGet<WorkspaceView>(`/user/workspaces/${workspaceId}`, { auth: true }) : null;
   const twoFactorEnabled = !!(session?.user as { twoFactorEnabled?: boolean } | undefined)?.twoFactorEnabled;
   return (
@@ -20,7 +21,7 @@ export default async function AccountSettingsPage() {
         <Panel title="Profile Information" description="Your name appears on reports, tasks and activity.">
           <ProfileForm name={me?.displayName ?? session?.user.name ?? ''} email={me?.email ?? session?.user.email ?? ''} />
         </Panel>
-        <AccountSecurity twoFactorEnabled={twoFactorEnabled} />
+        <AccountSecurity twoFactorEnabled={twoFactorEnabled} passkeysAllowed={platform.allowPasskeys} />
         <Panel title="Account Preferences" description="Language and timezone are set per workspace (Settings → Workspace).">
           <KeyValue label="Language" value={ws?.ok ? ws.data.language : '—'} />
           <KeyValue label="Timezone" value={ws?.ok ? ws.data.timezone : '—'} />

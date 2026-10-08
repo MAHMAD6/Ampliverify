@@ -22,3 +22,18 @@ export async function syncUserToApi(user: { id: string; email: string; name?: st
     throw new Error(`User provisioning failed (${res.status} ${body?.error?.code ?? 'UNKNOWN'}).`);
   }
 }
+
+/** Asks the API whether an account may be created for this email (sign-up open, or invited). */
+export async function canRegister(email: string) {
+  const secret = process.env.AUTH_SYNC_SECRET;
+  if (!secret) throw new Error('AUTH_SYNC_SECRET is not set; users cannot be provisioned in the API.');
+  const res = await fetch(`${API_URL}/api/v1/internal/auth/users/can-register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-auth-sync-secret': secret },
+    body: JSON.stringify({ email }),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Sign-up check failed (${res.status}).`);
+  const body = (await res.json()) as { data?: { allowed?: boolean } };
+  return body.data?.allowed === true;
+}
