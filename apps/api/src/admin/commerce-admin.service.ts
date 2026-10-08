@@ -7,7 +7,7 @@ import { CreditsService } from '../commerce/credits.service';
 import { BillingService } from '../billing/billing.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 
-export type PlanInput = { code?: string; name?: string; description?: string | null; status?: PlanStatus; isPublic?: boolean; displayOrder?: number };
+export type PlanInput = { code?: string; name?: string; description?: string | null; status?: PlanStatus; isPublic?: boolean; isFeatured?: boolean; displayOrder?: number };
 export type PriceInput = { billingInterval: BillingInterval; currency: string; amountMinor: number };
 export type EntitlementInput = { featureKey: string; enabled: boolean; limit?: number | null; config?: unknown };
 export type FeatureInput = { key: string; name: string; moduleKey?: string | null; description?: string | null; valueType: EntitlementValueType };
@@ -64,7 +64,7 @@ export class CommerceAdminService {
     if (await this.prisma.plan.findUnique({ where: { code } })) throw new ConflictException({ code: 'PLAN_CODE_EXISTS', message: 'A plan with this code already exists.' });
     return this.prisma.$transaction(async (tx) => {
       const plan = await tx.plan.create({
-        data: { code, name: input.name!.trim(), description: input.description ?? null, status: input.status ?? 'DRAFT', isPublic: input.isPublic ?? false, displayOrder: input.displayOrder ?? 0 },
+        data: { code, name: input.name!.trim(), description: input.description ?? null, status: input.status ?? 'DRAFT', isPublic: input.isPublic ?? false, isFeatured: input.isFeatured ?? false, displayOrder: input.displayOrder ?? 0 },
       });
       await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', action: 'plan.create', targetType: 'plan', targetId: plan.id, afterState: { code, name: plan.name, status: plan.status }, requestMeta: meta }, tx);
       return plan;
@@ -83,11 +83,12 @@ export class CommerceAdminService {
           ...(input.description !== undefined && { description: input.description }),
           ...(input.status !== undefined && { status: input.status }),
           ...(input.isPublic !== undefined && { isPublic: input.isPublic }),
+          ...(input.isFeatured !== undefined && { isFeatured: input.isFeatured }),
           ...(input.displayOrder !== undefined && { displayOrder: input.displayOrder }),
         },
       });
       await this.auditLog.record(
-        { actorUserId: userId, actorRole: 'admin', action: 'plan.update', targetType: 'plan', targetId: plan.id, beforeState: { name: plan.name, status: plan.status, isPublic: plan.isPublic }, afterState: { name: saved.name, status: saved.status, isPublic: saved.isPublic }, requestMeta: meta },
+        { actorUserId: userId, actorRole: 'admin', action: 'plan.update', targetType: 'plan', targetId: plan.id, beforeState: { name: plan.name, status: plan.status, isPublic: plan.isPublic, isFeatured: plan.isFeatured }, afterState: { name: saved.name, status: saved.status, isPublic: saved.isPublic, isFeatured: saved.isFeatured }, requestMeta: meta },
         tx,
       );
       return saved;

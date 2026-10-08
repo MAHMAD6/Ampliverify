@@ -9,15 +9,15 @@ import s from './ui.module.css';
 type Method = 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 /**
  * Where to go after success. Server components cannot pass functions to
- * these client controls, so a string may contain `{id}`, replaced with the
- * `id` of the API response.
+ * these client controls, so a string may contain `{field}` placeholders
+ * (e.g. `{id}`, `{code}`), replaced from the API response.
  */
 type RedirectTarget = string | ((data: unknown) => string);
 
 function target(to: RedirectTarget, data: unknown) {
   if (typeof to === 'function') return to(data);
-  const id = data && typeof data === 'object' && 'id' in data ? String((data as { id: unknown }).id) : '';
-  return to.replace('{id}', encodeURIComponent(id));
+  const record = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+  return to.replace(/\{(\w+)\}/g, (_, key: string) => encodeURIComponent(String(record[key] ?? '')));
 }
 
 /** Inline error/success line used under action controls. */
@@ -126,7 +126,8 @@ function readForm(form: HTMLFormElement) {
       else if (kind === 'list' || kind === 'optional-list') {
         value = el.value.split(/[\n,]/).map((v) => v.trim()).filter(Boolean);
         if (kind === 'optional-list' && !(value as string[]).length) continue;
-      } else if (kind === 'code') value = el.value.trim() ? el.value.trim().toUpperCase() : null;
+      } else if (kind === 'bool') value = el.value === 'on' || el.value === 'true';
+      else if (kind === 'code') value = el.value.trim() ? el.value.trim().toUpperCase() : null;
       else if (kind === 'date') value = el.value ? new Date(el.value).toISOString() : null;
       else if (kind === 'nullable') value = el.value.trim() === '' ? null : el.value;
       else if (kind === 'json') {
@@ -148,7 +149,7 @@ function readForm(form: HTMLFormElement) {
 
 /**
  * Form that submits its fields as JSON to an API path. Field types via
- * `data-type` (number, list, optional-list, date, nullable, code, json,
+ * `data-type` (number, bool, list, optional-list, date, nullable, code, json,
  * optional, array). `wrap` nests the values under a dotted path and `extra`
  * adds fixed fields; both are serializable so server components can use
  * them (`transform` only works from client components).

@@ -1,32 +1,28 @@
 import Link from 'next/link';
 import { CalendarDays, CircleDot, CreditCard, Layers, Pause, Plus } from 'lucide-react';
-import { ButtonLink } from '@/components/ui';
+import { Badge, ButtonLink } from '@/components/ui';
 import { AdminList, StatusPill } from '@/components/admin/AdminList';
-import { matchesQ } from '@/lib/admin-data';
-import { apiGet } from '@/lib/api';
+import { adminGet, matchesQ, type AdminPlan } from '@/lib/admin-data';
 import { formatMoney } from '@/lib/format';
-import type { PublicPlan } from '@/lib/types';
 
 export const metadata = { title: 'Plans & Pricing' };
 
-/**
- * Plans & Pricing (chat design 2026-10-06). Active public plans are live from
- * `GET /public/plans`; inactive/draft plans need the admin plans API.
- * Included credits come from a `credits` LIMIT entitlement when one exists.
- */
+const TONE = { ACTIVE: 'green', DRAFT: 'amber', ARCHIVED: 'slate' } as const;
+
+/** Plans & Pricing (chat design 2026-10-06), from the admin plans API (drafts and archived plans included). */
 export default async function PlansPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
   const { tab = 'all', q } = await searchParams;
-  const res = await apiGet<PublicPlan[]>('/public/plans');
-  const plans = res.ok ? res.data : [];
-  const price = (p: PublicPlan, i: 'MONTHLY' | 'ANNUAL') => {
-    const x = p.prices.find((y) => y.billingInterval === i);
+  const plans = await adminGet<AdminPlan[]>('/admin/plans');
+  const list = plans ?? [];
+  const price = (p: AdminPlan, i: 'MONTHLY' | 'ANNUAL') => {
+    const x = p.prices.find((y) => y.billingInterval === i && y.active);
     return x ? formatMoney(x.amountMinor, x.currency) : '—';
   };
-  const credits = (p: PublicPlan) => {
+  const credits = (p: AdminPlan) => {
     const e = p.entitlements.find((x) => x.enabled && x.feature.valueType === 'LIMIT' && /credit/i.test(x.feature.key));
-    return e?.limitNumeric ? Number(e.limitNumeric).toLocaleString('en-US') : '—';
+    return e ? (e.limitNumeric ? Number(e.limitNumeric).toLocaleString('en-US') : 'Unlimited') : '—';
   };
-  const rows = tab === 'inactive' ? [] : plans.filter((p) => matchesQ(q, p.name, p.code));
+  const rows = list.filter((p) => (tab === 'active' ? p.status === 'ACTIVE' : tab === 'inactive' ? p.status !== 'ACTIVE' : true) && matchesQ(q, p.name, p.code));
   const create = (
     <ButtonLink href="/admin/plans/new" icon={<Plus size={18} />}>
       Create Plan
@@ -39,10 +35,10 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
       description="Manage subscription plans, pricing, credits, and feature access."
       actions={create}
       metrics={[
-        { label: 'Total Plans', icon: <Layers size={26} />, tone: 'blue', note: 'Needs the admin plans API' },
-        { label: 'Active Plans', icon: <CircleDot size={26} />, tone: 'green', value: res.ok ? plans.length : undefined },
-        { label: 'Inactive Plans', icon: <Pause size={26} />, tone: 'slate' },
-        { label: 'Plans with Annual Billing', icon: <CalendarDays size={26} />, tone: 'purple', value: res.ok ? plans.filter((p) => p.prices.some((x) => x.billingInterval === 'ANNUAL')).length : undefined },
+        { label: 'Total Plans', icon: <Layers size={26} />, tone: 'blue', value: plans ? list.length : undefined },
+        { label: 'Active Plans', icon: <CircleDot size={26} />, tone: 'green', value: plans ? list.filter((p) => p.status === 'ACTIVE').length : undefined },
+        { label: 'Inactive Plans', icon: <Pause size={26} />, tone: 'slate', value: plans ? list.filter((p) => p.status !== 'ACTIVE').length : undefined },
+        { label: 'Plans with Annual Billing', icon: <CalendarDays size={26} />, tone: 'purple', value: plans ? list.filter((p) => p.prices.some((x) => x.billingInterval === 'ANNUAL' && x.active)).length : undefined },
       ]}
       tabs={[
         { key: 'all', label: 'All Plans' },
@@ -53,21 +49,28 @@ export default async function PlansPage({ searchParams }: { searchParams: Promis
       basePath="/admin/plans"
       search="Search plans..."
       liveFilters={{ q }}
-      columns={['Plan Name', 'Monthly Price', 'Annual Price', 'Included Credits', 'Feature Access', 'Status', 'Actions']}
+      columns={['Plan Name', 'Monthly Price', 'Annual Price', 'Included Credits', 'Feature Access', 'Subscribers', 'Status', 'Actions']}
       rows={rows.map((p) => [
-        <b key="n">{p.name}</b>,
+        <span key="n">
+          <b>{p.name}</b> {p.isFeatured && <Badge tone="blue">Most Popular</Badge>}
+          <small style={{ display: 'block', color: 'var(--muted)' }}>
+            {p.code}
+            {p.isPublic ? ' · public' : ' · hidden'}
+          </small>
+        </span>,
         price(p, 'MONTHLY'),
         price(p, 'ANNUAL'),
         credits(p),
         `${p.entitlements.filter((e) => e.enabled).length} features`,
-        <StatusPill key="s" tone="green">
-          Active
+        p._count.subscriptions,
+        <StatusPill key="s" tone={TONE[p.status]}>
+          {p.status.charAt(0) + p.status.slice(1).toLowerCase()}
         </StatusPill>,
         <Link key="v" href={`/admin/plans/${encodeURIComponent(p.code)}`} style={{ color: 'var(--blue)', fontWeight: 600 }}>
           Edit
         </Link>,
       ])}
-      empty={{ icon: <CreditCard size={40} />, title: 'No plans yet', text: 'Create your first subscription plan to start offering access to your platform. You can set pricing, credits, and feature entitlements.', action: create }}
+      empty={{ icon: <CreditCard size={40} />, title: plans ? 'No plans yet' : 'Plans unavailable', text: plans ? 'Create your first subscription plan to start offering access to your platform. You can set pricing, credits, and feature entitlements.' : 'Your account cannot read plans, or the API is unavailable.', action: create }}
     />
   );
 }

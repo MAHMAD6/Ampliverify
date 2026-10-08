@@ -30,7 +30,7 @@ const FAQ = [
 /**
  * Pricing (public-website-v2/04). Plans, prices, features and the comparison
  * come only from `GET /public/plans`; nothing from the mockup is hard-coded.
- * No plan is badged "Most Popular" because plans carry no such flag yet.
+ * The plan an admin marks as recommended is badged "Most Popular".
  */
 export default async function PricingPage({ searchParams }: { searchParams: Promise<{ interval?: string }> }) {
   const plans = await apiList<PublicPlan>('/public/plans');
@@ -84,7 +84,10 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
                 const Icon = ICONS[i % ICONS.length];
                 const price = priceFor(p, interval);
                 return (
-                  <article key={p.code} className={s.plan}>
+                  <article key={p.code} className={s.plan} data-featured={p.isFeatured || undefined} style={p.isFeatured ? { borderColor: 'var(--g900)', boxShadow: '0 12px 30px rgba(5, 46, 22, 0.12)', position: 'relative' } : undefined}>
+                    {p.isFeatured && (
+                      <span style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: 'var(--g900)', color: '#fff', fontSize: 12, fontWeight: 700, padding: '4px 12px', borderRadius: 999, whiteSpace: 'nowrap' }}>Most Popular</span>
+                    )}
                     <span className={s.icon}>
                       <Icon size={22} />
                     </span>
@@ -93,7 +96,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
                     <div className={s.price}>{price ? formatMoney(price.amountMinor, price.currency) : 'Custom'}</div>
                     <div className={s.per}>{price ? (interval === 'MONTHLY' ? 'per month' : 'per year') : 'Contact us for pricing'}</div>
                     {price ? (
-                      <Link href={`/signup?plan=${encodeURIComponent(p.code)}`} className={`${s.btnOutline} ${s.sm}`}>
+                      <Link href={`/signup?plan=${encodeURIComponent(p.code)}`} className={`${p.isFeatured ? s.btn : s.btnOutline} ${s.sm}`}>
                         {Number(price.amountMinor) === 0 ? 'Get Started Free' : `Choose ${p.name}`}
                       </Link>
                     ) : (

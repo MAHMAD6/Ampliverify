@@ -51,6 +51,10 @@ class PlanDto {
   isPublic?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @IsOptional()
   @IsInt()
   displayOrder?: number;
 }

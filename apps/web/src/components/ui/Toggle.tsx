@@ -39,7 +39,7 @@ export function Toggle({
           onChange?.(next);
         }}
       />
-      {name && <input type="hidden" name={name} value={on ? 'on' : 'off'} />}
+      {name && <input type="hidden" name={name} data-type="bool" value={on ? 'on' : 'off'} />}
     </>
   );
 }
