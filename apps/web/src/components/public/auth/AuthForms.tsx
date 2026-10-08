@@ -96,12 +96,14 @@ export function LoginForm({ next, error: initialError, providers }: { next?: str
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     run(async () => {
-      const { error: err } = await authClient.signIn.email({
+      const { data, error: err } = await authClient.signIn.email({
         email: String(f.get('email')),
         password: String(f.get('password')),
         rememberMe: f.get('remember') === 'on',
         callbackURL: target,
       });
+      // MFA accounts continue on /login/two-factor (twoFactorClient redirects).
+      if (!err && (data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect) return;
       if (!err) return router.push(target);
       if (err.status === 403) return setNotice('Please verify your email address first. We have sent you a new verification link.');
       if (err.status === 429) return setError('Too many attempts. Please wait a moment and try again.');
@@ -132,7 +134,58 @@ export function LoginForm({ next, error: initialError, providers }: { next?: str
         {pending ? 'Signing in…' : 'Sign In'}
       </button>
       <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--mute)' }}>OR</div>
+      <button
+        type="button"
+        className={s.btnOutline}
+        disabled={pending}
+        onClick={() =>
+          run(async () => {
+            const res = await authClient.signIn.passkey();
+            if (res?.error) return setError('Passkey sign-in was not completed.');
+            router.push(target);
+          })
+        }
+      >
+        Sign in with a passkey
+      </button>
       <SocialButtons providers={providers} callbackURL={target} />
+    </form>
+  );
+}
+
+/** Second step for accounts with MFA: authenticator code or a backup code. */
+export function TwoFactorForm({ next }: { next?: string }) {
+  const router = useRouter();
+  const { pending, error, setError, run } = useSubmit();
+  const [backup, setBackup] = useState(false);
+  const target = continueUrl({ next: safeNext(next) });
+  return (
+    <form
+      className={s.form}
+      style={{ gridTemplateColumns: '1fr' }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const code = String(new FormData(e.currentTarget).get('code') ?? '').replace(/\s+/g, '');
+        run(async () => {
+          const { error: err } = backup
+            ? await authClient.twoFactor.verifyBackupCode({ code, trustDevice: true })
+            : await authClient.twoFactor.verifyTotp({ code, trustDevice: true });
+          if (err) return setError(backup ? 'That backup code is not valid.' : 'That code is not valid. Check your authenticator app and try again.');
+          router.push(target);
+        });
+      }}
+    >
+      <Messages error={error} notice={null} />
+      <label>
+        {backup ? 'Backup code' : 'Authentication code'}
+        <input className={s.input} name="code" inputMode={backup ? 'text' : 'numeric'} autoComplete="one-time-code" placeholder={backup ? 'xxxxx-xxxxx' : '123456'} required autoFocus />
+      </label>
+      <button type="submit" className={s.btn} disabled={pending}>
+        {pending ? 'Verifying…' : 'Verify'}
+      </button>
+      <button type="button" className={s.btnOutline} onClick={() => setBackup((b) => !b)}>
+        {backup ? 'Use authenticator app instead' : 'Use a backup code'}
+      </button>
     </form>
   );
 }

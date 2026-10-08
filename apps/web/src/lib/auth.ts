@@ -2,6 +2,8 @@ import 'server-only';
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
 import { nextCookies } from 'better-auth/next-js';
 import { jwt } from 'better-auth/plugins/jwt';
+import { twoFactor } from 'better-auth/plugins/two-factor';
+import { passkey } from '@better-auth/passkey';
 import { Pool } from 'pg';
 import { sendAuthEmail } from './auth-email';
 import { syncUserToApi } from './auth-sync';
@@ -67,6 +69,9 @@ export const authOptions = {
         expirationTime: '15m',
       },
     }),
+    // TOTP authenticator apps with backup codes (Settings → Account → Security).
+    twoFactor({ issuer: 'AmpliVerify' }),
+    passkey({ rpID: new URL(baseURL).hostname, rpName: 'AmpliVerify', origin: baseURL }),
     nextCookies(),
   ],
 } satisfies BetterAuthOptions;
