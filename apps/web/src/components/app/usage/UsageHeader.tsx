@@ -1,9 +1,10 @@
 import { CalendarDays } from 'lucide-react';
 import { PageHeader, TabNav, type Crumb } from '@/components/ui';
+import { formatDate } from '@/lib/format';
 import s from './usage.module.css';
 
-/** Usage & Credits header with the billing period (from the subscription API; "—" until it exists) and sub-pages. */
-export function UsageHeader({ active = 'overview', crumbs }: { active?: 'overview' | 'history'; crumbs?: Crumb[] }) {
+/** Usage & Credits header with the current billing period and sub-pages. */
+export function UsageHeader({ active = 'overview', crumbs, periodStart, periodEnd }: { active?: 'overview' | 'history'; crumbs?: Crumb[]; periodStart?: string | null; periodEnd?: string | null }) {
   return (
     <>
       <PageHeader
@@ -14,7 +15,7 @@ export function UsageHeader({ active = 'overview', crumbs }: { active?: 'overvie
           <span className={s.period}>
             <CalendarDays size={18} /> Billing Period
             <span className={s.periodBox}>
-              Current Period <span>— to —</span>
+              Current Period <span>{periodStart ? `${formatDate(periodStart)} to ${periodEnd ? formatDate(periodEnd) : 'month end'}` : '— to —'}</span>
             </span>
           </span>
         }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { BarChart3, Building2, CheckCircle2, Rocket, Sprout, Users, XCircle } from 'lucide-react';
 import { Button, ButtonLink } from '@/components/ui';
+import { RedirectButton } from '@/components/ui/actions';
 import { formatMoney } from '@/lib/format';
 import type { PublicPlan } from '@/lib/types';
 import s from './plans.module.css';
@@ -38,11 +39,25 @@ export function annualSaving(plans: PublicPlan[]) {
 /**
  * Plan picker from the Billing & Plan design (user-settings/Billing_Plan_Plans.webp).
  * Plans, prices, features and the comparison table come only from
- * `GET /public/plans`. The current plan needs the subscription API, so no plan
- * is marked current yet, and plan changes stay disabled until checkout exists.
+ * `GET /public/plans`; the current plan comes from the workspace subscription
+ * and upgrades go to Stripe Checkout (or the portal when already subscribed).
  * A plan without a price for the interval is a sales-led plan: "Custom".
  */
-export function PlanCatalog({ plans, interval, basePath, currentCode = null }: { plans: PublicPlan[]; interval: Interval; basePath: string; currentCode?: string | null }) {
+export function PlanCatalog({
+  plans,
+  interval,
+  basePath,
+  currentCode = null,
+  workspaceId = null,
+  paymentsEnabled = false,
+}: {
+  plans: PublicPlan[];
+  interval: Interval;
+  basePath: string;
+  currentCode?: string | null;
+  workspaceId?: string | null;
+  paymentsEnabled?: boolean;
+}) {
   const hasAnnual = plans.some((p) => priceFor(p, 'ANNUAL'));
   const saving = annualSaving(plans);
   const features = new Map<string, string>();
@@ -70,7 +85,8 @@ export function PlanCatalog({ plans, interval, basePath, currentCode = null }: {
           const price = priceFor(plan, interval);
           const current = plan.code === currentCode;
           return (
-            <article key={plan.code} className={s.card} data-tone={TONES[i % TONES.length]}>
+            <article key={plan.code} className={s.card} data-tone={TONES[i % TONES.length]} style={plan.isFeatured ? { outline: '2px solid var(--blue)' } : undefined}>
+              {plan.isFeatured && <span style={{ alignSelf: 'flex-start', background: 'var(--blue)', color: '#fff', borderRadius: 999, padding: '2px 10px', fontSize: 12, fontWeight: 700 }}>Most Popular</span>}
               <span className={s.icon}>
                 <Icon size={30} />
               </span>
@@ -82,8 +98,12 @@ export function PlanCatalog({ plans, interval, basePath, currentCode = null }: {
                 <Button variant="muted" block disabled>
                   Current Plan
                 </Button>
+              ) : price && workspaceId && paymentsEnabled ? (
+                <RedirectButton variant={plan.isFeatured ? 'primary' : 'outline'} path={`/user/workspaces/${workspaceId}/billing/checkout`} body={{ planCode: plan.code, interval }}>
+                  {Number(price.amountMinor) === 0 ? `Switch to ${plan.name}` : `Upgrade to ${plan.name}`}
+                </RedirectButton>
               ) : price ? (
-                <Button variant="outline" block disabled title="Plan changes will be available once billing is enabled for your workspace.">
+                <Button variant="outline" block disabled title="Online payments are not available yet.">
                   {Number(price.amountMinor) === 0 ? `Switch to ${plan.name}` : `Upgrade to ${plan.name}`}
                 </Button>
               ) : (

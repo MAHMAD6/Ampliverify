@@ -1,65 +1,83 @@
 import Link from 'next/link';
-import {
-  ArrowRight,
-  CalendarDays,
-  CircleDollarSign,
-  Database,
-  FileText,
-  Info,
-  MessageSquare,
-  RefreshCw,
-  Search,
-  Settings2,
-  ShoppingCart,
-  Sparkles,
-} from 'lucide-react';
-import { ButtonLink, Button } from '@/components/ui';
-import { Toggle } from '@/components/ui/Toggle';
+import { ArrowRight, CalendarDays, Database, FileText, Info, KeyRound, MessageSquare, Search, Settings2, ShoppingCart, Sparkles } from 'lucide-react';
+import { ButtonLink } from '@/components/ui';
 import { StateView } from '@/components/ui/StateView';
-import { AddCreditsButton } from '@/components/app/billing/AddCreditsDialog';
+import { AddCreditsButton, toPacks } from '@/components/app/billing/AddCreditsDialog';
 import { UsageHeader } from '@/components/app/usage/UsageHeader';
+import { getAppContext } from '@/lib/project';
+import { apiGet } from '@/lib/api';
+import type { BillingOverview, LedgerEntry } from '@/lib/app-types';
+import { featureLabel, formatDate, formatDateTime, formatNumber, humanize } from '@/lib/format';
 import s from '@/components/app/usage/usage.module.css';
 
 export const metadata = { title: 'Usage & Credits' };
 
-/** Feature usage cards from the design: credit-metered features and plan-limited (non-credit) ones. */
+/** Usage feature keys → their plan limit keys. */
 const FEATURES = [
-  { title: 'SEO Audits', text: 'Site audits and SEO analysis', icon: <Search size={22} />, credit: true },
-  { title: 'AI Content Generations', text: 'Content creation and optimization', icon: <FileText size={22} />, credit: true },
-  { title: 'GEO Checks', text: 'AI search monitoring and visibility', icon: <Sparkles size={22} />, credit: true },
-  { title: 'Tracked Pages', text: 'Pages being monitored', icon: <FileText size={22} />, credit: false },
-  { title: 'Tracked GEO Prompts', text: 'Prompts being monitored', icon: <MessageSquare size={22} />, credit: false },
+  { key: 'seo.audit_run', limit: 'limit.audit_runs', title: 'SEO Audits', text: 'Pages analyzed by audits', icon: <Search size={22} /> },
+  { key: 'ai.action', limit: 'limit.ai_actions', title: 'AI Content Generations', text: 'Ideas, briefs and editor suggestions', icon: <FileText size={22} /> },
+  { key: 'geo.check', limit: 'limit.geo_queries', title: 'GEO Checks', text: 'AI platform answers checked', icon: <Sparkles size={22} /> },
+  { key: 'keywords.lookup', limit: 'limit.keyword_lookups', title: 'Keyword Lookups', text: 'Keyword research requests', icon: <KeyRound size={22} /> },
 ];
 
-const ACTIONS = [
-  { label: 'Run SEO Audit', icon: <Search size={16} /> },
-  { label: 'Generate AI Content', icon: <Sparkles size={16} /> },
-  { label: 'Run GEO Check', icon: <Sparkles size={16} /> },
-];
+type UsageHistory = { daily: { day: string; featureKey: string; units: number }[]; events: { id: string; featureKey: string; units: number; occurredAt: string; project: { id: string; name: string } | null }[] };
 
-/**
- * Usage & Credits (chat design 2026-10-06). Balances, usage and costs come
- * from the credit ledger and usage APIs (`credit_wallets`, `credit_ledger`,
- * `usage_events`), which are not exposed yet, so every value is "—" and
- * configuration actions are disabled. Nothing is estimated client-side.
- */
-export default function UsagePage() {
+const REASON: Record<string, string> = {
+  PLAN_GRANT: 'Plan credits',
+  PURCHASE: 'Purchase',
+  USAGE: 'Usage',
+  ADJUSTMENT_CREDIT: 'Adjustment (credit)',
+  ADJUSTMENT_DEBIT: 'Adjustment (debit)',
+  PROMOTIONAL: 'Promotional credits',
+  REFUND: 'Refund',
+  REVERSAL: 'Reversal',
+  EXPIRATION: 'Expiration',
+};
+
+/** Usage & Credits (chat design 2026-10-06): wallet, ledger, usage against plan limits and credit costs. */
+export default async function UsagePage({ searchParams }: { searchParams: Promise<{ purchase?: string }> }) {
+  const { purchase } = await searchParams;
+  const { workspaceId } = await getAppContext();
+  const [billingRes, ledgerRes, usageRes] = workspaceId
+    ? await Promise.all([
+        apiGet<BillingOverview>(`/user/workspaces/${workspaceId}/billing`, { auth: true }),
+        apiGet<LedgerEntry[]>(`/user/workspaces/${workspaceId}/credits/ledger?limit=200`, { auth: true }),
+        apiGet<UsageHistory>(`/user/workspaces/${workspaceId}/usage?days=30`, { auth: true }),
+      ])
+    : [null, null, null];
+  const billing = billingRes?.ok ? billingRes.data : null;
+  const ledger = ledgerRes?.ok ? ledgerRes.data : [];
+  const usage = usageRes?.ok ? usageRes.data : null;
+  const balance = billing ? Number(billing.credits.balance) : null;
+  const sumReason = (...reasons: string[]) => ledger.filter((e) => reasons.includes(e.reason)).reduce((n, e) => n + Number(e.delta), 0);
+  const planCredits = sumReason('PLAN_GRANT');
+  const purchased = sumReason('PURCHASE', 'PROMOTIONAL', 'ADJUSTMENT_CREDIT');
+  const spent = -sumReason('USAGE', 'ADJUSTMENT_DEBIT') - sumReason('REVERSAL', 'REFUND') * 0;
+  const used = (k: string) => billing?.usage.find((u) => u.featureKey === k)?.units ?? 0;
+  const limit = (k: string) => billing?.limits.find((l) => l.featureKey === k)?.limit ?? null;
+  const costs = Object.entries(billing?.creditCosts ?? {}).filter(([, v]) => v > 0);
+
   return (
     <>
-      <UsageHeader />
+      <UsageHeader periodStart={billing?.periodStart} periodEnd={billing?.periodEnd} />
+
+      {purchase === 'success' && (
+        <div className={s.note} style={{ marginBottom: 16 }}>
+          <Info size={18} />
+          <span>Thank you! Your credits are added as soon as the payment is confirmed (usually within a minute).</span>
+        </div>
+      )}
 
       <div className={s.top}>
         <section className={s.card}>
           <h2>
-            Current Plan <span className={s.badge}>Not loaded</span>
+            Current Plan <span className={s.badge}>{billing?.subscription?.status ? humanize(billing.subscription.status) : billing ? 'Active' : 'Not loaded'}</span>
           </h2>
-          <div className={s.big}>—</div>
-          <p>Your plan includes monthly credits and access to selected features.</p>
+          <div className={s.big}>{billing?.plan.name ?? (billing ? 'No plan' : '—')}</div>
+          <p>Your plan sets monthly credits and usage limits.</p>
           <div className={s.row}>
-            <Button variant="muted" disabled>
-              Upgrade Plan
-            </Button>
-            <ButtonLink href="/app/billing" variant="secondary">
+            <ButtonLink href="/app/billing">Upgrade Plan</ButtonLink>
+            <ButtonLink href="/app/settings/billing" variant="secondary">
               View Plan Details
             </ButtonLink>
           </div>
@@ -70,13 +88,13 @@ export default function UsagePage() {
           </h2>
           <ul className={s.balances}>
             <li>
-              <i /> <span>Included (Monthly)</span> —
+              <i /> <span>Plan credits received</span> {billing ? formatNumber(planCredits) : '—'}
             </li>
             <li>
-              <i /> <span>Purchased (Add-ons)</span> —
+              <i /> <span>Purchased & bonus credits</span> {billing ? formatNumber(purchased) : '—'}
             </li>
             <li className={s.total}>
-              <i /> <span>Total Available Credits</span> —
+              <i /> <span>Total Available Credits</span> {balance === null ? '—' : formatNumber(balance)}
             </li>
           </ul>
         </section>
@@ -86,22 +104,20 @@ export default function UsagePage() {
           </span>
           <div>
             <h2>Buy More Credits</h2>
-            <p>Purchase additional credits when you need them. Purchased credits may have different expiration rules than plan credits.</p>
+            <p>Purchase additional credits when you need them. Purchased credits do not reset with your billing period.</p>
             <div className={s.row}>
-              <AddCreditsButton packs={[]} balance={null} label="Buy More Credits" variant="outline" size="md" icon={<ShoppingCart size={16} />} />
+              <AddCreditsButton packs={toPacks(billing?.creditPacks ?? [])} balance={balance} workspaceId={workspaceId} paymentsEnabled={!!billing?.paymentsEnabled} label="Buy More Credits" variant="outline" size="md" icon={<ShoppingCart size={16} />} />
             </div>
           </div>
         </section>
         <section className={`${s.card} ${s.withIcon}`}>
           <span className={s.roundIcon}>
-            <RefreshCw size={24} />
+            <MessageSquare size={24} />
           </span>
           <div style={{ flex: 1 }}>
-            <h2 style={{ justifyContent: 'space-between' }}>
-              Auto Top-Up <Toggle label="Auto top-up" disabled />
-            </h2>
-            <p>Automatically purchase credits when your balance is low.</p>
-            <span className={s.link}>Configure Auto Top-Up (not available yet)</span>
+            <h2>Credits used this period</h2>
+            <div className={s.big}>{billing ? formatNumber(spent) : '—'}</div>
+            <p>Failed operations are refunded automatically.</p>
           </div>
         </section>
       </div>
@@ -110,34 +126,38 @@ export default function UsagePage() {
         <div className={s.sectionHead}>
           <div>
             <h2>Feature Usage</h2>
-            <p>See how your credits and limits are being used across different features.</p>
+            <p>Usage this billing period against your plan limits.</p>
           </div>
           <ButtonLink href="/help?q=credits" variant="secondary" icon={<Info size={16} />}>
             How Credits Work
           </ButtonLink>
         </div>
         <div className={s.features}>
-          {FEATURES.map((f) => (
-            <div key={f.title} className={s.feature}>
-              <div className={s.featureHead}>
-                <span className={s.featureIcon}>{f.icon}</span>
-                <span>
-                  <b>{f.title}</b>
-                  <small>{f.text}</small>
-                </span>
-              </div>
-              <div className={s.bar} />
-              <div className={s.split}>
-                <div>
-                  Used <b>—</b>
+          {FEATURES.map((f) => {
+            const u = used(f.key);
+            const l = limit(f.limit);
+            return (
+              <div key={f.title} className={s.feature}>
+                <div className={s.featureHead}>
+                  <span className={s.featureIcon}>{f.icon}</span>
+                  <span>
+                    <b>{f.title}</b>
+                    <small>{f.text}</small>
+                  </span>
                 </div>
-                <div>
-                  {f.credit ? 'Remaining' : 'Limit'} <b>—</b>
+                <div className={s.bar}>{l ? <i style={{ display: 'block', height: '100%', borderRadius: 'inherit', background: u >= l ? 'var(--red)' : 'var(--blue)', width: `${Math.min(100, (u / l) * 100)}%` }} /> : null}</div>
+                <div className={s.split}>
+                  <div>
+                    Used <b>{billing ? formatNumber(u) : '—'}</b>
+                  </div>
+                  <div>
+                    Limit <b>{l === null ? (billing ? 'No limit' : '—') : formatNumber(l)}</b>
+                  </div>
                 </div>
+                <small>{billing?.creditCosts[f.key] ? `${billing.creditCosts[f.key]} credit(s) per unit` : 'Included in your plan (no credits)'}</small>
               </div>
-              <small>{f.credit ? 'Resets each billing period (included credits)' : 'Based on your plan limits (not credit based)'}</small>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -145,26 +165,39 @@ export default function UsagePage() {
         <section className={s.section}>
           <div className={s.sectionHead}>
             <div>
-              <h2>Recent Credit Usage</h2>
-              <p>Your latest credit activity across all features.</p>
+              <h2>Recent Usage</h2>
+              <p>Your latest metered activity across all features.</p>
             </div>
             <Link href="/app/usage/history" className={s.viewAll}>
-              View All Activity <ArrowRight size={16} />
+              View Credit History <ArrowRight size={16} />
             </Link>
           </div>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Date &amp; Time</th>
-                <th>Action</th>
-                <th>Feature</th>
-                <th>Credits Used</th>
-                <th>Project</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-          </table>
-          <StateView kind="empty" compact icon={<FileText size={26} />} title="No usage activity yet" description="Your credit usage will appear here once you start using AmpliVerify." />
+          {usage?.events.length ? (
+            <table className={s.table}>
+              <thead>
+                <tr>
+                  <th>Date &amp; Time</th>
+                  <th>Feature</th>
+                  <th>Units</th>
+                  <th>Credits</th>
+                  <th>Project</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usage.events.slice(0, 12).map((e) => (
+                  <tr key={e.id}>
+                    <td>{formatDateTime(e.occurredAt)}</td>
+                    <td>{featureLabel(e.featureKey)}</td>
+                    <td>{formatNumber(e.units)}</td>
+                    <td>{billing?.creditCosts[e.featureKey] ? formatNumber(billing.creditCosts[e.featureKey] * e.units) : 0}</td>
+                    <td>{e.project?.name ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <StateView kind="empty" compact icon={<FileText size={26} />} title="No usage activity yet" description="Your usage will appear here once you start using AmpliVerify." />
+          )}
         </section>
         <section className={s.section}>
           <div className={s.sectionHead}>
@@ -172,88 +205,65 @@ export default function UsagePage() {
               <h2>
                 Credit Cost by Action <Info size={16} />
               </h2>
-              <p>Each action uses a different number of credits.</p>
+              <p>Credits charged per unit of each action.</p>
             </div>
           </div>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th>Action</th>
-                <th style={{ textAlign: 'right' }}>Credits per Use</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ACTIONS.map((a) => (
-                <tr key={a.label}>
-                  <td style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    {a.icon} {a.label}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>—</td>
+          {costs.length ? (
+            <table className={s.table}>
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th style={{ textAlign: 'right' }}>Credits per Use</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className={s.note}>
-            <Info size={18} />
-            <span>Only actions that consume credits are listed here. Some features, such as tracking pages and prompts, may be included in your plan and not consume credits.</span>
-          </div>
+              </thead>
+              <tbody>
+                {costs.map(([k, v]) => (
+                  <tr key={k}>
+                    <td>{featureLabel(k)}</td>
+                    <td style={{ textAlign: 'right' }}>{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className={s.note}>
+              <Info size={18} />
+              <span>No actions currently consume credits — usage is governed by your plan limits.</span>
+            </div>
+          )}
         </section>
       </div>
 
       <div className={s.two}>
         <section className={s.section}>
           <div className={s.sectionHead}>
-            <div>
-              <h2>
-                Credit Balance Breakdown <Info size={16} />
-              </h2>
-              <p>Understand where your available credits come from.</p>
-            </div>
+            <h2>Recent Credit Activity</h2>
           </div>
-          <div style={{ overflowX: 'auto' }}>
+          {ledger.length ? (
             <table className={s.table}>
               <thead>
                 <tr>
-                  <th>Credit Type</th>
-                  <th>Total Credits</th>
-                  <th>Used</th>
-                  <th>Remaining</th>
-                  <th>Expires</th>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th style={{ textAlign: 'right' }}>Credits</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>
-                    <span className={s.dot} />
-                    Included with Plan (Monthly)
-                  </td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>Resets each billing period</td>
-                </tr>
-                <tr>
-                  <td>
-                    <span className={s.dot} style={{ background: '#4f8cff' }} />
-                    Purchased (Add-ons)
-                  </td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>Varies by purchase</td>
-                </tr>
+                {ledger.slice(0, 8).map((e) => (
+                  <tr key={e.id}>
+                    <td>{formatDateTime(e.createdAt)}</td>
+                    <td>{REASON[e.reason] ?? humanize(e.reason)}</td>
+                    <td style={{ textAlign: 'right', color: Number(e.delta) < 0 ? 'var(--red)' : 'var(--green)' }}>
+                      {Number(e.delta) > 0 ? '+' : ''}
+                      {formatNumber(e.delta, 2)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
-              <tfoot>
-                <tr>
-                  <td>Total Available</td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>—</td>
-                  <td>—</td>
-                </tr>
-              </tfoot>
             </table>
-          </div>
+          ) : (
+            <StateView kind="empty" compact icon={<Database size={26} />} title="No credit activity yet" description="Grants, purchases and usage appear here." />
+          )}
         </section>
         <section className={s.section}>
           <div className={s.sectionHead}>
@@ -263,18 +273,15 @@ export default function UsagePage() {
           </div>
           <ul className={s.kv}>
             <li>
-              <CalendarDays size={18} /> <span>Billing Period</span> <span>— to —</span> <span />
+              <CalendarDays size={18} /> <span>Billing Period</span> <span>{billing ? `${formatDate(billing.periodStart)} to ${billing.periodEnd ? formatDate(billing.periodEnd) : 'month end'}` : '—'}</span> <span />
             </li>
             <li>
-              <CircleDollarSign size={18} /> <span>Monthly Spend Cap</span> <span>Not set</span> <span>Not available yet</span>
-            </li>
-            <li>
-              <RefreshCw size={18} /> <span>Auto Top-Up</span> <span>Disabled</span> <span>Not available yet</span>
+              <Info size={18} /> <span>Low-credit alert</span> <span>{billing?.credits.lowThreshold ? `Below ${billing.credits.lowThreshold} credits` : 'Not set'}</span> <span />
             </li>
           </ul>
           <div className={s.note}>
             <Info size={18} />
-            <span>Monthly credits reset each billing period. Purchased credits may have different expiration rules and do not reset automatically.</span>
+            <span>Plan limits reset each billing period. Purchased credits never expire with the period.</span>
           </div>
         </section>
       </div>

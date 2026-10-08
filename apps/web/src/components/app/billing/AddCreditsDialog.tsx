@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { CreditCard, Database, Lock, Plus, X } from 'lucide-react';
-import { Badge, Button, EmptyState, Input } from '@/components/ui';
+import { apiAction } from '@/lib/actions';
+import { Badge, Button, EmptyState } from '@/components/ui';
 import b from './billing.module.css';
 
 /** A purchasable pack as configured in billing (credits + price in minor units). */
@@ -10,15 +11,23 @@ export type CreditPack = { id: string; credits: number; amountMinor: number; cur
 
 const money = (minor: number, currency: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(minor / 100);
 
+/** Maps the API's configured packs (Super Admin → credit packs) to dialog packs. */
+export function toPacks(packs: { code: string; credits: number; amountMinor: number; currency: string }[]): CreditPack[] {
+  const perCredit = packs.map((p) => p.amountMinor / p.credits);
+  const best = Math.min(...perCredit);
+  return packs.map((p, i) => ({ id: p.code, credits: p.credits, amountMinor: p.amountMinor, currency: p.currency, bestValue: packs.length > 1 && perCredit[i] === best }));
+}
+
 /**
- * "Add Credits" dialog. Packs, minimums and prices come only from billing
- * configuration (`packs`); payment is handled by the payment provider. With no
- * configured packs the dialog says so, and checkout stays disabled until the
- * purchase API exists.
+ * "Add Credits" dialog. Packs and prices come only from billing configuration;
+ * checkout goes to Stripe and credits are added by the verified payment
+ * webhook. With no packs, or payments not enabled, the dialog says so.
  */
 export function AddCreditsButton({
   packs,
   balance,
+  workspaceId,
+  paymentsEnabled = false,
   label = 'Add Credits',
   variant = 'primary',
   icon = <Plus size={18} />,
@@ -26,6 +35,8 @@ export function AddCreditsButton({
 }: {
   packs: CreditPack[];
   balance: number | null;
+  workspaceId?: string | null;
+  paymentsEnabled?: boolean;
   label?: string;
   variant?: 'primary' | 'outline';
   icon?: React.ReactNode;
@@ -33,6 +44,8 @@ export function AddCreditsButton({
 }) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(packs[0]?.id ?? null);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -41,6 +54,14 @@ export function AddCreditsButton({
   }, [open]);
 
   const pack = packs.find((p) => p.id === selected) ?? null;
+  const checkout = () =>
+    start(async () => {
+      if (!pack || !workspaceId) return;
+      setError(null);
+      const r = await apiAction<{ url: string }>('POST', `/user/workspaces/${workspaceId}/credits/checkout`, { packCode: pack.id });
+      if (!r.ok) return setError(r.message);
+      window.location.assign(r.data.url);
+    });
 
   return (
     <>
@@ -77,18 +98,11 @@ export function AddCreditsButton({
                     <strong>{p.credits.toLocaleString('en-US')}</strong>
                     <span>Credits</span>
                     <b>{money(p.amountMinor, p.currency)}</b>
-                    <small>
-                      {money(p.amountMinor / p.credits, p.currency)}/credit
-                    </small>
+                    <small>{money(p.amountMinor / p.credits, p.currency)}/credit</small>
                   </button>
                 ))}
               </div>
             )}
-            <div className={b.or}>or</div>
-            <label className={b.label} htmlFor="custom-credits">
-              Custom Amount <small>(Optional)</small>
-            </label>
-            <Input id="custom-credits" type="number" placeholder="Enter credits" disabled={packs.length === 0} />
           </div>
           <aside className={b.summary}>
             <h3>Purchase Summary</h3>
@@ -108,12 +122,18 @@ export function AddCreditsButton({
               <span>New Balance (after purchase)</span>
               <b>{pack && balance !== null ? `${(balance + pack.credits).toLocaleString('en-US')} credits` : '—'}</b>
             </div>
-            <Button block icon={<CreditCard size={16} />} disabled title="Checkout is not available yet">
-              Continue to Payment
+            <Button block icon={<CreditCard size={16} />} disabled={!pack || !workspaceId || !paymentsEnabled || pending} title={paymentsEnabled ? undefined : 'Online payments are not available yet'} onClick={checkout}>
+              {pending ? 'Redirecting…' : 'Continue to Payment'}
             </Button>
             <Button block variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
+            {error && (
+              <p role="alert" style={{ color: 'var(--red)', fontSize: 13 }}>
+                {error}
+              </p>
+            )}
+            {!paymentsEnabled && <p style={{ color: 'var(--muted)', fontSize: 13 }}>Online payments are not enabled yet.</p>}
             <p className={b.secure}>
               <Lock size={14} /> Secure payment processing by our payment provider. Credits are added to your account after successful payment.
             </p>

@@ -1,27 +1,43 @@
 import Link from 'next/link';
 import { BarChart3, BookOpen, Coins, Repeat, ShieldCheck, Crown, CreditCard, Database, ExternalLink, FileText, Info } from 'lucide-react';
-import { AddCreditsButton } from '@/components/app/billing/AddCreditsDialog';
-import { Button, ButtonLink, EmptyState, Grid, IconCircle } from '@/components/ui';
+import { AddCreditsButton, toPacks } from '@/components/app/billing/AddCreditsDialog';
+import { Badge, ButtonLink, EmptyState, Grid, IconCircle, Notice } from '@/components/ui';
+import { ActionButton, RedirectButton } from '@/components/ui/actions';
 import { PlanCatalog, priceFor, type Interval } from '@/components/app/billing/PlanCatalog';
 import { PlanCompare } from '@/components/app/billing/PlanCompare';
-import { apiList } from '@/lib/api';
+import { apiGet, apiList } from '@/lib/api';
+import { getAppContext } from '@/lib/project';
 import type { PublicPlan } from '@/lib/types';
+import type { BillingOverview, Invoice } from '@/lib/app-types';
+import { formatDate, formatMoney, formatNumber, humanize } from '@/lib/format';
 import b from '@/components/app/billing/billing.module.css';
 
 export const metadata = { title: 'Billing & Plan · Settings' };
 
-/**
- * Settings view of billing. Plan, subscription, wallet balance, credit packs,
- * payment method and invoices come from the billing API, which is not built
- * yet, so each area shows its empty state ("No active plan", "—").
- */
-export default async function SettingsBillingPage({ searchParams }: { searchParams: Promise<{ interval?: string }> }) {
+/** Settings view of billing: subscription, credits, plan catalog, payment method (Stripe portal) and invoices. */
+export default async function SettingsBillingPage({ searchParams }: { searchParams: Promise<{ interval?: string; checkout?: string }> }) {
+  const sp = await searchParams;
   const plans = await apiList<PublicPlan>('/public/plans');
-  const interval: Interval = (await searchParams).interval === 'annual' && plans.some((p) => priceFor(p, 'ANNUAL')) ? 'ANNUAL' : 'MONTHLY';
+  const { workspaceId } = await getAppContext();
+  const [billingRes, invoicesRes] = workspaceId
+    ? await Promise.all([apiGet<BillingOverview>(`/user/workspaces/${workspaceId}/billing`, { auth: true }), apiGet<Invoice[]>(`/user/workspaces/${workspaceId}/invoices`, { auth: true })])
+    : [null, null];
+  const billing = billingRes?.ok ? billingRes.data : null;
+  const invoices = invoicesRes?.ok ? invoicesRes.data : [];
+  const sub = billing?.subscription ?? null;
+  const interval: Interval = sp.interval === 'annual' && plans.some((p) => priceFor(p, 'ANNUAL')) ? 'ANNUAL' : 'MONTHLY';
+  const usedCredits = billing ? Object.entries(billing.creditCosts).reduce((n, [k, c]) => n + c * (billing.usage.find((u) => u.featureKey === k)?.units ?? 0), 0) : null;
+  const included = billing?.features?.find((f) => f.featureKey === 'credits.monthly_grant')?.limit ?? null;
+
   return (
     <>
       <h2>Billing &amp; Plan</h2>
       <p>View your current plan, manage billing, and access invoices.</p>
+      {sp.checkout === 'success' && (
+        <div style={{ marginBottom: 16 }}>
+          <Notice tone="green" title="Subscription confirmed">Your plan updates as soon as the payment provider confirms the subscription (usually within a minute).</Notice>
+        </div>
+      )}
       <div style={{ display: 'grid', gap: 16 }}>
         <div className={b.planCard}>
           <IconCircle tone="blue" size={72}>
@@ -29,14 +45,33 @@ export default async function SettingsBillingPage({ searchParams }: { searchPara
           </IconCircle>
           <div>
             <h3>Current Plan</h3>
-            <strong>No active plan</strong>
-            <p>Your plan details will appear here once a subscription is active.</p>
+            <strong>{billing?.plan.name ?? 'No active plan'}</strong>
+            {sub ? (
+              <p>
+                <Badge tone={sub.status === 'ACTIVE' || sub.status === 'TRIALING' ? 'green' : 'amber'}>{humanize(sub.status)}</Badge>{' '}
+                {sub.amountMinor && sub.currency ? `${formatMoney(sub.amountMinor, sub.currency)} / ${sub.interval === 'ANNUAL' ? 'year' : 'month'} · ` : ''}
+                {sub.cancelAtPeriodEnd ? `Ends on ${formatDate(sub.currentPeriodEnd)}` : `Renews on ${formatDate(sub.currentPeriodEnd)}`}
+              </p>
+            ) : (
+              <p>{billing?.plan.name ? 'Applied to your workspace by default.' : 'Choose a plan to unlock more audits, AI actions and AI search checks.'}</p>
+            )}
           </div>
           <div className={b.planActions}>
-            <ButtonLink href="/app/billing" size="lg">
-              View Plans
-            </ButtonLink>
-            <Link href="/app/billing">Compare Plans</Link>
+            {sub && workspaceId ? (
+              <>
+                <RedirectButton path={`/user/workspaces/${workspaceId}/billing/portal`}>Manage Subscription</RedirectButton>
+                <ActionButton variant="ghost" path={`/user/workspaces/${workspaceId}/billing/cancel`} body={{ cancel: !sub.cancelAtPeriodEnd }} confirm={sub.cancelAtPeriodEnd ? undefined : 'Cancel at the end of the current period? You keep access until then.'}>
+                  {sub.cancelAtPeriodEnd ? 'Resume Subscription' : 'Cancel Subscription'}
+                </ActionButton>
+              </>
+            ) : (
+              <>
+                <ButtonLink href="/app/billing" size="lg">
+                  View Plans
+                </ButtonLink>
+                <Link href="/app/billing">Compare Plans</Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -55,22 +90,22 @@ export default async function SettingsBillingPage({ searchParams }: { searchPara
           </div>
           <div className={b.tiles}>
             {[
-              ['Current Balance', 'Credits available'],
-              ['Included This Period', 'From your plan'],
-              ['Used This Period', 'Credits used'],
-              ['Next Renewal', 'Renews on —'],
-            ].map(([label, note]) => (
+              ['Current Balance', billing ? formatNumber(billing.credits.balance) : '—', 'Credits available'],
+              ['Included This Period', included !== null ? formatNumber(included) : '—', 'From your plan'],
+              ['Used This Period', usedCredits !== null ? formatNumber(usedCredits) : '—', 'Credits used'],
+              ['Next Renewal', sub ? formatDate(sub.currentPeriodEnd) : '—', sub ? 'Subscription renewal' : 'No subscription'],
+            ].map(([label, value, note]) => (
               <div key={label} className={b.tile}>
                 <span>
                   {label} <Info size={14} color="var(--muted)" />
                 </span>
-                <strong>—</strong>
+                <strong>{value}</strong>
                 <small>{note}</small>
               </div>
             ))}
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <AddCreditsButton packs={[]} balance={null} />
+            <AddCreditsButton packs={toPacks(billing?.creditPacks ?? [])} balance={billing ? Number(billing.credits.balance) : null} workspaceId={workspaceId} paymentsEnabled={!!billing?.paymentsEnabled} />
             <ButtonLink href="/app/usage" variant="outline" size="lg" icon={<BarChart3 size={18} />}>
               View Usage &amp; History
             </ButtonLink>
@@ -81,7 +116,7 @@ export default async function SettingsBillingPage({ searchParams }: { searchPara
           <h3 style={{ fontSize: 20 }}>Plan Features</h3>
           <p style={{ color: 'var(--muted)', marginBottom: 12 }}>View the key features included in each plan and find the right plan for your needs.</p>
           {plans.length > 0 ? (
-            <PlanCatalog plans={plans} interval={interval} basePath="/app/settings/billing" />
+            <PlanCatalog plans={plans} interval={interval} basePath="/app/settings/billing" currentCode={billing?.plan.code ?? null} workspaceId={workspaceId} paymentsEnabled={!!billing?.paymentsEnabled && !sub} />
           ) : (
             <div className={b.boxed}>
               <EmptyState icon={<FileText size={26} />} title="Plans are being finalized" description="Published plans and their features will appear here." />
@@ -119,17 +154,23 @@ export default async function SettingsBillingPage({ searchParams }: { searchPara
             <h3 style={{ fontSize: 20, display: 'flex', gap: 10, alignItems: 'center' }}>
               <CreditCard size={22} color="var(--blue)" /> Payment Method
             </h3>
-            <p style={{ color: 'var(--muted)', marginBottom: 12 }}>Manage your payment method for subscriptions and billing.</p>
+            <p style={{ color: 'var(--muted)', marginBottom: 12 }}>Cards and billing details are managed securely by our payment provider.</p>
             <div className={b.boxed}>
               <EmptyState
                 compact
                 icon={<CreditCard size={24} />}
-                title="No payment method added"
-                description="Add a payment method to enable subscriptions and automatic billing."
+                title={sub ? 'Managed in the billing portal' : 'No payment method added'}
+                description={sub ? 'Update your card, billing address and tax details in the secure portal.' : 'Your payment method is added during checkout.'}
                 action={
-                  <Button variant="outline" disabled title="Payment methods are managed by our payment provider and will be available soon">
-                    Add Payment Method
-                  </Button>
+                  sub && workspaceId ? (
+                    <RedirectButton variant="outline" path={`/user/workspaces/${workspaceId}/billing/portal`}>
+                      Manage Payment Method
+                    </RedirectButton>
+                  ) : (
+                    <ButtonLink href="/app/billing" variant="outline">
+                      Choose a Plan
+                    </ButtonLink>
+                  )
                 }
               />
             </div>
@@ -140,17 +181,34 @@ export default async function SettingsBillingPage({ searchParams }: { searchPara
             </h3>
             <p style={{ color: 'var(--muted)', marginBottom: 12 }}>View and download your invoices and billing history.</p>
             <div className={b.boxed}>
-              <EmptyState
-                compact
-                icon={<FileText size={24} />}
-                title="No invoices yet"
-                description="Your invoices will appear here once you subscribe to a paid plan or purchase credits."
-                action={
-                  <ButtonLink href="/app/billing/invoices" variant="outline">
-                    View Invoices
-                  </ButtonLink>
-                }
-              />
+              {invoices.length ? (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 8 }}>
+                  {invoices.slice(0, 5).map((inv) => (
+                    <li key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                      <span>{formatDate(inv.issuedAt ?? inv.createdAt)}</span>
+                      <span>{formatMoney(inv.totalMinor, inv.currency)}</span>
+                      <Badge tone={inv.status === 'PAID' ? 'green' : 'amber'}>{humanize(inv.status)}</Badge>
+                    </li>
+                  ))}
+                  <li>
+                    <Link href="/app/billing/invoices" style={{ color: 'var(--blue)' }}>
+                      View all invoices →
+                    </Link>
+                  </li>
+                </ul>
+              ) : (
+                <EmptyState
+                  compact
+                  icon={<FileText size={24} />}
+                  title="No invoices yet"
+                  description="Your invoices will appear here once you subscribe to a paid plan or purchase credits."
+                  action={
+                    <ButtonLink href="/app/billing/invoices" variant="outline">
+                      View Invoices
+                    </ButtonLink>
+                  }
+                />
+              )}
             </div>
           </section>
         </Grid>

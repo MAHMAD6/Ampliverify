@@ -4,27 +4,39 @@ import { PageHeader, Panel } from '@/components/ui';
 import { StateView } from '@/components/ui/StateView';
 import { BillingTabs } from '@/components/app/billing/BillingTabs';
 import { PlanCatalog, priceFor, type Interval } from '@/components/app/billing/PlanCatalog';
-import { apiList } from '@/lib/api';
+import { apiGet, apiList } from '@/lib/api';
+import { getAppContext } from '@/lib/project';
+import type { BillingOverview } from '@/lib/app-types';
+import { Notice } from '@/components/ui';
 import type { PublicPlan } from '@/lib/types';
 import s from '@/components/app/billing/plans.module.css';
 
 export const metadata = { title: 'Billing & Plan' };
 
 /** Plans (`/billing` in the navigation page map; design user-settings/Billing_Plan_Plans.webp). */
-export default async function BillingPlansPage({ searchParams }: { searchParams: Promise<{ interval?: string }> }) {
+export default async function BillingPlansPage({ searchParams }: { searchParams: Promise<{ interval?: string; checkout?: string }> }) {
+  const sp = await searchParams;
   const plans = await apiList<PublicPlan>('/public/plans');
-  const interval: Interval = (await searchParams).interval === 'annual' && plans.some((p) => priceFor(p, 'ANNUAL')) ? 'ANNUAL' : 'MONTHLY';
+  const { workspaceId } = await getAppContext();
+  const billing = workspaceId ? await apiGet<BillingOverview>(`/user/workspaces/${workspaceId}/billing`, { auth: true }) : null;
+  const overview = billing?.ok ? billing.data : null;
+  const interval: Interval = sp.interval === 'annual' && plans.some((p) => priceFor(p, 'ANNUAL')) ? 'ANNUAL' : 'MONTHLY';
 
   return (
     <>
       <PageHeader title="Billing & Plan" description="Choose the plan that fits your SEO goals. Upgrade, downgrade, or manage your subscription." />
       <BillingTabs active="plans" />
+      {sp.checkout === 'canceled' && (
+        <div style={{ marginBottom: 16 }}>
+          <Notice tone="neutral" title="Checkout canceled">No changes were made to your plan.</Notice>
+        </div>
+      )}
       {plans.length === 0 ? (
         <Panel>
           <StateView kind="empty" icon={<Tags size={36} />} title="Plans are being finalized" description="Published plans and prices will appear here." />
         </Panel>
       ) : (
-        <PlanCatalog plans={plans} interval={interval} basePath="/app/billing" />
+        <PlanCatalog plans={plans} interval={interval} basePath="/app/billing" currentCode={overview?.plan.code ?? null} workspaceId={workspaceId} paymentsEnabled={!!overview?.paymentsEnabled} />
       )}
       <div className={s.facts}>
         <div className={s.fact}>
@@ -38,7 +50,7 @@ export default async function BillingPlansPage({ searchParams }: { searchParams:
           <ArrowLeftRight size={22} />
           <span>
             <b>Change Your Plan</b>
-            <small>Upgrade or downgrade from this page once billing is enabled for your workspace.</small>
+            <small>Upgrade here; manage, downgrade or cancel from Settings → Billing & Plan.</small>
           </span>
         </div>
         <div className={s.fact}>

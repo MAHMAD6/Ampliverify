@@ -45,6 +45,7 @@ export type PublicPlan = {
   code: string;
   name: string;
   description: string | null;
+  isFeatured?: boolean;
   prices: { billingInterval: 'MONTHLY' | 'ANNUAL'; currency: string; amountMinor: string }[];
   entitlements: {
     enabled: boolean;
