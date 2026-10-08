@@ -88,3 +88,6 @@ export async function adminGet<T>(path: string) {
   const r = await apiGet<T>(path, { auth: true });
   return r.ok ? r.data : null;
 }
+
+export const SUB_TONE = { ACTIVE: 'green', TRIALING: 'blue', PAST_DUE: 'red', CANCELED: 'slate', INCOMPLETE: 'amber' } as const;
+export const INVOICE_TONE = { PAID: 'green', OPEN: 'amber', DRAFT: 'slate', VOID: 'slate', UNCOLLECTIBLE: 'red' } as const;

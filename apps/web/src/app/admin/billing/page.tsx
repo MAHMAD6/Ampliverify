@@ -1,42 +1,53 @@
-import { AlertCircle, CheckCircle2, Clock3, FileSearch, FileText, RotateCcw, XCircle } from 'lucide-react';
-import { AdminList } from '@/components/admin/AdminList';
+import Link from 'next/link';
+import { AlertCircle, CheckCircle2, Clock3, FileSearch, FileText, XCircle } from 'lucide-react';
+import { AdminList, StatusPill } from '@/components/admin/AdminList';
+import { adminGet, INVOICE_TONE, matchesQ } from '@/lib/admin-data';
+import { formatDate, formatMoney } from '@/lib/format';
 
 export const metadata = { title: 'Billing & Invoices' };
 
+type Invoice = { id: string; providerInvoiceId: string; status: 'DRAFT' | 'OPEN' | 'PAID' | 'VOID' | 'UNCOLLECTIBLE'; currency: string; totalMinor: string; issuedAt: string | null; createdAt: string; workspace: { id: string; name: string } };
+
+const TABS: Record<string, string | null> = { all: null, paid: 'PAID', open: 'OPEN', uncollectible: 'UNCOLLECTIBLE', void: 'VOID', draft: 'DRAFT' };
+
 /** Billing & Invoices (chat design 2026-10-06). Provider-backed `invoices`; detail at /admin/billing/invoices/[id]. */
-export default async function BillingInvoicesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const { tab = 'all' } = await searchParams;
+export default async function BillingInvoicesPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
+  const { tab = 'all', q } = await searchParams;
+  const invoices = await adminGet<Invoice[]>('/admin/invoices');
+  const list = invoices ?? [];
+  const count = (s: string) => (invoices ? list.filter((i) => i.status === s).length : undefined);
+  const rows = list.filter((i) => (!TABS[tab] || i.status === TABS[tab]) && matchesQ(q, i.providerInvoiceId, i.workspace.name));
   return (
     <AdminList
       section="Billing & Access"
       title="Billing & Invoices"
-      description="View and manage all billing invoices."
+      description="View all billing invoices synchronized from the payment provider."
       metrics={[
-        { label: 'Total Invoices', icon: <FileText size={24} />, tone: 'blue' },
-        { label: 'Paid', icon: <CheckCircle2 size={24} />, tone: 'green' },
-        { label: 'Open', icon: <Clock3 size={24} />, tone: 'amber' },
-        { label: 'Past Due', icon: <AlertCircle size={24} />, tone: 'red' },
-        { label: 'Voided', icon: <XCircle size={24} />, tone: 'purple' },
-        { label: 'Refunded', icon: <RotateCcw size={24} />, tone: 'slate' },
+        { label: 'Total Invoices', icon: <FileText size={24} />, tone: 'blue', value: invoices ? list.length : undefined },
+        { label: 'Paid', icon: <CheckCircle2 size={24} />, tone: 'green', value: count('PAID') },
+        { label: 'Open', icon: <Clock3 size={24} />, tone: 'amber', value: count('OPEN') },
+        { label: 'Uncollectible', icon: <AlertCircle size={24} />, tone: 'red', value: count('UNCOLLECTIBLE') },
+        { label: 'Voided', icon: <XCircle size={24} />, tone: 'purple', value: count('VOID') },
       ]}
-      tabs={[
-        { key: 'all', label: 'All Invoices' },
-        { key: 'paid', label: 'Paid' },
-        { key: 'open', label: 'Open' },
-        { key: 'past-due', label: 'Past Due' },
-        { key: 'voided', label: 'Voided' },
-        { key: 'refunded', label: 'Refunded' },
-      ]}
+      tabs={Object.keys(TABS).map((k) => ({ key: k, label: k === 'all' ? 'All Invoices' : k.charAt(0).toUpperCase() + k.slice(1) }))}
       activeTab={tab}
       basePath="/admin/billing"
-      search="Search by invoice number, user, account, or email..."
-      selects={[
-        { label: 'Status', options: ['All Statuses'] },
-        { label: 'Plan', options: ['All Plans'] },
-        { label: 'Billing Period', options: ['Select date range'] },
-      ]}
-      columns={['Invoice #', 'Subscriber / Account', 'Plan', 'Amount', 'Status', 'Invoice Date', 'Due Date', 'Paid Date', 'Actions']}
-      empty={{ icon: <FileSearch size={40} />, title: 'No invoices yet', text: 'When invoices are generated for subscriptions, they will appear here.' }}
+      search="Search by invoice number or workspace..."
+      liveFilters={{ q }}
+      columns={['Invoice #', 'Workspace', 'Amount', 'Status', 'Invoice Date', 'Actions']}
+      rows={rows.map((i) => [
+        <code key="n">{i.providerInvoiceId}</code>,
+        i.workspace.name,
+        formatMoney(i.totalMinor, i.currency),
+        <StatusPill key="s" tone={INVOICE_TONE[i.status]}>
+          {i.status.charAt(0) + i.status.slice(1).toLowerCase()}
+        </StatusPill>,
+        formatDate(i.issuedAt ?? i.createdAt),
+        <Link key="v" href={`/admin/billing/invoices/${i.id}`} style={{ color: 'var(--blue)', fontWeight: 600 }}>
+          View
+        </Link>,
+      ])}
+      empty={{ icon: <FileSearch size={40} />, title: invoices ? 'No invoices yet' : 'Invoices unavailable', text: invoices ? 'When invoices are generated for subscriptions, they will appear here.' : 'Your account cannot read billing data, or the API is unavailable.' }}
     />
   );
 }
