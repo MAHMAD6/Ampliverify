@@ -52,3 +52,12 @@ function defaultMessage(reason: string) {
       return 'The service is unavailable. Please try again.';
   }
 }
+
+/** Authenticated GET for client components (search-as-you-type, pickers). */
+export async function apiQuery<T = unknown>(path: string): Promise<ActionResult<T>> {
+  if (!ALLOWED_PREFIXES.some((p) => path.startsWith(p)) || path.includes('..')) return { ok: false, message: 'Not allowed.' };
+  const { apiGet } = await import('./api');
+  const result = await apiGet<T>(path, { auth: true });
+  if (!result.ok) return { ok: false, message: defaultMessage(result.reason) };
+  return { ok: true, data: result.data };
+}

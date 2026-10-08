@@ -56,6 +56,11 @@ export class IntegrationsController {
   properties(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.integrations.googleProperties(a.userId, id);
   }
+  @Get('integrations/:id/wordpress/content')
+  wpContent(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Query('type') type?: string, @Query('q') q?: string) {
+    return this.integrations.wordpressContent(a.userId, id, { type: type === 'posts' ? 'posts' : 'pages', q });
+  }
+
   @Delete('integrations/:id')
   disconnect(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     return this.integrations.disconnect(a.userId, id, requestMeta(req));

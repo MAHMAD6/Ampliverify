@@ -153,6 +153,19 @@ export class IntegrationsService {
     return { ok };
   }
 
+  /** Lists pages / posts on a connected WordPress site (for choosing what to edit). */
+  async wordpressContent(userId: string, integrationId: string, input: { type: 'pages' | 'posts'; q?: string }) {
+    const { integ, secret } = await this.secretOf<WordPressSecret>(integrationId);
+    await this.rbac.requireWorkspace(userId, integ.workspaceId, 'workspace.read');
+    if (integ.provider.key !== 'wordpress') throw new BadRequestException({ code: 'INTEGRATION_MISMATCH', message: 'Not a WordPress connection.' });
+    const params = new URLSearchParams({ per_page: '50', context: 'edit', _fields: 'id,title,link,modified,status', status: 'publish,draft,pending,private' });
+    if (input.q) params.set('search', input.q.slice(0, 100));
+    const res = await safeFetch(`${secret.siteUrl}/wp-json/wp/v2/${input.type}?${params}`, { headers: this.wpHeaders(secret), allowPrivate: this.allowPrivate, maxBytes: 2 * 1024 * 1024 }).catch(() => null);
+    if (!res || res.status !== 200) throw new BadRequestException({ code: 'WORDPRESS_UNAVAILABLE', message: 'Could not load content from WordPress. Test the connection.' });
+    const rows = JSON.parse(res.body) as { id: number; title: { raw?: string; rendered?: string }; link: string; modified: string; status: string }[];
+    return rows.map((r) => ({ id: r.id, title: r.title.raw || r.title.rendered || '(untitled)', url: r.link, modified: r.modified, status: r.status }));
+  }
+
   /** Publishes (or updates) an editor document as a WordPress post or page. */
   async publishToWordPress(userId: string, documentId: string, input: { integrationId: string; status: 'draft' | 'publish'; type: 'posts' | 'pages' }, meta?: RequestMeta) {
     const doc = await this.prisma.editorDocument.findUnique({ where: { id: documentId } });

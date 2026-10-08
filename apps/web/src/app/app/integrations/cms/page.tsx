@@ -1,11 +1,18 @@
 import { BookOpen } from 'lucide-react';
-import { ConnectWebsite } from '@/components/app/cms/ConnectWebsite';
+import { ConnectWebsite, type WpConnection } from '@/components/app/cms/ConnectWebsite';
 import { ButtonLink, PageHeader } from '@/components/ui';
 import { appCrumbs } from '@/lib/nav';
+import { getAppContext } from '@/lib/project';
+import { apiGet } from '@/lib/api';
 
 export const metadata = { title: 'Connect Your Website' };
 
-export default function CmsConnectionPage() {
+type ProviderRow = { key: string; available: boolean; connections: WpConnection[] };
+
+export default async function CmsConnectionPage() {
+  const { workspaceId, selectedProject } = await getAppContext();
+  const res = workspaceId ? await apiGet<ProviderRow[]>(`/user/workspaces/${workspaceId}/integrations`, { auth: true }) : null;
+  const wp = res?.ok ? res.data.find((p) => p.key === 'wordpress') : undefined;
   return (
     <>
       <PageHeader
@@ -18,7 +25,7 @@ export default function CmsConnectionPage() {
           </ButtonLink>
         }
       />
-      <ConnectWebsite />
+      <ConnectWebsite workspaceId={workspaceId} projectId={selectedProject?.id ?? null} connection={wp?.connections[0] ?? null} available={!!wp?.available} />
     </>
   );
 }

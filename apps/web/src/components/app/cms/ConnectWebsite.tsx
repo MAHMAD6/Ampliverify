@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { CircleHelp, Code2, Eye, EyeOff, FileText, Info, Lock, PencilLine, Plug, Puzzle, Radio, Search, Trash2 } from 'lucide-react';
 import { Badge, Button, ButtonLink, DataTable, EmptyState, Field, Input, Panel } from '@/components/ui';
+import { ActionMessage } from '@/components/ui/actions';
+import { apiAction, apiQuery } from '@/lib/actions';
 import c from './cms.module.css';
 
 type Platform = 'wordpress' | 'webflow' | 'shopify' | 'custom';
@@ -12,6 +15,9 @@ const PLATFORMS: { key: Platform; name: string; text: string; icon: React.ReactN
   { key: 'shopify', name: 'Shopify', text: 'Coming soon', icon: <span className={c.logo} style={{ color: '#5e8e3e' }}>S</span>, available: false },
   { key: 'custom', name: 'Custom (API)', text: 'Coming soon', icon: <Code2 size={30} />, available: false },
 ];
+
+export type WpConnection = { id: string; status: string; account: string | null; createdAt: string };
+type WpItem = { id: number; title: string; url: string; modified: string; status: string };
 
 function Step({ n, title, text, children }: { n: number; title: string; text: string; children: React.ReactNode }) {
   return (
@@ -29,16 +35,56 @@ function Step({ n, title, text, children }: { n: number; title: string; text: st
 }
 
 /**
- * WordPress connection flow. Credentials would be stored as a secret
- * reference (integration_tokens), never in plain text. The connection API is
- * not built yet, so Connect / Test / Disconnect are disabled and no
- * credentials leave the browser.
+ * WordPress connection flow. Credentials are verified against the site's REST
+ * API, then stored encrypted (integration_tokens) and never shown again.
+ * After connecting, pages/posts can be opened in the On-Page SEO Editor.
  */
-export function ConnectWebsite() {
+export function ConnectWebsite({ workspaceId, projectId, connection, available }: { workspaceId: string | null; projectId: string | null; connection: WpConnection | null; available: boolean }) {
+  const router = useRouter();
   const [platform, setPlatform] = useState<Platform>('wordpress');
   const [method, setMethod] = useState<'password' | 'plugin'>('password');
   const [showPassword, setShowPassword] = useState(false);
-  const [contentTab, setContentTab] = useState('Pages');
+  const [contentTab, setContentTab] = useState<'pages' | 'posts'>('pages');
+  const [q, setQ] = useState('');
+  const [items, setItems] = useState<WpItem[]>([]);
+  const [selected, setSelected] = useState<WpItem | null>(null);
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<{ error?: string; ok?: string }>({});
+
+  const load = useCallback(() => {
+    if (!connection) return;
+    start(async () => {
+      const r = await apiQuery<WpItem[]>(`/user/integrations/${connection.id}/wordpress/content?type=${contentTab}${q ? `&q=${encodeURIComponent(q)}` : ''}`);
+      if (!r.ok) return setMsg({ error: r.message });
+      setItems(r.data);
+    });
+  }, [connection, contentTab, q]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connection, contentTab]);
+
+  const connect = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setMsg({});
+    start(async () => {
+      const r = await apiAction('POST', `/user/workspaces/${workspaceId}/integrations/wordpress`, { siteUrl: String(f.get('siteUrl')), username: String(f.get('username')), applicationPassword: String(f.get('password')) });
+      if (!r.ok) return setMsg({ error: r.message });
+      setMsg({ ok: 'WordPress connected.' });
+      router.refresh();
+    });
+  };
+
+  const run = (fn: () => Promise<{ ok: boolean; message?: string; data?: unknown }>, ok: string, after?: (d: unknown) => void) =>
+    start(async () => {
+      setMsg({});
+      const r = await fn();
+      if (!r.ok) return setMsg({ error: r.message });
+      setMsg({ ok });
+      after?.(r.data);
+      router.refresh();
+    });
 
   return (
     <div className={c.layout}>
@@ -46,15 +92,7 @@ export function ConnectWebsite() {
         <Step n={1} title="Choose Your Platform" text="Select the platform where your website is hosted.">
           <div className={c.platforms} role="radiogroup" aria-label="Platform">
             {PLATFORMS.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                role="radio"
-                aria-checked={platform === p.key}
-                disabled={!p.available}
-                className={`${c.platform} ${platform === p.key ? c.platformOn : ''}`}
-                onClick={() => setPlatform(p.key)}
-              >
+              <button key={p.key} type="button" role="radio" aria-checked={platform === p.key} disabled={!p.available} className={`${c.platform} ${platform === p.key ? c.platformOn : ''}`} onClick={() => setPlatform(p.key)}>
                 {p.icon}
                 <span>
                   <strong>{p.name}</strong>
@@ -67,63 +105,93 @@ export function ConnectWebsite() {
         </Step>
 
         <Step n={2} title="Connect to Your WordPress Site" text="Choose a connection method to securely connect your WordPress site.">
-          <div className={c.methods} role="tablist">
-            <button role="tab" aria-selected={method === 'password'} className={method === 'password' ? c.methodOn : ''} onClick={() => setMethod('password')}>
-              <Lock size={16} /> Application Password (Recommended)
-            </button>
-            <button role="tab" aria-selected={method === 'plugin'} className={method === 'plugin' ? c.methodOn : ''} onClick={() => setMethod('plugin')}>
-              <Puzzle size={16} /> Plugin Connection
-            </button>
-          </div>
-          {method === 'password' ? (
-            <>
-              <div className={c.info}>
-                <Info size={18} />
-                <span>Use a WordPress Application Password to securely connect without installing a plugin.</span>
-                <a href="/help?q=application%20password">Learn how to create an application password</a>
-              </div>
-              <div className={c.fields}>
-                <Field label="Site URL" htmlFor="wp-url" hint="For example: https://yourdomain.com">
-                  <Input id="wp-url" type="url" placeholder="Enter your WordPress site URL" autoComplete="url" />
-                </Field>
-                <Field label="Username" htmlFor="wp-user">
-                  <Input id="wp-user" placeholder="Enter your WordPress username" autoComplete="off" />
-                </Field>
-                <Field label="Application Password" htmlFor="wp-pass">
-                  <div style={{ position: 'relative' }}>
-                    <Input id="wp-pass" type={showPassword ? 'text' : 'password'} placeholder="Enter your application password" autoComplete="new-password" />
-                    <button type="button" className={c.eye} aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((v) => !v)}>
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </Field>
-              </div>
-              <div className={c.connectRow}>
-                <span>
-                  <Lock size={14} /> Credentials are stored encrypted and are never displayed after connection.
-                </span>
-                <Button size="lg" disabled title="Website connections are not available yet">
-                  Connect Site
-                </Button>
-              </div>
-            </>
+          {connection ? (
+            <div className={c.info}>
+              <Info size={18} />
+              <span>
+                Connected to <b>{connection.account}</b>. To use different credentials, disconnect and connect again.
+              </span>
+            </div>
           ) : (
-            <EmptyState compact icon={<Plug size={24} />} title="Plugin connection is coming soon" description="Use an Application Password to connect today." />
+            <>
+              <div className={c.methods} role="tablist">
+                <button role="tab" aria-selected={method === 'password'} className={method === 'password' ? c.methodOn : ''} onClick={() => setMethod('password')}>
+                  <Lock size={16} /> Application Password (Recommended)
+                </button>
+                <button role="tab" aria-selected={method === 'plugin'} className={method === 'plugin' ? c.methodOn : ''} onClick={() => setMethod('plugin')}>
+                  <Puzzle size={16} /> Plugin Connection
+                </button>
+              </div>
+              {method === 'password' ? (
+                <form onSubmit={connect}>
+                  <div className={c.info}>
+                    <Info size={18} />
+                    <span>In WordPress, go to Users → Profile → Application Passwords, create one for AmpliVerify and paste it below.</span>
+                    <a href="/help?q=application%20password">Learn how to create an application password</a>
+                  </div>
+                  <div className={c.fields}>
+                    <Field label="Site URL" htmlFor="wp-url" hint="For example: https://yourdomain.com">
+                      <Input id="wp-url" name="siteUrl" type="url" required placeholder="Enter your WordPress site URL" autoComplete="url" />
+                    </Field>
+                    <Field label="Username" htmlFor="wp-user">
+                      <Input id="wp-user" name="username" required placeholder="Enter your WordPress username" autoComplete="off" />
+                    </Field>
+                    <Field label="Application Password" htmlFor="wp-pass">
+                      <div style={{ position: 'relative' }}>
+                        <Input id="wp-pass" name="password" required minLength={8} type={showPassword ? 'text' : 'password'} placeholder="xxxx xxxx xxxx xxxx xxxx xxxx" autoComplete="new-password" />
+                        <button type="button" className={c.eye} aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((v) => !v)}>
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </Field>
+                  </div>
+                  <div className={c.connectRow}>
+                    <span>
+                      <Lock size={14} /> Credentials are stored encrypted and are never displayed after connection.
+                    </span>
+                    <Button type="submit" size="lg" disabled={!available || !workspaceId || pending} title={available ? undefined : 'Integrations are not available yet'}>
+                      {pending ? 'Connecting…' : 'Connect Site'}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <EmptyState compact icon={<Plug size={24} />} title="Plugin connection is coming soon" description="Use an Application Password to connect today." />
+              )}
+            </>
           )}
         </Step>
 
         <Step n={3} title="Select a Page or Post" text="Choose the page or post you want to edit and publish.">
           <div className={c.contentTabs}>
-            {['Pages', 'Posts', 'Custom Post Types'].map((t) => (
+            {(['pages', 'posts'] as const).map((t) => (
               <button key={t} className={contentTab === t ? c.contentTabOn : ''} onClick={() => setContentTab(t)}>
-                {t}
+                {t === 'pages' ? 'Pages' : 'Posts'}
               </button>
             ))}
-            <Input placeholder={`Search ${contentTab.toLowerCase()}...`} icon={<Search size={16} />} disabled style={{ marginLeft: 'auto', width: 260 }} aria-label="Search pages" />
+            <form
+              style={{ marginLeft: 'auto' }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                load();
+              }}
+            >
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${contentTab}...`} icon={<Search size={16} />} disabled={!connection} style={{ width: 260 }} aria-label="Search content" />
+            </form>
           </div>
           <DataTable
-            columns={['Title', 'URL', 'Last Modified']}
-            empty={<EmptyState compact icon={<FileText size={26} />} title={`No ${contentTab.toLowerCase()} found`} description="Connect your WordPress site to load your pages." />}
+            columns={['Title', 'URL', 'Status', 'Last Modified', '']}
+            rows={items.map((it) => [
+              <b key="t">{it.title}</b>,
+              <a key="u" href={it.url} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)', fontSize: 13, wordBreak: 'break-all' }}>
+                {it.url.replace(/^https?:\/\//, '')}
+              </a>,
+              it.status,
+              new Date(it.modified).toLocaleDateString(),
+              <Button key="s" size="sm" variant={selected?.id === it.id ? 'primary' : 'outline'} onClick={() => setSelected(it)}>
+                {selected?.id === it.id ? 'Selected' : 'Select'}
+              </Button>,
+            ])}
+            empty={<EmptyState compact icon={<FileText size={26} />} title={connection ? `No ${contentTab} found` : `No ${contentTab} yet`} description={connection ? 'Try another search.' : 'Connect your WordPress site to load your pages.'} />}
           />
         </Step>
       </div>
@@ -133,32 +201,43 @@ export function ConnectWebsite() {
           <div className={c.summaryHead}>
             <span className={c.wp}>W</span>
             <strong>WordPress</strong>
-            <span className={c.notConnected}>Not connected</span>
+            <span className={c.notConnected}>{connection ? (connection.status === 'CONNECTED' ? 'Connected' : connection.status.toLowerCase()) : 'Not connected'}</span>
           </div>
-          {['Site URL', 'Username', 'Selected Page'].map((k) => (
-            <div key={k} className={c.kv}>
-              <span>{k}</span>—
-            </div>
-          ))}
+          <div className={c.kv}>
+            <span>Site</span>
+            {connection?.account ?? '—'}
+          </div>
+          <div className={c.kv}>
+            <span>Selected Page</span>
+            {selected?.title ?? '—'}
+          </div>
           <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            <Button variant="secondary" icon={<PencilLine size={16} />} disabled block>
-              Change Page
+            <Button
+              variant="secondary"
+              icon={<PencilLine size={16} />}
+              disabled={!selected || !projectId || pending}
+              block
+              onClick={() => selected && run(() => apiAction<{ id: string }>('POST', `/user/projects/${projectId}/editor/import`, { url: selected.url }), 'Opening the editor…', (d) => router.push(`/app/editor/${(d as { id: string }).id}`))}
+            >
+              Edit in SEO Editor
             </Button>
-            <Button variant="secondary" icon={<Radio size={16} />} disabled block>
+            <Button variant="secondary" icon={<Radio size={16} />} disabled={!connection || pending} block onClick={() => connection && run(() => apiAction('POST', `/user/integrations/${connection.id}/test`, {}), 'Connection test finished.')}>
               Test Connection
             </Button>
-            <Button variant="secondary" icon={<Trash2 size={16} />} disabled block>
+            <Button
+              variant="secondary"
+              icon={<Trash2 size={16} />}
+              disabled={!connection || pending}
+              block
+              onClick={() => connection && window.confirm('Disconnect this site?') && run(() => apiAction('DELETE', `/user/integrations/${connection.id}`), 'Disconnected.')}
+            >
               Disconnect
             </Button>
           </div>
+          <ActionMessage error={msg.error} success={msg.ok} />
         </Panel>
         <Panel title="What Happens Next?" flushHead>
-          {[
-            'Connect your website or CMS using your credentials.',
-            'Select the page or post you want to edit and publish.',
-            'Your connection will be saved for future use.',
-            'Return to the On-Page SEO Editor and click Publish to push your optimized content to your website.',
-          ].map((t, i) => (
+          {['Connect your website using an application password.', 'Select the page or post you want to improve.', 'Edit it in the On-Page SEO Editor with live SEO and AI search scoring.', 'Click Publish in the editor to push the optimized content back to WordPress.'].map((t, i) => (
             <div key={t} className={c.next}>
               <span className={c.stepNum} style={{ width: 28, height: 28, fontSize: 13 }}>
                 {i + 1}
