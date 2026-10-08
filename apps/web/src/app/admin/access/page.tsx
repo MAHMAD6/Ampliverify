@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { Layers, User, UserX, Users } from 'lucide-react';
 import { AdminList, StatusPill } from '@/components/admin/AdminList';
-import { AddMenu } from '@/components/admin/AddMenu';
-import { date, loadAssignments, loadUsers, matchesQ, scopeLabel, userLabel } from '@/lib/admin-data';
+import { Panel } from '@/components/ui';
+import { ActionButton } from '@/components/ui/actions';
+import { RoleAssignForm } from '@/components/admin/RoleAssignForm';
+import { adminGet, date, loadAssignments, loadRoles, loadUsers, matchesQ, scopeLabel, userLabel, type AdminWorkspace } from '@/lib/admin-data';
 
 export const metadata = { title: 'Access Assignments' };
 
@@ -14,7 +16,9 @@ export const metadata = { title: 'Access Assignments' };
  */
 export default async function AccessPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; scope?: string }> }) {
   const { tab = 'roles', q, scope } = await searchParams;
-  const [assignments, users] = await Promise.all([loadAssignments(), loadUsers()]);
+  const [assignments, users, roles, workspaces] = await Promise.all([loadAssignments(), loadUsers(), loadRoles(), adminGet<AdminWorkspace[]>('/admin/workspaces')]);
+  const wsName = (id: string | null) => (workspaces ?? []).find((w) => w.id === id)?.name;
+  const orgs = [...new Map((workspaces ?? []).map((w) => [w.organization.id, w.organization.name])).entries()].map(([id, label]) => ({ id, label }));
   const assigned = new Set((assignments ?? []).map((a) => a.user.id));
   const rows = tab === 'roles' ? (assignments ?? []).filter((a) => matchesQ(q, a.user.email, a.user.displayName, a.role.name) && (!scope || scopeLabel(a) === scope)) : [];
   return (
@@ -22,15 +26,6 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
       section="User Management"
       title="Access Assignments"
       description="Assign roles to users at platform, organization, workspace or project scope."
-      actions={
-        <AddMenu
-          label="Create Assignment"
-          items={[
-            { title: 'Assign Role', text: 'Grant a role at a scope', icon: <User size={20} />, disabledReason: 'Available once signed-in admin actions are wired (API ready).' },
-            { title: 'Assign Module Access', text: 'Per-user module access', icon: <Layers size={20} />, disabledReason: 'Module access follows plan entitlements.' },
-          ]}
-        />
-      }
       metrics={[
         { label: 'Total Assignments', icon: <Users size={26} />, tone: 'blue', value: assignments?.length, note: 'Active role assignments' },
         { label: 'Role Assignments', icon: <User size={26} />, tone: 'green', value: assignments ? assigned.size : undefined, note: 'Users with assigned roles' },
@@ -51,15 +46,32 @@ export default async function AccessPage({ searchParams }: { searchParams: Promi
         <b key="u">{userLabel(a.user)}</b>,
         a.user.email,
         a.role.name,
-        scopeLabel(a),
+        `${scopeLabel(a)}${a.workspaceId && wsName(a.workspaceId) ? ` · ${wsName(a.workspaceId)}` : ''}`,
         <StatusPill key="s" tone={a.user.status === 'ACTIVE' ? 'green' : 'slate'}>
           {a.user.status === 'ACTIVE' ? 'Active' : a.user.status}
         </StatusPill>,
         date(a.createdAt),
-        <Link key="v" href={`/admin/admins/${a.user.id}`} style={{ color: 'var(--blue)', fontWeight: 600 }}>
-          View
-        </Link>,
+        <span key="v" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Link href={`/admin/users/${a.user.id}`} style={{ color: 'var(--blue)', fontWeight: 600 }}>
+            View
+          </Link>
+          <ActionButton size="sm" variant="ghost" path={`/admin/access-assignments/${a.id}/revoke`} body={{}} confirm={`Revoke ${a.role.name} from ${a.user.email}?`}>
+            Revoke
+          </ActionButton>
+        </span>,
       ])}
+      children={
+        tab === 'roles' && roles && users ? (
+          <Panel title="Assign a Role" description="You can only grant roles whose permissions you already hold at that scope; workspace and organization roles need the person to be a member.">
+            <RoleAssignForm
+              users={users.map((u) => ({ id: u.id, label: `${u.displayName ?? u.email} (${u.email})` }))}
+              roles={roles.map((r) => ({ id: r.id, label: r.name }))}
+              workspaces={(workspaces ?? []).map((w) => ({ id: w.id, label: `${w.name} · ${w.organization.name}` }))}
+              organizations={orgs}
+            />
+          </Panel>
+        ) : undefined
+      }
       empty={
         tab === 'modules'
           ? { icon: <Layers size={40} />, title: 'Module access follows plans', text: 'Module availability is set in Module Controls and plan access in Feature Entitlements. Per-user module grants are not used.' }

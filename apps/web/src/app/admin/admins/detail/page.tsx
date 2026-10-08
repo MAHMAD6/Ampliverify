@@ -1,8 +1,6 @@
-import { AdminDetail } from '@/components/admin/AdminDetail';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Admin / Sub-Admin Detail' };
-
-/** Template entry from the navigation; a specific person is opened from Admins, Sub-Admins or All Users. */
+/** Navigation entry for "Admin Detail": a person is opened from Admins, Sub-Admins or All Users. */
 export default function AdminDetailTemplate() {
-  return <AdminDetail user={null} assignments={[]} activity={[]} />;
+  redirect('/admin/admins');
 }

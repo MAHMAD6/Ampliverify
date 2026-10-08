@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Clock3, Mail, UserCheck, UserPlus, UserX, Users } from 'lucide-react';
+import { Globe2, UserCheck, UserPlus, UserX, Users } from 'lucide-react';
+import { ButtonLink } from '../ui';
 import { AdminList, StatusPill } from './AdminList';
-import { AddMenu } from './AddMenu';
 import { dateTime, loadAssignments, matchesQ, scopeLabel, userLabel, type AdminAssignment } from '@/lib/admin-data';
 
 /**
@@ -24,18 +24,14 @@ export async function AdminRoster({ kind, roleKeys, q, scope, status, emptyIcon 
       title={plural}
       description={`Manage ${kind.toLowerCase()} accounts, their roles, permissions, and access assignments.`}
       actions={
-        <AddMenu
-          label={`Add ${kind}`}
-          items={[
-            { title: `Create ${kind}`, text: 'Create an account now', icon: <UserPlus size={20} />, disabledReason: 'Grant a role to an existing user under Access Assignments.' },
-            { title: 'Send Invitation', text: 'Invite by email', icon: <Mail size={20} />, disabledReason: 'Invitations are not available yet.' },
-          ]}
-        />
+        <ButtonLink href="/admin/access" icon={<UserPlus size={18} />}>
+          {`Add ${kind}`}
+        </ButtonLink>
       }
       metrics={[
         { label: `Total ${plural}`, icon: <Users size={26} />, tone: 'blue', value: assignments ? people.length : undefined, note: assignments && people.length ? undefined : `No ${plural.toLowerCase()} yet` },
         { label: `Active ${plural}`, icon: <UserCheck size={26} />, tone: 'green', value: assignments ? people.filter(([a]) => a.user.status === 'ACTIVE').length : undefined },
-        { label: 'Pending Invitations', icon: <Clock3 size={26} />, tone: 'amber', note: 'No invitations yet' },
+        { label: 'Platform-wide', icon: <Globe2 size={26} />, tone: 'amber', value: assignments ? people.filter((list) => list.some((x) => x.scopeType === 'GLOBAL')).length : undefined, note: 'Hold a platform-scope role' },
         { label: `Suspended ${plural}`, icon: <UserX size={26} />, tone: 'red', value: assignments ? people.filter(([a]) => a.user.status === 'SUSPENDED').length : undefined },
       ]}
       basePath={base}

@@ -23,8 +23,8 @@ export type AuditCategory = 'access' | 'billing' | 'system' | 'content' | 'tenan
 const CATEGORY_PREFIXES: Record<AuditCategory, string[]> = {
   access: ['user.', 'role.', 'access.', 'admin.'],
   billing: ['billing.', 'subscription.', 'invoice.', 'credit.', 'plan.'],
-  system: ['system.', 'module.', 'flag.', 'settings.'],
-  content: ['content.', 'blog.', 'guide.', 'help.', 'job.', 'media.'],
+  system: ['system.', 'module.', 'flag.', 'settings.', 'ai.'],
+  content: ['content.', 'blog.', 'guide.', 'help.', 'job.', 'media.', 'cms.', 'support.'],
   tenant: ['organization.', 'workspace.', 'project.'],
 };
 
