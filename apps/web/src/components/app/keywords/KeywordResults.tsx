@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart3, ChevronLeft, ChevronRight, MoreHorizontal, CircleDollarSign, MapPin, MessageCircleQuestion, MoreVertical, PencilLine, PieChart, Plus, Search, Star, Video, Bookmark } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, CircleDollarSign, MapPin, MessageCircleQuestion, MoreVertical, PencilLine, PieChart, Plus, Search, Star, Video, Bookmark } from 'lucide-react';
 import { useState } from 'react';
 import { Button, ButtonLink, IconCircle } from '@/components/ui';
 import ui from '@/components/ui/ui.module.css';
@@ -61,6 +61,7 @@ export function KeywordResultsTable({
   onPage,
   variant = 'ideas',
   onPageSize,
+  onSave,
 }: {
   results: KeywordIdea[];
   total: number;
@@ -71,6 +72,7 @@ export function KeywordResultsTable({
   onPage: (page: number) => void;
   variant?: 'ideas' | 'related';
   onPageSize?: (size: number) => void;
+  onSave?: (keywords: string[]) => void;
 }) {
   const related = variant === 'related';
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -112,11 +114,8 @@ export function KeywordResultsTable({
                     <button className={p.chip} style={{ background: 'none' }} aria-label={`Research ${r.keyword}`} onClick={() => onSelect(r.keyword)}>
                       <Search size={16} />
                     </button>
-                    <button className={p.chip} style={{ background: 'none' }} aria-label={`Save ${r.keyword}`} disabled title="Saving keywords is not available yet">
+                    <button className={p.chip} style={{ background: 'none' }} aria-label={`Save ${r.keyword}`} disabled={!onSave} title={onSave ? 'Save to this project' : 'Select a project to save keywords'} onClick={() => onSave?.([r.keyword])}>
                       <Bookmark size={16} />
-                    </button>
-                    <button className={p.chip} style={{ background: 'none' }} aria-label="More actions" disabled>
-                      <MoreHorizontal size={16} />
                     </button>
                   </td>
                 )}
@@ -195,7 +194,7 @@ function TrendChart({ points }: { points: KeywordDetail['trend'] }) {
 const yesNo = (v: boolean | null) => (v === null ? '—' : v ? 'Yes' : 'No');
 
 /** Populated "Keyword Details" panel (Overview / SERP / Related / Questions / Trend). */
-export function KeywordDetailsPanel({ detail, onClose }: { detail: KeywordDetail; onClose: () => void }) {
+export function KeywordDetailsPanel({ detail, onClose, onSave }: { detail: KeywordDetail; onClose: () => void; onSave?: (keywords: string[]) => void }) {
   const [tab, setTab] = useState('Overview');
   const intent = detail.intent ? INTENT_META[detail.intent] : null;
   const showOverview = tab === 'Overview';
@@ -289,7 +288,7 @@ export function KeywordDetailsPanel({ detail, onClose }: { detail: KeywordDetail
         <ButtonLink href="/app/editor" variant="outline" block icon={<PencilLine size={16} />}>
           Open in SEO Editor
         </ButtonLink>
-        <Button variant="outline" block icon={<Bookmark size={16} />} disabled title="Saving keywords is not available yet">
+        <Button variant="outline" block icon={<Bookmark size={16} />} disabled={!onSave} title={onSave ? undefined : 'Select a project to save keywords'} onClick={() => onSave?.([detail.keyword])}>
           Save Keyword
         </Button>
       </div>

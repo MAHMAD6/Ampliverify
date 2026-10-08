@@ -369,6 +369,7 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
                 }}
                 onPage={setPage}
                 variant={tab.key === 'related' ? 'related' : 'ideas'}
+                onSave={projectId ? save : undefined}
                 onPageSize={(n) => {
                   setPageSize(n);
                   setPage(1);
@@ -396,7 +397,7 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
               }
             >
               {detail ? (
-                <KeywordDetailsPanel detail={detail} onClose={() => setDrawerOpen(false)} />
+                <KeywordDetailsPanel detail={detail} onClose={() => setDrawerOpen(false)} onSave={projectId ? save : undefined} />
               ) : (
                 <EmptyState compact icon={<FileSearch size={26} />} title="No keyword selected" description="Select a keyword from the results table to view volume, difficulty, intent, trend and related terms." />
               )}

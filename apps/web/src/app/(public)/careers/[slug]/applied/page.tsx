@@ -10,8 +10,8 @@ type Receipt = { reference: string | null; jobTitle: string };
 
 /**
  * Application Success (public-careers-application/02). Shown only for a
- * receipt the backend confirms; the applications API is not built yet, so
- * this resolves to 404. Makes no promise about interviews or response times.
+ * receipt the backend confirms (otherwise 404). Makes no promise about
+ * interviews or response times.
  */
 export default async function ApplicationSuccessPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ receipt?: string }> }) {
   const [{ slug }, { receipt }] = await Promise.all([params, searchParams]);

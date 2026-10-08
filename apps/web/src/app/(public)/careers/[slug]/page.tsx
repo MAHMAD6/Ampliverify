@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Briefcase, Clock, MapPin } from 'lucide-react';
+import { ApplyForm } from '@/components/public/ApplyForm';
 import { Markdown } from '@/components/public/Markdown';
 import { apiGet } from '@/lib/api';
 import { formatDate, humanize } from '@/lib/format';
@@ -23,10 +24,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /**
  * Job Detail + Application (public-careers-application/01). Everything shown
- * comes from the published job record; unpublished or closed roles 404 in the
- * API. The application endpoint (private storage, validated résumé upload)
- * is not built yet, so Submit is disabled — success is only ever shown after
- * a confirmed backend submission (see ./applied).
+ * comes from the published job record; unpublished roles 404 in the API.
+ * Success is only ever shown after a confirmed backend submission (./applied).
  */
 export default async function JobPage({ params }: Props) {
   const job = await load((await params).slug);
@@ -75,69 +74,7 @@ export default async function JobPage({ params }: Props) {
               </p>
             )}
           </div>
-          <form className={`${s.card} ${s.form}`} style={{ padding: 32, position: 'sticky', top: 100 }}>
-            <div className={s.full}>
-              <h2 className={s.cardTitle} style={{ marginTop: 0 }}>
-                Apply for this role
-              </h2>
-              <p className={s.cardText}>Submit the information required for this opening. Optional fields are marked.</p>
-            </div>
-            <label>
-              <span>
-                First name <span className={s.req}>*</span>
-              </span>
-              <input className={s.input} name="firstName" required placeholder="Enter first name" autoComplete="given-name" />
-            </label>
-            <label>
-              <span>
-                Last name <span className={s.req}>*</span>
-              </span>
-              <input className={s.input} name="lastName" required placeholder="Enter last name" autoComplete="family-name" />
-            </label>
-            <label className={s.full}>
-              <span>
-                Email address <span className={s.req}>*</span>
-              </span>
-              <input className={s.input} name="email" type="email" required placeholder="Enter your email" autoComplete="email" />
-            </label>
-            <label className={s.full}>
-              Phone number (optional)
-              <input className={s.input} name="phone" type="tel" placeholder="Enter phone number" autoComplete="tel" />
-            </label>
-            <label className={s.full}>
-              <span>
-                Résumé / CV {job.requireResume ? <span className={s.req}>*</span> : '(optional)'}
-              </span>
-              <input className={s.input} name="resume" type="file" required={job.requireResume} accept=".pdf,.doc,.docx" style={{ paddingTop: 13 }} />
-              <small style={{ fontWeight: 400, color: 'var(--mute)' }}>PDF or Word document.</small>
-            </label>
-            <label>
-              LinkedIn profile (optional)
-              <input className={s.input} name="linkedinUrl" type="url" placeholder="Profile URL" />
-            </label>
-            <label>
-              Portfolio / website (optional)
-              <input className={s.input} name="websiteUrl" type="url" placeholder="Website URL" />
-            </label>
-            <label className={s.full}>
-              <span>
-                {job.requireCoverLetter ? 'Cover letter' : 'Message'} {job.requireCoverLetter ? <span className={s.req}>*</span> : '(optional)'}
-              </span>
-              <textarea className={s.input} name="message" required={job.requireCoverLetter} placeholder="Add a short note relevant to your application." />
-            </label>
-            <p className={`${s.full} ${s.cardText}`} style={{ fontSize: 13 }}>
-              By submitting this application, you acknowledge that the information you provide will be processed for recruitment purposes in accordance with the AmpliVerify <Link href="/legal#privacy">privacy notice</Link>.
-            </p>
-            <label className={s.full} style={{ display: 'flex', gap: 10, fontWeight: 400 }}>
-              <input type="checkbox" name="consent" required /> I confirm that the information provided is accurate and I agree to the application privacy terms.
-            </label>
-            <div className={s.full} style={{ display: 'grid', gap: 10 }}>
-              <button type="submit" className={s.btn} disabled>
-                Submit Application
-              </button>
-              <p className={s.notice}>{closed ? 'This role is no longer accepting applications.' : 'Online applications are not open yet for this role.'}</p>
-            </div>
-          </form>
+          <ApplyForm slug={job.slug} closed={closed} requireResume={job.requireResume} requireCoverLetter={job.requireCoverLetter} />
         </div>
       </section>
     </>
