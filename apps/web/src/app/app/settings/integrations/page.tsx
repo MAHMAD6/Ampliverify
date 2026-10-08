@@ -231,7 +231,7 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
                   </ul>
                 )}
                 {properties?.ok && projects.length > 0 ? (
-                  <ApiForm path={`/user/projects/${selectedProject?.id ?? projects[0].id}/data-sources`} submitLabel={`Use for ${(selectedProject ?? projects[0]).name}`} transform={(v) => ({ integrationId: c.id, propertyId: v.propertyId })}>
+                  <ApiForm path={`/user/projects/${selectedProject?.id ?? projects[0].id}/data-sources`} submitLabel={`Use for ${(selectedProject ?? projects[0]).name}`} extra={{ integrationId: c.id }}>
                     <Field label="Property" htmlFor={`prop-${c.id}`}>
                       <Select id={`prop-${c.id}`} name="propertyId" defaultValue={current?.config?.propertyId ?? properties.data[0]?.id}>
                         {properties.data.map((p) => (

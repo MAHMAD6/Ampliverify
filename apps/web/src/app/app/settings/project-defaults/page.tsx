@@ -27,7 +27,7 @@ export default async function ProjectDefaultsPage() {
           </p>
         </div>
       </div>
-      <ApiForm method="PATCH" path={`/user/workspaces/${ws.data.id}`} transform={(v) => ({ settings: { projectDefaults: v } })} submitLabel="Save Defaults">
+      <ApiForm method="PATCH" path={`/user/workspaces/${ws.data.id}`} wrap="settings.projectDefaults" submitLabel="Save Defaults">
         <div style={{ display: 'grid', gap: 14 }}>
           <Panel title="Audit Settings" description="How audits run by default.">
             <Grid cols={2}>

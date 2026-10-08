@@ -64,7 +64,7 @@ export default async function DataPrivacyPage() {
 
         {workspaceId && ws?.permissions.update && (
           <Panel title="Data Retention & Sharing" description="Workspace policies for history and shared report links.">
-            <ApiForm method="PATCH" path={`/user/workspaces/${workspaceId}`} transform={(v) => ({ settings: { privacy: v } })}>
+            <ApiForm method="PATCH" path={`/user/workspaces/${workspaceId}`} wrap="settings.privacy">
               <Grid cols={2}>
                 <Field label="Project data retention" htmlFor="dp-retention">
                   <Select id="dp-retention" name="retentionDays" data-type="number" defaultValue={policy.retentionDays ? String(policy.retentionDays) : ''}>

@@ -7,6 +7,18 @@ import { Button, type ButtonVariant } from './index';
 import s from './ui.module.css';
 
 type Method = 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+/**
+ * Where to go after success. Server components cannot pass functions to
+ * these client controls, so a string may contain `{id}`, replaced with the
+ * `id` of the API response.
+ */
+type RedirectTarget = string | ((data: unknown) => string);
+
+function target(to: RedirectTarget, data: unknown) {
+  if (typeof to === 'function') return to(data);
+  const id = data && typeof data === 'object' && 'id' in data ? String((data as { id: unknown }).id) : '';
+  return to.replace('{id}', encodeURIComponent(id));
+}
 
 /** Inline error/success line used under action controls. */
 export function ActionMessage({ error, success }: { error?: string | null; success?: string | null }) {
@@ -47,7 +59,7 @@ export function ActionButton({
   icon?: ReactNode;
   confirm?: string;
   revalidate?: string[];
-  redirectTo?: string | ((data: unknown) => string);
+  redirectTo?: RedirectTarget;
   onDone?: (data: unknown) => void;
   disabled?: boolean;
   title?: string;
@@ -75,7 +87,7 @@ export function ActionButton({
             if (!result.ok) return setError(result.message);
             onDone?.(result.data);
             if (successMessage) setDone(successMessage);
-            if (redirectTo) router.push(typeof redirectTo === 'function' ? redirectTo(result.data) : redirectTo);
+            if (redirectTo) router.push(target(redirectTo, result.data));
             else router.refresh();
           });
         }}
@@ -111,7 +123,10 @@ function readForm(form: HTMLFormElement) {
     } else {
       value = el.value;
       if (kind === 'number') value = el.value === '' ? null : Number(el.value);
-      else if (kind === 'list') value = el.value.split(/[\n,]/).map((v) => v.trim()).filter(Boolean);
+      else if (kind === 'list' || kind === 'optional-list') {
+        value = el.value.split(/[\n,]/).map((v) => v.trim()).filter(Boolean);
+        if (kind === 'optional-list' && !(value as string[]).length) continue;
+      } else if (kind === 'code') value = el.value.trim() ? el.value.trim().toUpperCase() : null;
       else if (kind === 'date') value = el.value ? new Date(el.value).toISOString() : null;
       else if (kind === 'nullable') value = el.value.trim() === '' ? null : el.value;
       else if (kind === 'json') {
@@ -133,7 +148,10 @@ function readForm(form: HTMLFormElement) {
 
 /**
  * Form that submits its fields as JSON to an API path. Field types via
- * `data-type` (number, list, date, nullable, json, optional, array).
+ * `data-type` (number, list, optional-list, date, nullable, code, json,
+ * optional, array). `wrap` nests the values under a dotted path and `extra`
+ * adds fixed fields; both are serializable so server components can use
+ * them (`transform` only works from client components).
  */
 export function ApiForm({
   method = 'POST',
@@ -145,6 +163,8 @@ export function ApiForm({
   redirectTo,
   successMessage = 'Saved.',
   transform,
+  wrap,
+  extra,
   onDone,
   className,
   resetOnSuccess,
@@ -156,9 +176,11 @@ export function ApiForm({
   submitLabel?: ReactNode;
   submitVariant?: ButtonVariant;
   revalidate?: string[];
-  redirectTo?: string | ((data: unknown) => string);
+  redirectTo?: RedirectTarget;
   successMessage?: string | null;
   transform?: (values: Record<string, unknown>) => unknown;
+  wrap?: string;
+  extra?: Record<string, unknown>;
   onDone?: (data: unknown) => void;
   className?: string;
   resetOnSuccess?: boolean;
@@ -180,11 +202,14 @@ export function ApiForm({
       return setError((err as Error).message);
     }
     start(async () => {
-      const result = await apiAction(method, path, transform ? transform(values) : values, revalidate);
+      let body = transform ? transform(values) : values;
+      if (wrap) body = wrap.split('.').reduceRight<unknown>((inner, key) => ({ [key]: inner }), body);
+      if (extra) body = { ...extra, ...(body as Record<string, unknown>) };
+      const result = await apiAction(method, path, body, revalidate);
       if (!result.ok) return setError(result.message);
       onDone?.(result.data);
       if (resetOnSuccess) form.reset();
-      if (redirectTo) return router.push(typeof redirectTo === 'function' ? redirectTo(result.data) : redirectTo);
+      if (redirectTo) return router.push(target(redirectTo, result.data));
       if (successMessage) setDone(successMessage);
       router.refresh();
     });

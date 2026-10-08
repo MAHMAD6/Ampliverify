@@ -1,9 +1,15 @@
+import 'server-only';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
-import { CalendarDays, Info, Link2, MessageSquareText, Plus, Target, BarChart3 } from 'lucide-react';
-import { Button, PageHeader } from '@/components/ui';
+import { cache, type ReactNode } from 'react';
+import { BarChart3, CalendarDays, Folder, Info, Link2, MessageSquareText, Target } from 'lucide-react';
+import { ButtonLink, PageHeader } from '@/components/ui';
 import { AutoSubmitSelect } from '@/components/ui/AutoSubmitSelect';
+import { StateView } from '@/components/ui/StateView';
+import { apiGet, apiList, qs } from '@/lib/api';
+import type { BillingOverview, GeoOverview, GeoPlatformStatus, WorkspaceView } from '@/lib/app-types';
 import { appCrumbs } from '@/lib/nav';
+import { getAppContext } from '@/lib/project';
+import { AddPromptDialog } from './AddPromptDialog';
 import s from './geo.module.css';
 
 export type GeoTab = 'prompts' | 'trends' | 'citations' | 'platforms' | 'competitors' | 'opportunities';
@@ -27,20 +33,47 @@ const PERIODS = [
   ['7d', 'Last 7 days'],
   ['30d', 'Last 30 days'],
   ['90d', 'Last 90 days'],
+  ['12m', 'Last 12 months'],
 ] as const;
 
-/**
- * Shared GEO header, summary metrics and tab bar. Metrics come from the GEO
- * API (`geo_prompts`, `geo_visibility_snapshots`, `geo_citations`), which is
- * not built yet, so they read "—"; Add Prompt is disabled for the same reason.
- */
-export function GeoShell({ tab, period, children }: { tab: GeoTab; period: string; children: ReactNode }) {
+export const geoPeriod = (p?: string) => (PERIODS.some(([v]) => v === p) ? p! : '30d');
+export const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${v}%`);
+
+/** Everything the GEO header needs, loaded once per request. */
+export const loadGeo = cache(async (period: string) => {
+  const { selectedProject: project, workspaceId } = await getAppContext();
+  const [overview, platforms, billing, workspace] = await Promise.all([
+    project ? apiGet<GeoOverview>(`/user/projects/${project.id}/geo/overview${qs({ period })}`, { auth: true }) : null,
+    apiList<GeoPlatformStatus>('/public/geo-platforms/status'),
+    workspaceId ? apiGet<BillingOverview>(`/user/workspaces/${workspaceId}/billing`, { auth: true }) : null,
+    workspaceId ? apiGet<WorkspaceView>(`/user/workspaces/${workspaceId}`, { auth: true }) : null,
+  ]);
+  return {
+    project,
+    overview: overview?.ok ? overview.data : null,
+    platforms,
+    creditPerPlatform: billing?.ok ? (billing.data.creditCosts['geo.check'] ?? 0) : null,
+    aiGeo: workspace?.ok ? (workspace.data.settings.aiGeo ?? {}) : {},
+  };
+});
+
+/** Add Prompt control bound to the selected project (null without one). */
+export async function AddPrompt({ period, label, size }: { period: string; label?: string; size?: 'md' | 'lg' }) {
+  const g = await loadGeo(period);
+  if (!g.project) return null;
+  return <AddPromptDialog projectId={g.project.id} platforms={g.platforms} defaultPlatforms={g.aiGeo.defaultPlatforms} defaultCountry={g.aiGeo.defaultCountry} creditPerPlatform={g.creditPerPlatform} label={label} size={size} />;
+}
+
+/** Shared GEO header, summary metrics and tab bar. */
+export async function GeoShell({ tab, period, children }: { tab: GeoTab; period: string; children: ReactNode }) {
   const current = GEO_TABS.find((t) => t.key === tab)!;
+  const { project, overview: o } = await loadGeo(period);
+  const best = o?.platforms.filter((p) => p.visibility !== null).sort((a, b) => b.visibility! - a.visibility!)[0];
   const metrics = [
-    { label: 'Total Prompts', icon: <MessageSquareText size={26} />, tone: 'purple', info: 'Prompts tracked for the selected project.' },
-    { label: 'Avg. Visibility Score', icon: <BarChart3 size={26} />, tone: 'green', info: 'Average visibility across tracked prompts and platforms.' },
-    { label: 'Total Citations', icon: <Link2 size={26} />, tone: 'amber', info: 'Times your content was cited in AI answers.' },
-    { label: 'Highest Visibility Platform', icon: <Target size={26} />, tone: 'red', info: 'The platform where your brand is most visible.' },
+    { label: 'Total Prompts', value: o ? o.prompts.toLocaleString('en-US') : '—', icon: <MessageSquareText size={26} />, tone: 'purple', info: 'Active prompts tracked for the selected project.' },
+    { label: 'Avg. Visibility Score', value: pct(o?.visibility), icon: <BarChart3 size={26} />, tone: 'green', info: 'Share of the latest AI answers in this period that mention your brand.' },
+    { label: 'Total Citations', value: o ? o.citations.toLocaleString('en-US') : '—', icon: <Link2 size={26} />, tone: 'amber', info: 'Sources cited in the latest AI answers for your prompts.' },
+    { label: 'Highest Visibility Platform', value: best ? `${best.name}` : '—', icon: <Target size={26} />, tone: 'red', info: best ? `${best.visibility}% visibility on ${best.name}.` : 'The platform where your brand is most visible.' },
   ];
   return (
     <>
@@ -63,9 +96,7 @@ export function GeoShell({ tab, period, children }: { tab: GeoTab; period: strin
                 <button type="submit">Apply</button>
               </noscript>
             </form>
-            <Button size="lg" icon={<Plus size={18} />} disabled title="Prompt tracking is not available for your account yet.">
-              Add Prompt
-            </Button>
+            <AddPrompt period={period} />
           </>
         }
       />
@@ -75,8 +106,8 @@ export function GeoShell({ tab, period, children }: { tab: GeoTab; period: strin
             <span className={s.metricIcon} data-tone={m.tone}>
               {m.icon}
             </span>
-            <span>
-              <b>—</b>
+            <span style={{ minWidth: 0 }}>
+              <b>{m.value}</b>
               <small>
                 {m.label} <Info size={14} aria-label={m.info} />
               </small>
@@ -86,18 +117,30 @@ export function GeoShell({ tab, period, children }: { tab: GeoTab; period: strin
       </div>
       <nav className={s.tabs} aria-label="AI Search (GEO)">
         {GEO_TABS.map((t) => (
-          <Link key={t.key} href={t.href} className={t.key === tab ? s.tabOn : undefined} aria-current={t.key === tab ? 'page' : undefined}>
+          <Link key={t.key} href={`${t.href}${qs({ period: period === '30d' ? undefined : period })}`} className={t.key === tab ? s.tabOn : undefined} aria-current={t.key === tab ? 'page' : undefined}>
             {t.label}
           </Link>
         ))}
       </nav>
-      <div className={s.body}>{children}</div>
+      <div className={s.body}>
+        {project ? (
+          children
+        ) : (
+          <StateView
+            kind="empty"
+            icon={<Folder size={40} />}
+            title="Select a project"
+            description="AI search visibility is tracked per project. Choose a project to add prompts."
+            action={<ButtonLink href="/app/projects">Select a Project</ButtonLink>}
+          />
+        )}
+      </div>
     </>
   );
 }
 
-/** Empty table body used by the GEO tabs. */
-export function GeoTable({ columns, children }: { columns: string[]; children: ReactNode }) {
+/** Table frame for the GEO tabs; `empty` shows below the header when there are no rows. */
+export function GeoTable({ columns, rows, empty }: { columns: string[]; rows: ReactNode[][]; empty?: ReactNode }) {
   return (
     <div className={s.tableWrap}>
       <table className={s.table}>
@@ -108,8 +151,19 @@ export function GeoTable({ columns, children }: { columns: string[]; children: R
             ))}
           </tr>
         </thead>
+        {rows.length > 0 && (
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                {r.map((c, j) => (
+                  <td key={j}>{c}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        )}
       </table>
-      {children}
+      {rows.length === 0 && empty}
     </div>
   );
 }

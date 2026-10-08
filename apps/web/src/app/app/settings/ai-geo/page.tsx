@@ -23,7 +23,7 @@ export default async function AiGeoPreferencesPage() {
       {ws?.permissions.update && (
         <div style={{ marginTop: 20 }}>
           <Panel title="Brand recognition" description="Names AI search checks look for when deciding whether an answer mentions you. The project name and domain are always included.">
-            <ApiForm method="PATCH" path={`/user/workspaces/${ws.id}`} transform={(v) => ({ settings: { aiGeo: v } })}>
+            <ApiForm method="PATCH" path={`/user/workspaces/${ws.id}`} wrap="settings.aiGeo">
               <Field label="Brand name" htmlFor="brand">
                 <Input id="brand" name="brandName" defaultValue={aiGeo?.brandName ?? ''} maxLength={120} placeholder="e.g. Acme Analytics" />
               </Field>

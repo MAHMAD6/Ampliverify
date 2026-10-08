@@ -49,7 +49,7 @@ export default async function HelpSupportPage({ searchParams }: { searchParams: 
         </Panel>
         <Panel title="Contact Support" description="Send a request when documentation does not resolve the issue." flushHead>
           {workspaceId ? (
-            <ApiForm path="/user/support-tickets" submitLabel="Submit Support Request" transform={(v) => ({ ...v, workspaceId })} resetOnSuccess successMessage="Request sent. We’ll reply here and by email.">
+            <ApiForm path="/user/support-tickets" submitLabel="Submit Support Request" extra={{ workspaceId }} resetOnSuccess successMessage="Request sent. We’ll reply here and by email.">
               <Field label="Topic" htmlFor="s-topic">
                 <Select id="s-topic" name="category" defaultValue="GENERAL">
                   <option value="GENERAL">General question</option>

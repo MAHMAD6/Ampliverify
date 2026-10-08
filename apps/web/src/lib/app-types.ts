@@ -104,7 +104,7 @@ export type NotificationItem = { id: string; workspaceId: string; eventKey: stri
 
 export type GeoPlatformStatus = { id: string; key: string; name: string; provider: string; configured: boolean };
 
-export type GeoMetrics = { answers: number; visibility: number | null; citationRate: number | null; avgPosition: number | null; shareOfVoice: number | null };
+export type GeoMetrics = { answers: number; citations: number; lastCheckedAt: string | null; visibility: number | null; citationRate: number | null; avgPosition: number | null; shareOfVoice: number | null };
 
 export type GeoOverview = GeoMetrics & {
   periodDays: number;

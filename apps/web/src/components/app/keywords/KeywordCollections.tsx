@@ -47,7 +47,7 @@ export async function KeywordLists({ projectId, listId, saved }: { projectId: st
         <Panel title={saved ? 'Saved Keywords' : target!.name} description="Latest metrics from your research." bodyless>
           {target && (
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', display: 'grid', gap: 8 }}>
-              <ApiForm path={`/user/keyword-lists/${target.id}/keywords`} submitLabel="Add Keywords" transform={(v) => ({ keywords: v.keywords })} resetOnSuccess successMessage="Keywords added.">
+              <ApiForm path={`/user/keyword-lists/${target.id}/keywords`} submitLabel="Add Keywords" resetOnSuccess successMessage="Keywords added.">
                 <Field label="Add keywords (one per line or comma separated)" htmlFor="kl-add">
                   <Textarea id="kl-add" name="keywords" data-type="list" rows={2} required />
                 </Field>
@@ -88,7 +88,6 @@ export async function KeywordClusters({ projectId }: { projectId: string }) {
         <ApiForm
           path={`/user/projects/${projectId}/keyword-clusters`}
           submitLabel="Create Clusters"
-          transform={(v) => (v.listId ? { listId: v.listId } : { keywords: v.keywords })}
           successMessage="Clusters created."
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 1fr) minmax(260px, 2fr)', gap: 12 }}>
@@ -103,7 +102,7 @@ export async function KeywordClusters({ projectId }: { projectId: string }) {
               </Select>
             </Field>
             <Field label="Keywords (one per line)" htmlFor="cl-kw">
-              <Textarea id="cl-kw" name="keywords" data-type="list" rows={3} />
+              <Textarea id="cl-kw" name="keywords" data-type="optional-list" rows={3} />
             </Field>
           </div>
         </ApiForm>

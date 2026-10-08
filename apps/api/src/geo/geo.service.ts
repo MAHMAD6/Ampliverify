@@ -494,6 +494,8 @@ export class GeoService implements OnModuleInit {
       const competitorMentions = rs.reduce((n, r) => n + r.competitorMentions.length, 0);
       return {
         answers: rs.length,
+        citations: rs.reduce((n, r) => n + r.citations.length, 0),
+        lastCheckedAt: rs.reduce<Date | null>((d, r) => (!d || r.at > d ? r.at : d), null),
         visibility: rs.length ? Math.round((mentioned.length / rs.length) * 100) : null,
         citationRate: rs.length ? Math.round((cited.length / rs.length) * 100) : null,
         avgPosition: positions.length ? Math.round((positions.reduce((a, b) => a + b, 0) / positions.length) * 10) / 10 : null,
@@ -513,11 +515,11 @@ export class GeoService implements OnModuleInit {
     const checkDays = new Set(snapshots.map((s) => s.day.toISOString()));
     return {
       periodDays: days,
-      lastCheckedAt: lastRun?.completedAt ?? null,
       prompts: promptCount,
       checks: runs.length,
       openOpportunities: openOpps,
       ...metrics(results),
+      lastCheckedAt: lastRun?.completedAt ?? null,
       platforms: platforms.map((p) => ({ ...p, ...metrics(results.filter((r) => r.platform.key === p.key)) })),
       // No trend before two check days (planning rule).
       trend:

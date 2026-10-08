@@ -96,7 +96,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
               )}
             </dl>
             <div style={{ marginTop: 12 }}>
-              <ActionButton variant="outline" path={`/user/projects/${r.projectId}/reports`} body={{ type: r.type, periodStart: r.periodStart ?? undefined, periodEnd: r.periodEnd ?? undefined }} redirectTo={(d) => `/app/reports/${(d as { id: string }).id}`}>
+              <ActionButton variant="outline" path={`/user/projects/${r.projectId}/reports`} body={{ type: r.type, periodStart: r.periodStart ?? undefined, periodEnd: r.periodEnd ?? undefined }} redirectTo="/app/reports/{id}">
                 Regenerate
               </ActionButton>
             </div>
