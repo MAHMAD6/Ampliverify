@@ -34,3 +34,18 @@
   .nextArrow { display: none; }
 }
 @media (max-width: 640px) { .features, .nextSteps { grid-template-columns: minmax(0, 1fr); } }
+.count { margin-left: 6px; font-size: 12px; padding: 1px 7px; border-radius: 999px; background: var(--surface-alt); color: var(--muted); font-weight: 600; }
+.stack { display: grid; gap: 16px; margin-bottom: 16px; }
+.formRow { display: grid; grid-template-columns: minmax(240px, 2fr) minmax(160px, 1fr); gap: 12px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.inline { display: flex; gap: 8px; align-items: flex-start; flex: 1 1 320px; }
+.inline > input { flex: 1; }
+.planForm { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; flex: 1 1 520px; }
+.planForm > input:first-child { flex: 1 1 200px; }
+.filter { display: flex; gap: 8px; align-items: center; }
+.apply { border: 1px solid var(--line-strong); background: #fff; border-radius: var(--radius-sm); padding: 8px 12px; font-size: 14px; cursor: pointer; }
+.sub { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.check { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; margin-top: 10px; }
+@media (max-width: 640px) { .formRow { grid-template-columns: minmax(0, 1fr); } }
+.inline > div:last-child, .planForm > div:last-child { margin-top: 0; }
