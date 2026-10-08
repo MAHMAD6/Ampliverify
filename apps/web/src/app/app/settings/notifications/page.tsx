@@ -1,52 +1,69 @@
-import { Bell, BarChart3, Megaphone, Search, TriangleAlert, Zap } from 'lucide-react';
-import { Button, EmptyState, IconCircle, Notice } from '@/components/ui';
-import { Toggle } from '@/components/ui/Toggle';
-import p from '@/components/app/pages.module.css';
+import { Bell } from 'lucide-react';
+import { EmptyState, Notice } from '@/components/ui';
+import { ApiForm } from '@/components/ui/actions';
+import { getAppContext } from '@/lib/project';
+import { apiGet } from '@/lib/api';
 
 export const metadata = { title: 'Notifications · Settings' };
 
-const CATEGORIES = [
-  { icon: <Zap size={22} />, tone: 'blue' as const, title: 'Project Activity', text: 'Get notified about important activity on your projects, such as audit completion, content updates, or recommended actions.' },
-  { icon: <Search size={22} />, tone: 'purple' as const, title: 'Keyword Monitoring', text: 'Receive notifications about keyword ranking changes, new opportunities, and significant movements.' },
-  { icon: <BarChart3 size={22} />, tone: 'green' as const, title: 'Reports', text: 'Get notified when scheduled reports are ready or when new insights are available.' },
-  { icon: <TriangleAlert size={22} />, tone: 'red' as const, title: 'System Alerts', text: 'Important notifications about your account, billing, or system status.' },
-  { icon: <Megaphone size={22} />, tone: 'amber' as const, title: 'Product Updates', text: 'Occasional updates about new features, improvements, and tips.' },
-];
+type Pref = { eventKey: string; label: string; description: string; inApp: boolean; email: boolean };
 
-/** Preferences persist per user per workspace (notification_preferences); saving is not wired yet. */
-export default function NotificationSettingsPage() {
+/** Per-event preferences for in-app and email notifications (notification_preferences, per user per workspace). */
+export default async function NotificationSettingsPage() {
+  const { workspaceId } = await getAppContext();
+  const res = workspaceId ? await apiGet<Pref[]>(`/user/notification-preferences?workspaceId=${workspaceId}`, { auth: true }) : null;
+  const prefs = res?.ok ? res.data : [];
   return (
     <>
       <h2>Notifications</h2>
-      <p>Choose the types of notifications you want to receive and how you want to be notified.</p>
-      <div style={{ display: 'grid', gap: 12 }}>
-        {CATEGORIES.map((c) => (
-          <div key={c.title} className={p.notifCard}>
-            <IconCircle tone={c.tone} size={52}>
-              {c.icon}
-            </IconCircle>
-            <div>
-              <h4>{c.title}</h4>
-              <p>{c.text}</p>
-            </div>
-            <Toggle label={c.title} disabled />
+      <p>Choose the notifications you want to receive and how you want to be notified.</p>
+      {!workspaceId || !prefs.length ? (
+        <EmptyState icon={<Bell size={26} />} title="No workspace yet" description="Create a project to configure notifications." />
+      ) : (
+        <ApiForm
+          method="PUT"
+          path="/user/notification-preferences"
+          submitLabel="Save Preferences"
+          transform={(values) => ({
+            workspaceId,
+            preferences: prefs.map((p) => {
+              const k = p.eventKey.replace(/\./g, '~');
+              return { eventKey: p.eventKey, inApp: values[`in_${k}`] === true, email: values[`em_${k}`] === true };
+            }),
+          })}
+        >
+          <div style={{ border: '1px solid var(--line)', borderRadius: 12, overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: 12 }}>Notification</th>
+                  <th style={{ padding: 12, width: 100 }}>In-app</th>
+                  <th style={{ padding: 12, width: 100 }}>Email</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prefs.map((p) => {
+                  const k = p.eventKey.replace(/\./g, '~');
+                  return (
+                    <tr key={p.eventKey} style={{ borderTop: '1px solid var(--line)' }}>
+                      <td style={{ padding: 12 }}>
+                        <b>{p.label}</b>
+                        <div style={{ color: 'var(--muted)', fontSize: 13 }}>{p.description}</div>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input type="checkbox" name={`in_${k}`} defaultChecked={p.inApp} aria-label={`${p.label} in-app`} />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input type="checkbox" name={`em_${k}`} defaultChecked={p.email} aria-label={`${p.label} email`} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
-      <h3 style={{ fontSize: 20, marginTop: 28 }}>Notification Channels</h3>
-      <p style={{ color: 'var(--muted)', marginBottom: 12 }}>Choose how you want to receive notifications.</p>
-      <div style={{ border: '1px solid var(--line)', borderRadius: 12 }}>
-        <EmptyState
-          icon={<Bell size={26} />}
-          title="No notification channels configured"
-          description="Enable email or in-app notifications to start receiving updates."
-          action={
-            <Button variant="outline" disabled>
-              Configure Notifications
-            </Button>
-          }
-        />
-      </div>
+        </ApiForm>
+      )}
       <div style={{ marginTop: 16 }}>
         <Notice tone="neutral">Critical service, security and legally required notices are always delivered.</Notice>
       </div>

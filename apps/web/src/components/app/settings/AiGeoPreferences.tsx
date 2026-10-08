@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
+import { apiAction } from '@/lib/actions';
 import {
   BarChart3,
   Bell,
@@ -30,7 +32,7 @@ import s from './ai-geo.module.css';
 type Platform = { key: string; name: string };
 type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
-type Prefs = {
+export type Prefs = {
   platforms: string[];
   location: string;
   language: string;
@@ -147,11 +149,50 @@ function ToggleRow({ label, text, checked, onChange }: { label: string; text: st
  * #66); "Configure" opens the detailed forms from the earlier design (#64).
  * Tracking platforms come from
  * the GEO platform registry (`GET /public/geo-platforms`); locations and
- * languages from the shared lists. The form is fully interactive, but there
- * is no preferences API yet, so Save stays disabled and nothing is persisted.
+ * languages from the shared lists. Saved to the workspace settings
+ * (`settings.aiGeo`), which GEO checks use for default platforms and locale.
  */
-export function AiGeoPreferences({ platforms, locations, languages }: { platforms: Platform[]; locations: string[]; languages: string[] }) {
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
+export function AiGeoPreferences({
+  platforms,
+  locations,
+  languages,
+  initial,
+  workspaceId,
+  canEdit = true,
+}: {
+  platforms: Platform[];
+  locations: string[];
+  languages: string[];
+  initial?: Partial<Prefs> | null;
+  workspaceId?: string | null;
+  canEdit?: boolean;
+}) {
+  const saved: Prefs = { ...DEFAULTS, ...(initial ?? {}) };
+  const [prefs, setPrefs] = useState<Prefs>(saved);
+  const router = useRouter();
+  const [saving, startSave] = useTransition();
+  const [saveMsg, setSaveMsg] = useState<{ error?: string; ok?: string }>({});
+  const save = () =>
+    startSave(async () => {
+      if (!workspaceId) return;
+      setSaveMsg({});
+      const r = await apiAction('PATCH', `/user/workspaces/${workspaceId}`, {
+        settings: {
+          aiGeo: {
+            defaultPlatforms: prefs.platforms,
+            ...(prefs.location ? { defaultCountry: prefs.location.slice(0, 10) } : {}),
+            ...(prefs.language ? { defaultLanguage: prefs.language.slice(0, 10) } : {}),
+            checkFrequency: prefs.frequency,
+            ...(prefs.tone ? { aiTone: prefs.tone } : {}),
+            preferences: prefs,
+          },
+        },
+      });
+      if (!r.ok) return setSaveMsg({ error: r.message });
+      setSaveMsg({ ok: 'Preferences saved.' });
+      setEditing({});
+      router.refresh();
+    });
   const [openGroups, setOpenGroups] = useState<Record<Group, boolean>>({ providers: true, behavior: true, geo: true, credits: true });
   const [editing, setEditing] = useState<Partial<Record<Group, boolean>>>({});
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -171,7 +212,7 @@ export function AiGeoPreferences({ platforms, locations, languages }: { platform
   }, [pickerOpen]);
 
   const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setPrefs((p) => ({ ...p, [key]: value }));
-  const dirty = JSON.stringify(prefs) !== JSON.stringify(DEFAULTS);
+  const dirty = JSON.stringify(prefs) !== JSON.stringify(saved);
   const selected = platforms.filter((p) => prefs.platforms.includes(p.key));
 
   const open = (key: Group) => setOpenGroups((o) => ({ ...o, [key]: !o[key] }));
@@ -498,19 +539,23 @@ export function AiGeoPreferences({ platforms, locations, languages }: { platform
           <Button variant="secondary" icon={<RotateCcw size={16} />} onClick={() => setPrefs(DEFAULTS)} disabled={!dirty}>
             Reset to Defaults
           </Button>
-          <span className={s.unsaved}>
-            <Info size={14} /> Preferences can’t be saved yet; changes here are not stored.
-          </span>
+          {(saveMsg.error || saveMsg.ok || !canEdit) && (
+            <span className={s.unsaved} role={saveMsg.error ? 'alert' : 'status'}>
+              <Info size={14} /> {saveMsg.error ?? saveMsg.ok ?? 'Only workspace owners can change these preferences.'}
+            </span>
+          )}
           <Button
             variant="secondary"
             onClick={() => {
-              setPrefs(DEFAULTS);
+              setPrefs(saved);
               setEditing({});
             }}
           >
             Cancel
           </Button>
-          <Button disabled>Save Changes</Button>
+          <Button disabled={!dirty || !canEdit || saving || !workspaceId} onClick={save}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </Button>
         </div>
       )}
     </>

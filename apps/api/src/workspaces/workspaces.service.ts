@@ -28,6 +28,7 @@ export type WorkspaceSettings = {
     aiCreativity?: 'LOW' | 'BALANCED' | 'HIGH';
     autoApplySuggestions?: boolean;
     monthlyCreditCap?: number | null;
+    preferences?: Record<string, unknown>;
   };
   privacy?: { retentionDays?: number | null; allowPublicReportShares?: boolean; shareLinkExpiryDays?: number };
   projectDefaults?: { crawlScope?: 'PAGE' | 'SITE'; maxPages?: number; auditMode?: 'SEO' | 'GEO' | 'BOTH'; auditFrequency?: 'MANUAL' | 'WEEKLY' | 'MONTHLY'; reportFrequency?: 'NONE' | 'WEEKLY' | 'MONTHLY' };

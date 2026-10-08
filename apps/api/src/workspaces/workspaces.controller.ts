@@ -37,6 +37,8 @@ class AiGeoSettingsDto {
   @IsOptional() @IsIn(['LOW', 'BALANCED', 'HIGH']) aiCreativity?: 'LOW' | 'BALANCED' | 'HIGH';
   @IsOptional() @IsBoolean() autoApplySuggestions?: boolean;
   @IsOptional() @IsNumber() @Min(0) monthlyCreditCap?: number | null;
+  /** Full UI preference object (AI & GEO Preferences page). */
+  @IsOptional() @IsObject() preferences?: Record<string, unknown>;
 }
 
 class PrivacySettingsDto {
