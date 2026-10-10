@@ -15,13 +15,15 @@ export default async function EditorDocumentPage({ params }: { params: Promise<{
   const { projects } = await getAppContext();
   const project = projects.find((p) => p.id === res.data.projectId) ?? null;
   const integrations = project ? await apiGet<ProviderRow[]>(`/user/workspaces/${project.workspaceId}/integrations`, { auth: true }) : null;
-  const wp = integrations?.ok ? (integrations.data.find((p) => p.key === 'wordpress')?.connections ?? []) : [];
+  // Every connected CMS can receive this document.
+  const CMS: Record<string, string> = { wordpress: 'WordPress', webflow: 'Webflow', shopify: 'Shopify', custom_webhook: 'Custom (API)' };
+  const cms = integrations?.ok ? integrations.data.filter((p) => p.key in CMS).flatMap((p) => p.connections.filter((c) => c.status === 'CONNECTED').map((c) => ({ id: c.id, label: `${CMS[p.key]} · ${c.account ?? ''}`, provider: p.key }))) : [];
   return (
     <SeoEditor
       key={res.data.id}
       doc={res.data}
       projectName={project?.name ?? null}
-      connections={wp.filter((c) => c.status === 'ACTIVE').map((c) => ({ id: c.id, label: c.account ?? 'WordPress site' }))}
+      connections={cms}
     />
   );
 }

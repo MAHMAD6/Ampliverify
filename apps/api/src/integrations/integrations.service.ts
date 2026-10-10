@@ -11,6 +11,23 @@ import { EditorService } from '../editor/editor.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { parsePublicUrl, safeFetch } from '../common/utils/safe-fetch';
 import { SecretBox } from '../common/utils/secret-box';
+import { randomBytes } from 'crypto';
+import {
+  PublishContent,
+  PublishResult,
+  shopifyConnect,
+  shopifyPublish,
+  ShopifySecret,
+  webflowConnect,
+  webflowPublish,
+  WebflowSecret,
+  webhookPublish,
+  webhookSend,
+  WebhookSecret,
+} from './cms-connectors';
+
+/** Providers that can receive editor documents. */
+export const CMS_PROVIDERS = ['wordpress', 'webflow', 'shopify', 'custom_webhook'] as const;
 
 const GOOGLE_PROVIDERS = ['google_search_console', 'google_analytics'] as const;
 type GoogleProvider = (typeof GOOGLE_PROVIDERS)[number];
@@ -19,8 +36,9 @@ type WordPressSecret = { siteUrl: string; username: string; password: string };
 type GoogleSecret = { refreshToken: string; accessToken?: string; expiresAt?: number };
 
 /**
- * Workspace integrations: WordPress publishing (application passwords) and
- * Google Search Console / Analytics 4 (OAuth, read-only). Credentials are
+ * Workspace integrations: CMS publishing (WordPress application passwords,
+ * Webflow and Shopify API tokens, or a signed webhook to a custom endpoint)
+ * and Google Search Console / Analytics 4 (OAuth, read-only). Credentials are
  * sealed with AES-256-GCM and never returned to clients.
  */
 @Injectable()
@@ -139,6 +157,39 @@ export class IntegrationsService {
     return this.storeConnection(userId, workspaceId, 'wordpress', new URL(siteUrl).host, secret, meta);
   }
 
+  // ── Webflow / Shopify / custom webhook ─────────────────────────────────
+
+  async connectWebflow(userId: string, workspaceId: string, input: { apiToken: string; collectionId: string }, meta?: RequestMeta) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'integration.manage');
+    await this.entitlements.assertFeature(workspaceId, 'integrations.cms');
+    const { account, secret } = await webflowConnect(input.apiToken.trim(), input.collectionId.trim(), this.allowPrivate);
+    return this.storeConnection(userId, workspaceId, 'webflow', account, secret, meta);
+  }
+
+  async connectShopify(userId: string, workspaceId: string, input: { shopDomain: string; accessToken: string }, meta?: RequestMeta) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'integration.manage');
+    await this.entitlements.assertFeature(workspaceId, 'integrations.cms');
+    const { account, secret } = await shopifyConnect(input.shopDomain, input.accessToken.trim(), this.allowPrivate);
+    return this.storeConnection(userId, workspaceId, 'shopify', account, secret, meta);
+  }
+
+  /**
+   * Registers a customer endpoint that receives signed `document.publish`
+   * webhooks. A `ping` must succeed first. The signing secret is returned
+   * once, here, so the customer can verify signatures.
+   */
+  async connectWebhook(userId: string, workspaceId: string, input: { url: string }, meta?: RequestMeta) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'integration.manage');
+    await this.entitlements.assertFeature(workspaceId, 'integrations.cms');
+    const url = parsePublicUrl(input.url.trim(), this.allowPrivate);
+    if (url.protocol !== 'https:' && !this.allowPrivate) throw new BadRequestException({ code: 'WEBHOOK_HTTPS_REQUIRED', message: 'The endpoint must use https.' });
+    const secret: WebhookSecret = { url: url.toString(), signingSecret: `whsec_${randomBytes(24).toString('base64url')}` };
+    const ping = await webhookSend(secret, 'ping', { workspaceId }, this.allowPrivate);
+    if (ping.status < 200 || ping.status >= 300) throw new BadRequestException({ code: 'WEBHOOK_UNREACHABLE', message: ping.status ? `The endpoint answered HTTP ${ping.status} to our test ping.` : 'We could not reach the endpoint.' });
+    const saved = await this.storeConnection(userId, workspaceId, 'custom_webhook', url.host, secret, meta);
+    return { ...saved, signingSecret: secret.signingSecret };
+  }
+
   async testConnection(userId: string, integrationId: string) {
     const { integ, secret } = await this.secretOf<WordPressSecret & GoogleSecret>(integrationId);
     await this.rbac.requireWorkspace(userId, integ.workspaceId, 'integration.manage');
@@ -146,6 +197,15 @@ export class IntegrationsService {
     if (integ.provider.key === 'wordpress') {
       const res = await safeFetch(`${secret.siteUrl}/wp-json/wp/v2/users/me`, { headers: this.wpHeaders(secret), allowPrivate: this.allowPrivate, maxBytes: 256 * 1024 }).catch(() => null);
       ok = res?.status === 200;
+    } else if (integ.provider.key === 'webflow') {
+      const s = secret as unknown as WebflowSecret;
+      ok = !!(await webflowConnect(s.token, s.collectionId, this.allowPrivate).catch(() => null));
+    } else if (integ.provider.key === 'shopify') {
+      const s = secret as unknown as ShopifySecret;
+      ok = !!(await shopifyConnect(s.shop, s.token, this.allowPrivate).catch(() => null));
+    } else if (integ.provider.key === 'custom_webhook') {
+      const res = await webhookSend(secret as unknown as WebhookSecret, 'ping', { workspaceId: integ.workspaceId }, this.allowPrivate);
+      ok = res.status >= 200 && res.status < 300;
     } else {
       ok = !!(await this.googleAccessToken(integrationId).catch(() => null));
     }
@@ -166,14 +226,20 @@ export class IntegrationsService {
     return rows.map((r) => ({ id: r.id, title: r.title.raw || r.title.rendered || '(untitled)', url: r.link, modified: r.modified, status: r.status }));
   }
 
-  /** Publishes (or updates) an editor document as a WordPress post or page. */
-  async publishToWordPress(userId: string, documentId: string, input: { integrationId: string; status: 'draft' | 'publish'; type: 'posts' | 'pages' }, meta?: RequestMeta) {
+  /**
+   * Publishes (or updates) an editor document on a connected CMS. Repeat
+   * publishes to the same connection update the remote item instead of
+   * creating a duplicate.
+   */
+  async publish(userId: string, documentId: string, input: { integrationId: string; status: 'draft' | 'publish'; type: 'posts' | 'pages' }, meta?: RequestMeta) {
     const doc = await this.prisma.editorDocument.findUnique({ where: { id: documentId } });
     if (!doc) throw new NotFoundException({ code: 'DOCUMENT_NOT_FOUND', message: 'Document not found.' });
     const project = await this.projects.requireProject(userId, doc.projectId, 'editor.write');
     await this.entitlements.assertFeature(project.workspaceId, 'integrations.cms');
     const { integ, secret } = await this.secretOf<WordPressSecret>(input.integrationId);
-    if (integ.workspaceId !== project.workspaceId || integ.provider.key !== 'wordpress') throw new BadRequestException({ code: 'INTEGRATION_MISMATCH', message: 'Choose a WordPress site connected to this workspace.' });
+    const key = integ.provider.key as (typeof CMS_PROVIDERS)[number];
+    if (integ.workspaceId !== project.workspaceId || !CMS_PROVIDERS.includes(key)) throw new BadRequestException({ code: 'INTEGRATION_MISMATCH', message: 'Choose a website connected to this workspace.' });
+    if (key !== 'wordpress') return this.publishOther(userId, doc, project, integ.id, key, secret as unknown, input, meta);
     const content = await this.editor.content(documentId);
     if (!content) throw new BadRequestException({ code: 'EMPTY_DOCUMENT', message: 'Save the document before publishing.' });
 
@@ -200,6 +266,45 @@ export class IntegrationsService {
     ]);
     await this.auditLog.record({ actorUserId: userId, organizationId: project.organizationId, workspaceId: project.workspaceId, action: 'project.editor.publish', targetType: 'editor_document', targetId: documentId, afterState: { remoteId: post.id, status: input.status }, requestMeta: meta });
     return { remoteId: post.id, link: post.link ?? null, status: post.status ?? input.status };
+  }
+
+  private async publishOther(
+    userId: string,
+    doc: { id: string; title: string; status: string },
+    project: { organizationId: string; workspaceId: string },
+    integrationId: string,
+    key: 'webflow' | 'shopify' | 'custom_webhook',
+    secret: unknown,
+    input: { status: 'draft' | 'publish'; type: 'posts' | 'pages' },
+    meta?: RequestMeta,
+  ) {
+    const content = await this.editor.content(doc.id);
+    if (!content) throw new BadRequestException({ code: 'EMPTY_DOCUMENT', message: 'Save the document before publishing.' });
+    const previous = await this.prisma.editorChangeEvent.findFirst({ where: { documentId: doc.id, action: 'cms.publish', metadata: { path: ['integrationId'], equals: integrationId } }, orderBy: { createdAt: 'desc' } });
+    const prev = (previous?.metadata as { remoteId?: string | number; type?: string } | null) ?? null;
+    const remoteId = prev && (key === 'webflow' || prev.type === input.type) ? (prev.remoteId ?? null) : null;
+    const payload: PublishContent = { documentId: doc.id, title: content.title || doc.title, html: content.html, metaDescription: content.metaDescription, slug: content.slug, focusKeyword: content.focusKeyword };
+    const sync = await this.prisma.syncRun.create({ data: { workspaceIntegrationId: integrationId, syncType: 'PUBLISH', status: 'RUNNING' } });
+    let result: PublishResult;
+    try {
+      const args = { ...input, remoteId } as const;
+      result =
+        key === 'webflow'
+          ? await webflowPublish(secret as WebflowSecret, payload, args, this.allowPrivate)
+          : key === 'shopify'
+            ? await shopifyPublish(secret as ShopifySecret, payload, args, this.allowPrivate)
+            : await webhookPublish(secret as WebhookSecret, payload, args, this.allowPrivate);
+    } catch (err) {
+      await this.prisma.syncRun.update({ where: { id: sync.id }, data: { status: 'FAILED', completedAt: new Date(), errorCode: 'PUBLISH_FAILED' } });
+      throw err;
+    }
+    await this.prisma.$transaction([
+      this.prisma.syncRun.update({ where: { id: sync.id }, data: { status: 'SUCCEEDED', completedAt: new Date() } }),
+      this.prisma.editorChangeEvent.create({ data: { documentId: doc.id, actorUserId: userId, action: 'cms.publish', metadata: { integrationId, provider: key, remoteId: result.remoteId, link: result.link, status: result.status, type: input.type } } }),
+      this.prisma.editorDocument.update({ where: { id: doc.id }, data: { status: input.status === 'publish' ? 'PUBLISHED' : (doc.status as 'DRAFT') } }),
+    ]);
+    await this.auditLog.record({ actorUserId: userId, organizationId: project.organizationId, workspaceId: project.workspaceId, action: 'project.editor.publish', targetType: 'editor_document', targetId: doc.id, afterState: { provider: key, remoteId: result.remoteId, status: input.status }, requestMeta: meta });
+    return result;
   }
 
   // ── Google (Search Console, Analytics 4) ───────────────────────────────

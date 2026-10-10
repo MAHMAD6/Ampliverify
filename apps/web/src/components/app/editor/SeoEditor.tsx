@@ -113,7 +113,7 @@ const payload = (sections: Section[], meta: Meta): Content => ({
  * or rejects, version history and WordPress publishing. Unsaved edits are
  * also kept on this device so a closed tab does not lose work.
  */
-export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; projectName: string | null; connections: { id: string; label: string }[] }) {
+export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; projectName: string | null; connections: { id: string; label: string; provider?: string }[] }) {
   const router = useRouter();
   const backupKey = `av-editor:${doc.id}`;
   const [ready, setReady] = useState(false);
@@ -370,7 +370,7 @@ export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; p
       if (!r.ok) throw new Error(r.message);
       if (pub.status === 'publish') await apiAction('PATCH', `/user/editor/documents/${doc.id}`, { status: 'PUBLISHED' });
       router.refresh();
-      return `Sent to WordPress as ${r.data.status ?? pub.status}${r.data.link ? `: ${r.data.link}` : '.'}`;
+      return `Sent to ${connections.find((c) => c.id === pub.integrationId)?.label ?? 'your website'} as ${r.data.status ?? pub.status}${r.data.link ? `: ${r.data.link}` : '.'}`;
     });
 
   const visible = useMemo(() => {
@@ -453,10 +453,10 @@ export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; p
               </button>
               {menu === 'more' && (
                 <div className={e.menu} style={{ width: 300, padding: 12 }}>
-                  <strong style={{ fontSize: 14 }}>Publish to WordPress</strong>
+                  <strong style={{ fontSize: 14 }}>Publish to your website</strong>
                   {connections.length === 0 ? (
                     <p style={{ fontSize: 13, color: 'var(--muted)', margin: '6px 0' }}>
-                      No website connected. <Link href="/app/integrations/cms" style={{ color: 'var(--blue)' }}>Connect WordPress</Link>
+                      No website connected. <Link href="/app/integrations/cms" style={{ color: 'var(--blue)' }}>Connect your website</Link>
                     </p>
                   ) : (
                     <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
@@ -467,16 +467,18 @@ export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; p
                           </option>
                         ))}
                       </Select>
-                      <Select aria-label="Content type" value={pub.type} onChange={(ev) => setPub({ ...pub, type: ev.target.value })}>
-                        <option value="posts">Post</option>
-                        <option value="pages">Page</option>
-                      </Select>
-                      <Select aria-label="WordPress status" value={pub.status} onChange={(ev) => setPub({ ...pub, status: ev.target.value })}>
-                        <option value="draft">Save as WordPress draft</option>
+                      {['wordpress', 'shopify', 'custom_webhook'].includes(connections.find((c) => c.id === pub.integrationId)?.provider ?? 'wordpress') && (
+                        <Select aria-label="Content type" value={pub.type} onChange={(ev) => setPub({ ...pub, type: ev.target.value })}>
+                          <option value="posts">Post / article</option>
+                          <option value="pages">Page</option>
+                        </Select>
+                      )}
+                      <Select aria-label="Publish status" value={pub.status} onChange={(ev) => setPub({ ...pub, status: ev.target.value })}>
+                        <option value="draft">Save as draft on the site</option>
                         <option value="publish">Publish live</option>
                       </Select>
                       <Button icon={<Send size={16} />} onClick={publish} disabled={!!busy}>
-                        {busy === 'publish' ? 'Sending…' : 'Send to WordPress'}
+                        {busy === 'publish' ? 'Sending…' : 'Publish'}
                       </Button>
                     </div>
                   )}

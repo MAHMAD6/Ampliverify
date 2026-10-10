@@ -1,5 +1,5 @@
 import { BookOpen } from 'lucide-react';
-import { ConnectWebsite, type WpConnection } from '@/components/app/cms/ConnectWebsite';
+import { ConnectWebsite, type Platform, type WpConnection } from '@/components/app/cms/ConnectWebsite';
 import { ButtonLink, PageHeader } from '@/components/ui';
 import { appCrumbs } from '@/lib/nav';
 import { getAppContext } from '@/lib/project';
@@ -12,7 +12,9 @@ type ProviderRow = { key: string; available: boolean; connections: WpConnection[
 export default async function CmsConnectionPage() {
   const { workspaceId, selectedProject } = await getAppContext();
   const res = workspaceId ? await apiGet<ProviderRow[]>(`/user/workspaces/${workspaceId}/integrations`, { auth: true }) : null;
-  const wp = res?.ok ? res.data.find((p) => p.key === 'wordpress') : undefined;
+  const rows = res?.ok ? res.data : [];
+  const connections: Partial<Record<Platform, WpConnection | null>> = Object.fromEntries((['wordpress', 'webflow', 'shopify', 'custom_webhook'] as Platform[]).map((k) => [k, rows.find((p) => p.key === k)?.connections[0] ?? null]));
+  const available = rows.some((p) => p.key === 'wordpress' && p.available);
   return (
     <>
       <PageHeader
@@ -25,7 +27,7 @@ export default async function CmsConnectionPage() {
           </ButtonLink>
         }
       />
-      <ConnectWebsite workspaceId={workspaceId} projectId={selectedProject?.id ?? null} connection={wp?.connections[0] ?? null} available={!!wp?.available} />
+      <ConnectWebsite workspaceId={workspaceId} projectId={selectedProject?.id ?? null} connections={connections} available={available} />
     </>
   );
 }

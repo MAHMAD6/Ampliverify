@@ -11,6 +11,17 @@ class WordPressDto {
   @IsString() @MinLength(1) @MaxLength(200) username: string;
   @IsString() @MinLength(8) @MaxLength(200) applicationPassword: string;
 }
+class WebflowDto {
+  @IsString() @MinLength(10) @MaxLength(500) apiToken: string;
+  @IsString() @MinLength(10) @MaxLength(64) collectionId: string;
+}
+class ShopifyDto {
+  @IsString() @MinLength(3) @MaxLength(255) shopDomain: string;
+  @IsString() @MinLength(10) @MaxLength(500) accessToken: string;
+}
+class WebhookDto {
+  @IsString() @MaxLength(2048) url: string;
+}
 class GoogleStartDto {
   @IsIn(['google_search_console', 'google_analytics']) provider: 'google_search_console' | 'google_analytics';
 }
@@ -40,6 +51,21 @@ export class IntegrationsController {
   wordpress(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WordPressDto, @Req() req: Request) {
     return this.integrations.connectWordPress(a.userId, id, dto, requestMeta(req));
   }
+  @Post('workspaces/:id/integrations/webflow')
+  webflow(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WebflowDto, @Req() req: Request) {
+    return this.integrations.connectWebflow(a.userId, id, dto, requestMeta(req));
+  }
+
+  @Post('workspaces/:id/integrations/shopify')
+  shopify(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ShopifyDto, @Req() req: Request) {
+    return this.integrations.connectShopify(a.userId, id, dto, requestMeta(req));
+  }
+
+  @Post('workspaces/:id/integrations/webhook')
+  webhook(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WebhookDto, @Req() req: Request) {
+    return this.integrations.connectWebhook(a.userId, id, dto, requestMeta(req));
+  }
+
   @Post('workspaces/:id/integrations/google/start')
   googleStart(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: GoogleStartDto) {
     return this.integrations.googleStart(a.userId, id, dto.provider);
@@ -67,7 +93,7 @@ export class IntegrationsController {
   }
   @Post('editor/documents/:id/publish')
   publish(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PublishDto, @Req() req: Request) {
-    return this.integrations.publishToWordPress(a.userId, id, { integrationId: dto.integrationId, status: dto.status, type: dto.type ?? 'posts' }, requestMeta(req));
+    return this.integrations.publish(a.userId, id, { integrationId: dto.integrationId, status: dto.status, type: dto.type ?? 'posts' }, requestMeta(req));
   }
   @Get('projects/:projectId/data-sources')
   sources(@CurrentActor() a: AuthenticatedActor, @Param('projectId', ParseUUIDPipe) id: string) {

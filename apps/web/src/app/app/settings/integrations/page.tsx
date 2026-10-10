@@ -51,7 +51,6 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
   const geo = geoRes.ok ? geoRes.data : [];
   const providers = listRes?.ok ? listRes.data : [];
   const provider = (key: string) => providers.find((p) => p.key === key);
-  const wp = provider('wordpress');
   const googleConnections = await Promise.all(
     ['google_search_console', 'google_analytics'].flatMap((k) =>
       (provider(k)?.connections ?? []).map(async (c) => ({
@@ -123,49 +122,45 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
             </div>
           </div>
           <div className={s.grid}>
-            <div className={s.card}>
-              <Logo mark="W" color="#21759b" />
-              <div>
-                <h4>WordPress</h4>
-                <p>Publish editor documents as WordPress posts or pages.</p>
-                {wp?.connections.length ? (
-                  wp.connections.map((c) => (
-                    <div key={c.id} className={s.row} style={{ flexWrap: 'wrap' }}>
-                      <span className={`${s.status} ${c.status === 'CONNECTED' ? s.ok : ''}`}>{c.status === 'CONNECTED' ? `Connected · ${c.account}` : `${c.status.toLowerCase()} · ${c.account}`}</span>
-                      <ActionButton size="sm" variant="ghost" path={`/user/integrations/${c.id}/test`}>
-                        Test
-                      </ActionButton>
-                      <ActionButton size="sm" variant="ghost" method="DELETE" path={`/user/integrations/${c.id}`} confirm="Disconnect this site? Publishing will stop.">
-                        Disconnect
-                      </ActionButton>
-                    </div>
-                  ))
-                ) : (
-                  <div className={s.row}>
-                    <span className={s.status}>{wp?.available ? 'Not Connected' : 'Not available yet'}</span>
-                    {wp?.available && (
-                      <ButtonLink href="/app/integrations/cms" size="sm">
-                        Connect
-                      </ButtonLink>
+            {[
+              { key: 'wordpress', name: 'WordPress', text: 'Publish editor documents as WordPress posts or pages.', mark: 'W' as React.ReactNode, color: '#21759b' },
+              { key: 'webflow', name: 'Webflow', text: 'Publish editor documents as items in a Webflow CMS collection.', mark: 'W' as React.ReactNode, color: '#4353ff' },
+              { key: 'shopify', name: 'Shopify', text: 'Publish editor documents as Shopify pages or blog articles.', mark: 'S' as React.ReactNode, color: '#5e8e3e' },
+              { key: 'custom_webhook', name: 'Custom Website (API)', text: 'Send signed publish webhooks to your own endpoint.', mark: <Code2 size={24} />, color: 'var(--blue)' },
+            ].map((cms) => {
+              const row = provider(cms.key);
+              return (
+                <div key={cms.key} className={s.card}>
+                  <Logo mark={cms.mark} color={cms.color} />
+                  <div>
+                    <h4>{cms.name}</h4>
+                    <p>{cms.text}</p>
+                    {row?.connections.length ? (
+                      row.connections.map((c) => (
+                        <div key={c.id} className={s.row} style={{ flexWrap: 'wrap' }}>
+                          <span className={`${s.status} ${c.status === 'CONNECTED' ? s.ok : ''}`}>{c.status === 'CONNECTED' ? `Connected · ${c.account}` : `${c.status.toLowerCase()} · ${c.account}`}</span>
+                          <ActionButton size="sm" variant="ghost" path={`/user/integrations/${c.id}/test`}>
+                            Test
+                          </ActionButton>
+                          <ActionButton size="sm" variant="ghost" method="DELETE" path={`/user/integrations/${c.id}`} confirm={`Disconnect ${cms.name}? Publishing to it will stop.`}>
+                            Disconnect
+                          </ActionButton>
+                        </div>
+                      ))
+                    ) : (
+                      <div className={s.row}>
+                        <span className={s.status}>{row?.available ? 'Not Connected' : 'Not configured on this server'}</span>
+                        {row?.available && (
+                          <ButtonLink href="/app/integrations/cms" size="sm">
+                            Connect
+                          </ButtonLink>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
-            {[
-              { name: 'Webflow', mark: 'W', color: '#4353ff' },
-              { name: 'Shopify', mark: 'S', color: '#5e8e3e' },
-              { name: 'Custom Website (API)', mark: <Code2 size={24} />, color: 'var(--blue)' },
-            ].map((c) => (
-              <div key={c.name} className={s.card}>
-                <Logo mark={c.mark} color={c.color} />
-                <div>
-                  <h4>{c.name}</h4>
-                  <p>Integration coming soon.</p>
-                  <span className={s.status}>Coming Soon</span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
