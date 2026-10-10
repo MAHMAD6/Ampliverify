@@ -1,33 +1,47 @@
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, ChevronRight, Cloud, CreditCard, Database, FileText, HardDrive, Layers, Mail, Plus, Server, Settings, Users, Activity } from 'lucide-react';
 import { ButtonLink, PageHeader } from '@/components/ui';
-import { dateTime, loadUsers } from '@/lib/admin-data';
-import { apiGet } from '@/lib/api';
+import { adminGet, dateTime, loadUsers } from '@/lib/admin-data';
 import { loadAudit } from '@/lib/audit';
-import type { ContentSummary, JobSummary } from '@/lib/types';
 import s from '@/components/admin/command.module.css';
 
 export const metadata = { title: 'Command Center' };
 
+type Counts = { draft: number; published: number; archived: number };
+type Health = {
+  database: { status: 'UP' | 'DOWN'; latencyMs: number };
+  checks: { componentKey: string; status: 'HEALTHY' | 'DEGRADED' | 'DOWN' }[];
+  incidents: { status: string }[];
+  deadJobs: unknown[];
+  webhooksFailed: number;
+  providers: { key: string; configured: boolean }[];
+};
+
 /**
- * Command Center (chat design 2026-10-06). Users, published content and
- * recent activity are live; subscriptions, alerts and component status need
- * the billing and monitoring APIs and read "—".
+ * Command Center (chat design 2026-10-06): users, content, active
+ * subscriptions, open alerts (incidents, dead jobs, failed webhooks),
+ * component status and recent administrative activity.
  */
 export default async function CommandCenterPage() {
-  const [users, blog, guides, jobs, audit] = await Promise.all([
+  const [users, overview, subs, health, audit] = await Promise.all([
     loadUsers(),
-    apiGet<ContentSummary[]>('/public/blog?limit=50'),
-    apiGet<ContentSummary[]>('/public/guides?limit=50'),
-    apiGet<JobSummary[]>('/public/careers'),
+    adminGet<{ blog: Counts; guides: Counts; help: Counts; caseStudies: Counts; jobs: Record<string, number> }>('/admin/content/overview'),
+    adminGet<{ status: string }[]>('/admin/subscriptions'),
+    adminGet<Health>('/admin/health'),
     loadAudit(),
   ]);
-  const content = blog.ok && guides.ok && jobs.ok ? blog.data.length + guides.data.length + jobs.data.length : null;
+  const sum = (c: Counts) => c.draft + c.published + c.archived;
+  const content = overview ? sum(overview.blog) + sum(overview.guides) + sum(overview.help) + sum(overview.caseStudies) + Object.values(overview.jobs).reduce((n, v) => n + v, 0) : null;
+  const activeSubs = subs ? subs.filter((x) => ['ACTIVE', 'TRIALING', 'PAST_DUE'].includes(x.status)).length : null;
+  const alerts = health ? health.incidents.filter((i) => i.status !== 'RESOLVED').length + health.deadJobs.length + (health.webhooksFailed > 0 ? 1 : 0) + (health.database.status === 'DOWN' ? 1 : 0) : null;
+  const check = (key: string) => health?.checks.find((c) => c.componentKey === key)?.status;
+  const provider = (key: string) => health?.providers.find((x) => x.key === key)?.configured;
+  const label = (v: string | boolean | undefined) => (v === undefined ? '—' : v === true || v === 'HEALTHY' || v === 'UP' ? 'Operational' : v === false ? 'Not configured' : v === 'DEGRADED' ? 'Degraded' : 'Down');
   const metrics = [
     { label: 'Total Users', value: users?.length, note: users ? null : 'No users loaded.', icon: <Users size={28} />, tone: 'green' },
-    { label: 'Content Items', value: content, note: content === null ? 'No content loaded.' : 'Published items', icon: <FileText size={28} />, tone: 'blue' },
-    { label: 'Active Subscriptions', value: null, note: 'No subscriptions data yet.', icon: <Layers size={28} />, tone: 'purple' },
-    { label: 'Open Alerts', value: null, note: 'No monitoring data yet.', icon: <AlertTriangle size={28} />, tone: 'red' },
+    { label: 'Content Items', value: content, note: content === null ? 'No content loaded.' : 'All content types', icon: <FileText size={28} />, tone: 'blue' },
+    { label: 'Active Subscriptions', value: activeSubs, note: activeSubs === null ? 'Billing data unavailable.' : 'Active, trialing or past due', icon: <Layers size={28} />, tone: 'purple' },
+    { label: 'Open Alerts', value: alerts, note: alerts === null ? 'Health data unavailable.' : 'Incidents, dead jobs, failed webhooks', icon: <AlertTriangle size={28} />, tone: 'red' },
   ];
   const actions = [
     { title: 'Manage Users', text: 'View and manage all users, admins, and permissions.', href: '/admin/users', icon: <Users size={26} />, tone: 'green' },
@@ -36,11 +50,11 @@ export default async function CommandCenterPage() {
     { title: 'System Operations', text: 'Configure modules, feature flags, and system settings.', href: '/admin/modules', icon: <Settings size={26} />, tone: 'green' },
   ];
   const status = [
-    { label: 'Platform', icon: <Server size={20} /> },
-    { label: 'API Services', icon: <Cloud size={20} /> },
-    { label: 'Database', icon: <Database size={20} /> },
-    { label: 'File Storage', icon: <HardDrive size={20} /> },
-    { label: 'Email Services', icon: <Mail size={20} /> },
+    { label: 'Platform', icon: <Server size={20} />, value: label(health ? (alerts ? 'DEGRADED' : 'HEALTHY') : undefined) },
+    { label: 'Background Jobs', icon: <Cloud size={20} />, value: label(check('job_queue')) },
+    { label: 'Database', icon: <Database size={20} />, value: label(health?.database.status) },
+    { label: 'File Storage', icon: <HardDrive size={20} />, value: label(provider('storage')) },
+    { label: 'Email Services', icon: <Mail size={20} />, value: label(provider('email')) },
   ];
   const recent = audit.records.slice(0, 6);
   return (
@@ -127,7 +141,7 @@ export default async function CommandCenterPage() {
                 <li key={x.label}>
                   {x.icon}
                   <span>{x.label}</span>
-                  <b>—</b>
+                  <b>{x.value}</b>
                 </li>
               ))}
             </ul>
