@@ -8,8 +8,8 @@ Multi-tenant SEO and AI-search (GEO) SaaS: a public site, a user app and a Super
 
 This repository contains:
 
-- **`apps/api`**: the full PostgreSQL schema plus a NestJS API for auth integration, tenancy, projects, RBAC, immutable audit logging and public content.
-- **`apps/web`**: a Next.js app with the public website, the user app (`/app`) and the Super Admin console (`/admin`), built from the supplied designs. See [`docs/SCREENS.md`](docs/SCREENS.md) for which screens are live and which show empty states.
+- **`apps/api`**: the PostgreSQL schema and a NestJS API: tenancy, RBAC and audit log; SEO/GEO audits, optimization and verification; On-Page SEO Editor; content strategy; keyword research (DataForSEO); AI Search (GEO) tracking across ChatGPT, Claude, Gemini and Perplexity; reports; credits, entitlements and Stripe billing; integrations (WordPress, Google Search Console/GA4); CMS, careers, support; platform operations. A Postgres-backed job queue runs inside the API process.
+- **`apps/web`**: a Next.js app with the public website, the user app (`/app`) and the Super Admin console (`/admin`), built from the supplied designs and wired to the API. See [`docs/SCREENS.md`](docs/SCREENS.md) and [`docs/API.md`](docs/API.md).
 
 ```text
 apps/
@@ -23,6 +23,7 @@ docs/
   SECURITY.md              Auth / RBAC / audit model
   INPUTS.md                Register of every supplied input file
   SCREENS.md               Screen register: design → route → data status
+  ROADMAP.md               Build status and remaining launch work
   design/                  Approved UI mockups (admin, public, user app)
   reference/               Original Backend Batch 1 (NestJS + TypeORM), kept for provenance
 ```
@@ -34,7 +35,7 @@ Node.js ≥ 22.12 · NestJS 11 · Prisma 6 · PostgreSQL 16 · Next.js 16 / Reac
 ## Getting started
 
 ```bash
-cp apps/api/.env.example apps/api/.env         # API: database, Better Auth issuer/audience/JWKS URL, AUTH_SYNC_SECRET
+cp apps/api/.env.example apps/api/.env         # API: database, Better Auth issuer/audience/JWKS URL, AUTH_SYNC_SECRET, provider keys (all optional)
 cp apps/web/.env.example apps/web/.env.local   # web: API_URL, Better Auth secret + database, same AUTH_SYNC_SECRET
 docker compose up -d postgres                   # or any PostgreSQL 16
 createdb ampliverify_auth                       # Better Auth's own database (AUTH_DATABASE_URL)
@@ -53,7 +54,7 @@ Better Auth runs inside the web app at `/api/auth` (`apps/web/src/lib/auth.ts`):
 - **API tokens:** the jwt plugin mints 15-minute EdDSA bearer tokens for API calls (`lib/session.ts`) and serves `/api/auth/jwks`, which the API verifies. The web `BETTER_AUTH_ISSUER`/`BETTER_AUTH_AUDIENCE` must equal the API's, and the API's `BETTER_AUTH_JWKS_URL` must point at the web origin.
 - **Provisioning:** every Better Auth user create/update is synced into the API (`POST /internal/auth/users/sync`, `AUTH_SYNC_SECRET`). `/auth/continue` repeats the sync after each sign-in and, on first sign-in, creates the user's organization and default workspace.
 - **Route gate:** `/app` and `/admin` redirect to `/login` without a session cookie (`src/proxy.ts`). Permissions are always enforced by the API.
-- **Email:** email/password requires verification. **No email provider is wired yet** (`lib/auth-email.ts`); sending fails loudly. For local testing set `AUTH_EMAIL_LOG_LINKS=true` to print verification and reset links to the server log. This only works when `BETTER_AUTH_URL` is localhost.
+- **Email:** email/password requires verification. Emails go through Resend (`RESEND_API_KEY`, `EMAIL_FROM` in both apps). For local testing set `AUTH_EMAIL_LOG_LINKS=true` (web) and `EMAIL_LOG_ONLY=true` (API) to print messages to the server log instead; the web flag only works when `BETTER_AUTH_URL` is localhost.
 - **Social:** Google and Microsoft buttons are enabled when their client id and secret are set.
 
 First Super Admin: sign up and verify the account, then take its Better Auth user id (`select id from "user" where email = '…'` in the auth database) and run this once:
@@ -61,6 +62,24 @@ First Super Admin: sign up and verify the account, then take its Better Auth use
 ```bash
 psql "$DATABASE_URL" -v auth_subject='BETTER_AUTH_USER_ID' -f apps/api/scripts/bootstrap-super-admin.sql
 ```
+
+### Providers
+
+Every external provider is optional; the dependent feature is disabled with an explanation until its keys are set (see `apps/api/.env.example`):
+
+| Feature | Variables |
+|---|---|
+| Payments, credit packs | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (webhook: `POST /api/v1/webhooks/stripe`) |
+| Email | `RESEND_API_KEY`, `EMAIL_FROM` |
+| AI ideas, briefs, editor suggestions, Claude GEO checks | `ANTHROPIC_API_KEY` |
+| GEO checks on ChatGPT / Gemini / Perplexity | `OPENAI_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY` |
+| Keyword research | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` |
+| WordPress / Google credentials encryption | `INTEGRATION_ENCRYPTION_KEY` |
+| Google Search Console / GA4 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
+| File storage | `STORAGE_DRIVER=s3` + `S3_*` (default: local `STORAGE_DIR`) |
+| Applicant file malware scanning | `CLAMAV_HOST`, `CLAMAV_PORT` (files stay undownloadable until scanned clean) |
+
+Credit costs, credit packs, the default plan, sign-up credits, maintenance mode, the sign-up gate, admin MFA and staff alert recipients are set in **Super Admin → Settings**.
 
 ## Checks
 
@@ -71,7 +90,7 @@ npm run test:db     # integration tests; rebuilds the database named in TEST_DAT
 npm run build       # api + web
 ```
 
-The integration suite covers onboarding, cross-tenant denial, RBAC anti-escalation, membership gating, append-only tables, ledger idempotency and reconciliation, and the job-application gate. It also exercises the full HTTP stack with real JWKS-signed tokens.
+The integration suite covers onboarding, cross-tenant denial, RBAC anti-escalation, membership gating, append-only tables, ledger idempotency and reconciliation, audits against a local test site, invitations, Stripe webhooks, uploads, reports, maintenance mode, admin MFA, the sign-up gate and session revocation. It exercises the full HTTP stack with real JWKS-signed tokens.
 
 ## Schema changes
 

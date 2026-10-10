@@ -1,123 +1,41 @@
 # Build roadmap
 
-Plan for taking AmpliVerify from today's state (every screen routed, schema complete,
-foundation APIs live) to a working product. Status per screen is in
-[SCREENS.md](./SCREENS.md); inputs in [INPUTS.md](./INPUTS.md).
+Status of the product build. Per-screen detail is in [SCREENS.md](./SCREENS.md),
+routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 
 ## Where things stand
 
-| Layer | Done | Missing |
+| Layer | Done | Remaining |
 |---|---|---|
-| Schema (`apps/api/prisma`) | 110 models from the database guide, migrations, integrity constraints | Gaps listed in INPUTS.md (workspace timezone/language, featured plan flag, contact/support tickets, videos/events/case studies, credit packs, privacy preferences) |
-| API (`apps/api/src`) | Auth sync + JWKS, users, orgs/workspaces, projects, RBAC, audit log, public content, admin read endpoints | Every write path below, plus jobs, billing and external providers |
-| Web (`apps/web`) | All public, user-app and admin routes from the designs; sign-in via Better Auth | Screens marked "Empty states" / "disabled" in SCREENS.md wait on the APIs below |
-| Infra | Postgres via docker-compose | Redis + BullMQ workers, object storage, email provider, payment provider, CI, deployment |
-
-## Principles
-
-- One batch = schema check → API module + tests → wire the existing screen → update SCREENS.md.
-- No simulated data. A screen goes "Live" only when its API exists.
-- Every write is permission-checked server-side and writes an audit event.
-- Credit-consuming actions go through the credit ledger before calling any paid provider.
+| Schema (`apps/api/prisma`) | Models from the database guide plus the INPUTS gaps (workspace timezone/language, featured plan, contact/support tickets, videos/events/case studies, credit packs, privacy), migrations, integrity constraints | — |
+| API (`apps/api/src`) | All modules below, unit + DB integration tests | Load testing |
+| Web (`apps/web`) | Every public, user-app and admin screen wired to the API | Visual QA against each design at all breakpoints |
+| Infra | Postgres (docker), Postgres-backed job queue with worker in the API process, local/S3 storage, Resend email, Stripe, ClamAV | CI pipeline, production deployment, backups, monitoring/alerting |
 
 ## Batches
 
-### Batch A — Platform infrastructure (prerequisite for everything)
+| Batch | Status | Notes |
+|---|---|---|
+| A — Platform infrastructure | Done | Job queue on `background_jobs` (`FOR UPDATE SKIP LOCKED`, retries, periodic jobs; `JOBS_WORKER=off` to disable) instead of Redis/BullMQ; S3-compatible storage (`STORAGE_DRIVER=s3`) with local fallback; Resend email |
+| B — Credits, entitlements, billing | Done | Append-only credit ledger, charges/refunds, entitlement resolver (plan + overrides + default plan), Stripe checkout/portal/cancel/webhooks, credit packs, two-person credit adjustments |
+| C — Workspace, account, settings | Done | Members/invitations/roles, MFA (TOTP), passkeys, sessions, notification preferences + feed, project defaults, data export and retention, AI & GEO preferences |
+| D — SEO audit engine | Done | Crawler (SSRF-safe, robots.txt), rule catalogue from the SEO Audit Guide, scoring, scheduled audits |
+| E — Optimization & verification | Done | Tasks from findings, statuses, assignment, verification re-checks |
+| F — Editor & CMS publishing | Done | Versioned documents, page import, live scoring, Claude suggestions, WordPress publish (encrypted credentials) |
+| G — Keyword research | Done | DataForSEO explorer/related/questions/competitors/SERP, lists, saved keywords, clusters |
+| H — Content strategy | Done | AI ideas and briefs, plans, clusters, optimized content, brief → editor |
+| I — AI Search (GEO) | Done | Prompts, schedules, checks on ChatGPT/Claude/Gemini/Perplexity, mentions, citations, competitors, snapshots, opportunities |
+| J — Reports | Done | HTML/PDF/CSV generation, schedules, share links |
+| K — Admin CMS & careers | Done | Blog/guides/help/case studies, categories, authors, media, videos, events; jobs, applications with scanned uploads; contact and support inbox |
+| L — Admin operations | Done | Module controls, feature flags with rules, platform settings that take effect (maintenance mode, sign-up gate, admin MFA, passkeys, invitation expiry, workspace defaults, staff alerts), usage & costs, system health, incidents, admin search, sessions/devices |
+| M — Launch hardening | Open | CI (typecheck, tests, build), deployment (web, API + worker, Postgres, storage), backups, monitoring and alerting, CSP review, load tests for crawler and GEO checks, legal text approval |
 
-- Redis + BullMQ worker app (`apps/worker`) sharing the Prisma client.
-- S3-compatible storage service (extend `storage/`) with private buckets and signed URLs.
-- Email provider (Amazon SES or Resend) in `apps/web/src/lib/auth-email.ts` and an API notifications sender.
-- CI: lint, typecheck, unit + DB tests for `apps/api` and `apps/web` build.
-- Done when: verification/reset emails send; a test job runs on the worker; files upload and download through signed URLs.
+## Decisions taken
 
-### Batch B — Credits, entitlements, billing
+1. Payments: Stripe. 2. Email: Resend. 3. Keyword/SERP data: DataForSEO. 4. GEO platforms: ChatGPT (OpenAI Responses + web search), Claude (web search), Gemini (Google Search grounding), Perplexity (Sonar); editor/content AI: Claude. 5. Credit costs, packs, default plan and sign-up credits are set by admins in Settings → Credits & Billing (no hard-coded prices).
 
-- Credit wallet + append-only ledger service; usage events; reservations and reversals.
-- Entitlement resolver (plan entitlements + workspace overrides) used as a guard by every module.
-- Payment provider (Stripe recommended): checkout, customer portal, webhooks → subscriptions, invoices, credit purchases.
-- Screens: `/app/usage`, `/app/usage/history`, `/app/billing*`, `/app/settings/billing`, Add Credits dialog; admin subscriptions, billing/invoices, credits & adjustments, plan editor save.
-- Unlocks the Plan Restricted / Low Credits page states.
+## Decisions still needed
 
-### Batch C — Workspace, account, settings writes
-
-- Members and invitations, role changes, workspace settings (add timezone/language columns).
-- Account security (password change, sessions/devices, MFA via Better Auth plugins).
-- Notification preferences + in-app notifications feed.
-- Project defaults, Data & Privacy (export requests, retention; new tables per INPUTS gaps), AI & GEO preferences API.
-- Screens: all `/app/settings/*`, `/app/notifications`.
-
-### Batch D — SEO audit engine (core product)
-
-- Crawler worker (fetch, robots.txt, sitemap, rate limits, page snapshots).
-- Issue catalogue from `AmpliVerify_SEO_Audit_Guide.pdf` → `seo_issues` seed; check implementations → issue instances.
-- Audit runs (QUEUED → RUNNING → COMPLETED/FAILED/CANCELED), scores, per-page results.
-- Screens: `/app/audit`, project overview module data, dashboard metrics.
-
-### Batch E — Optimization Center and verification loop
-
-- Recommendations generated from audit findings; task states; actions history (before/after).
-- Re-audit + verification runs comparing previous condition.
-- Screens: `/app/optimize`, audit/optimize `[id]` detail pages.
-
-### Batch F — On-Page SEO Editor and CMS publishing
-
-- Pages API, editor documents and versions, AI suggestions (Claude API) metered through credits.
-- WordPress connector (application passwords / OAuth), encrypted credentials, publish + sync.
-- Screens: `/app/editor`, `/app/editor/[id]`, `/app/integrations/cms`, Publish Connector.
-
-### Batch G — Keyword research
-
-- Provider abstraction (e.g. DataForSEO) with normalized snapshots and caching.
-- Explorer, related, questions, competitor keywords, SERP analysis; lists, saved keywords, clusters.
-- Screens: all `/app/keywords/*`.
-
-### Batch H — Content strategy
-
-- Topic ideas, clusters, content plan, briefs, optimized content, linked to keywords and editor.
-- Screens: `/app/content/*`.
-
-### Batch I — AI Search (GEO)
-
-- Prompts, schedules, runs per platform (OpenAI, Gemini, Perplexity, Claude…), mentions, citations, sources, competitors, visibility snapshots, opportunities.
-- Rules adopted from planning: "last checked" separate from reporting range; no trends before two checks; opportunities must be actionable.
-- Screens: `/app/geo/*`, prompt detail.
-
-### Batch J — Reports
-
-- Report generation worker (PDF/HTML), versions, schedules, share tokens.
-- Screens: `/app/reports*`, `/app/projects/[id]/reports`.
-
-### Batch K — Admin CMS and careers
-
-- Admin CRUD for blog/guides/help/resources, categories, authors, media library (uses storage), videos/events/case studies (new tables).
-- Job openings editor save/publish; public job applications with résumé upload, validation and malware scanning.
-- Contact form and support tickets (new tables).
-- Screens: `/admin/{content,blog,resources,careers,media,categories,authors,videos,events,case-studies}`, `/careers/[slug]`, `/contact`, `/app/help`.
-
-### Batch L — Admin operations
-
-- Feature flag and module control writes, platform settings, security settings, appearance.
-- Usage & costs (provider cost records), system health (job/queue/provider checks), admin search.
-- Screens: remaining admin read-only/empty screens.
-
-### Batch M — Launch hardening
-
-- Rate limiting, CSP, CSRF review, secrets management, backups, monitoring/alerting.
-- Load test the crawler and GEO workers; security review; legal text approval.
-- Production deployment (web, API, worker, Postgres, Redis, storage).
-
-## Suggested order
-
-A → B → C → D → E → G → I → F → H → J → K → L → M
-
-D, E, G and I are the product; B must precede them because they consume credits.
-K can run in parallel with D–J if a second developer is available.
-
-## Decisions needed before starting
-
-1. Payment provider (Stripe assumed).
-2. Email provider (SES or Resend).
-3. Keyword/SERP data provider and budget.
-4. AI platforms to monitor for GEO, and which model powers editor suggestions.
-5. Hosting target (e.g. Vercel + Fly/Render, or AWS).
-6. Credit cost per action (planning mentions a "1000 credits" definition).
+1. Hosting target (e.g. Vercel + Fly/Render, or AWS).
+2. Approved legal text (privacy, terms, cookies).
+3. Production values for credit costs and packs.

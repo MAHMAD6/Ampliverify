@@ -100,16 +100,9 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 ## Not yet supplied / known gaps
 
 - Admin batch 4 (see #7).
-- User-app screens still without a design: the page-map sub-pages (Keyword Overview/Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices) and the `[id]` detail pages for audit, optimize and editor.
-- Auth emails (verification, password reset) need an email provider (`apps/web/src/lib/auth-email.ts`); none has been chosen.
-- Job applications (#85) need a public submit endpoint with résumé upload, validation and malware scanning before the form can be enabled.
-- Settings → Data & Privacy (#12, #16) needs storage the guide does not define: data-export requests, per-workspace retention and public-share settings, and per-user privacy preferences (product usage data, product communications).
-- The user-app nav (#17) adds an **Optimization Center**. It is backed by `optimization_tasks` / `verification_runs`; no new tables are needed.
-- The public Contact page and the user Help & Support page imply contact-form and support-ticket storage. The database guide defines neither, so no tables exist for them yet.
-- The admin Content Management redesign (#50) adds videos, webinars/events and case studies, and the Add Credits modal (#47) implies purchasable credit packs. The guide defines no tables for any of these; the screens show empty states until they are modelled.
-- The Integrations catalog (#48) mentions a marketplace; no marketplace data exists.
-- Schema gaps from this batch:
-  - Workspaces have no default timezone or language (#54).
-  - Plans have no "featured" / "Most Popular" flag (#55), so no plan is highlighted.
-  - There is no hard-delete workflow for projects; the Dashboard delete confirmation (#60) offers Archive instead.
-- No API yet for AI & GEO preferences (#64), so the form cannot be saved.
+- User-app pages without a dedicated design (page-map sub-pages such as Keyword Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices; editor and brief detail pages) follow the nearest supplied design.
+- Approved legal text (privacy, terms, cookies) has not been supplied; `/legal` shows the section structure.
+- The Integrations catalog (#48) mentions a marketplace and lists Webflow, Shopify and a custom API connector; only WordPress and Google (Search Console, GA4) connectors exist, the others are shown as "Coming soon".
+- There is no hard-delete workflow for projects; delete confirmations offer Archive instead (the API archives, never deletes).
+
+Resolved since earlier batches (schema and API added): workspace timezone/language (#54), featured plan flag (#55), contact submissions and support tickets, videos/events/case studies (#50), credit packs (#47), Data & Privacy storage (#12, #16), AI & GEO preferences (#64), job applications with scanned uploads (#85), auth email delivery (Resend).
