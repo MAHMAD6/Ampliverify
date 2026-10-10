@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import { Body, Controller, Get, HttpException, HttpStatus, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { PlatformService } from '../platform/platform.service';
 import { TicketStatus } from '@prisma/client';
@@ -48,6 +49,7 @@ export class SupportController {
   ) {}
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('public/contact')
   async contact(@Body() dto: ContactDto, @Req() req: Request) {
     // Bots fill the hidden field; accept silently without storing.

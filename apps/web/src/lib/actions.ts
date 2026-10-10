@@ -7,6 +7,13 @@ export type ActionResult<T = unknown> = { ok: true; data: T } | { ok: false; mes
 
 const ALLOWED_PREFIXES = ['/user/', '/admin/'];
 
+/** Only plain user/admin API paths: no traversal (incl. encoded), backslashes, whitespace or schemes. */
+function allowedPath(path: string) {
+  if (!ALLOWED_PREFIXES.some((p) => path.startsWith(p))) return false;
+  const pathname = path.split('?')[0];
+  return !/\.\.|%2e|%2f|%5c|\\|\s|:\/\//i.test(pathname);
+}
+
 /**
  * Generic authenticated API call for client components. The browser can only
  * reach the user/admin API with the signed-in user's own token, and the API
@@ -18,7 +25,7 @@ export async function apiAction<T = unknown>(
   body?: unknown,
   revalidate: string[] = [],
 ): Promise<ActionResult<T>> {
-  if (!ALLOWED_PREFIXES.some((p) => path.startsWith(p)) || path.includes('..')) {
+  if (!allowedPath(path)) {
     return { ok: false, message: 'Not allowed.' };
   }
   const result = await apiSend<T>(method, path, body);
@@ -29,7 +36,7 @@ export async function apiAction<T = unknown>(
 
 /** Multipart upload to an allowed admin/user endpoint. */
 export async function uploadAction<T = unknown>(path: string, form: FormData, revalidate: string[] = []): Promise<ActionResult<T>> {
-  if (!ALLOWED_PREFIXES.some((p) => path.startsWith(p)) || path.includes('..')) return { ok: false, message: 'Not allowed.' };
+  if (!allowedPath(path)) return { ok: false, message: 'Not allowed.' };
   const result = await apiForm<T>(path, form);
   if (!result.ok) return { ok: false, message: result.message ?? defaultMessage(result.reason), code: result.code };
   for (const p of revalidate) if (p.startsWith('/app') || p.startsWith('/admin')) revalidatePath(p, 'layout');
@@ -55,7 +62,7 @@ function defaultMessage(reason: string) {
 
 /** Authenticated GET for client components (search-as-you-type, pickers). */
 export async function apiQuery<T = unknown>(path: string): Promise<ActionResult<T>> {
-  if (!ALLOWED_PREFIXES.some((p) => path.startsWith(p)) || path.includes('..')) return { ok: false, message: 'Not allowed.' };
+  if (!allowedPath(path)) return { ok: false, message: 'Not allowed.' };
   const { apiGet } = await import('./api');
   const result = await apiGet<T>(path, { auth: true });
   if (!result.ok) return { ok: false, message: defaultMessage(result.reason) };

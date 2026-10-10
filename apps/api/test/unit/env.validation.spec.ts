@@ -21,3 +21,19 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...valid, AUTH_SYNC_SECRET: 'too-short' })).toThrow('at least 32');
   });
 });
+
+describe('validateEnv production guards', () => {
+  const base = { DATABASE_URL: 'postgres://x', BETTER_AUTH_JWKS_URL: 'http://web/jwks', BETTER_AUTH_ISSUER: 'i', BETTER_AUTH_AUDIENCE: 'a', AUTH_SYNC_SECRET: 's'.repeat(32) };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { validateEnv } = require('../../src/config/env.validation') as typeof import('../../src/config/env.validation');
+
+  it('refuses development-only switches in production', () => {
+    expect(() => validateEnv({ ...base, NODE_ENV: 'production', AUDIT_ALLOW_PRIVATE_HOSTS: 'true' })).toThrow(/AUDIT_ALLOW_PRIVATE_HOSTS/);
+    expect(() => validateEnv({ ...base, NODE_ENV: 'production', EMAIL_LOG_ONLY: 'true' })).toThrow(/EMAIL_LOG_ONLY/);
+    expect(() => validateEnv({ ...base, NODE_ENV: 'development', AUDIT_ALLOW_PRIVATE_HOSTS: 'true' })).not.toThrow();
+  });
+
+  it('requires a long integration encryption key when set', () => {
+    expect(() => validateEnv({ ...base, INTEGRATION_ENCRYPTION_KEY: 'short' })).toThrow(/INTEGRATION_ENCRYPTION_KEY/);
+  });
+});

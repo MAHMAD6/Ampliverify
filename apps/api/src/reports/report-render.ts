@@ -94,7 +94,8 @@ export function renderPdf(doc: ReportDoc): Promise<Buffer> {
 }
 
 export function renderCsv(sections: SectionPayload[]) {
-  const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  // Quote every cell and neutralize spreadsheet formulas (CSV injection).
+  const cell = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
   const lines: string[] = [];
   for (const s of sections) {
     if (!s.table?.rows.length) continue;

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Lightbulb } from 'lucide-react';
+import { ButtonLink } from '@/components/ui';
 import { ActionButton } from '@/components/ui/actions';
 import { AutoSubmitSelect } from '@/components/ui/AutoSubmitSelect';
 import { StateView } from '@/components/ui/StateView';
@@ -12,6 +13,41 @@ import s from '@/components/app/geo/geo.module.css';
 export const metadata = { title: 'Opportunities · AI Search (GEO)' };
 
 const STATUSES = ['OPEN', 'IN_PROGRESS', 'DONE', 'DISMISSED'] as const;
+
+/**
+ * Every opportunity leads somewhere concrete (planning rule): content gaps
+ * open a brief for the prompt, citation gaps go to the page audit and the
+ * editor, and outreach targets link to the cited site.
+ */
+function OpportunityAction({ o, projectId }: { o: GeoOpportunity; projectId: string }) {
+  if (o.type === 'SOURCE_OUTREACH' && o.domain)
+    return (
+      <a href={`https://${o.domain}`} target="_blank" rel="noopener noreferrer nofollow" style={{ color: 'var(--blue)', fontWeight: 600, fontSize: 13, alignSelf: 'center' }}>
+        Visit {o.domain}
+      </a>
+    );
+  if (o.type === 'NOT_CITED')
+    return (
+      <>
+        <ButtonLink size="sm" variant="primary" href="/app/audit">
+          Audit the page
+        </ButtonLink>
+        <ButtonLink size="sm" variant="outline" href="/app/editor">
+          Open Editor
+        </ButtonLink>
+      </>
+    );
+  const title = (o.prompt ?? '').trim();
+  return title.length >= 3 ? (
+    <ActionButton size="sm" path={`/user/projects/${projectId}/content/briefs`} body={{ title: title.slice(0, 300) }} redirectTo="/app/content/briefs/{id}">
+      Create Content Brief
+    </ActionButton>
+  ) : (
+    <ButtonLink size="sm" href="/app/content/ideas">
+      Plan Content
+    </ButtonLink>
+  );
+}
 const PRIORITY: Record<number, string> = { 1: 'High', 2: 'Medium', 3: 'Low' };
 
 /** Visibility opportunities generated from the latest checks (`geo_opportunities`). */
@@ -53,6 +89,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
           PRIORITY[o.priority] ?? o.priority,
           formatDate(o.createdAt),
           <span key="a" className={s.rowActions}>
+            {project && <OpportunityAction o={o} projectId={project.id} />}
             {o.status === 'OPEN' && move(o, 'IN_PROGRESS', 'Start', 'outline')}
             {o.status !== 'DONE' && move(o, 'DONE', 'Mark Done')}
             {o.status !== 'DISMISSED' && o.status !== 'DONE' && move(o, 'DISMISSED', 'Dismiss')}

@@ -51,3 +51,5 @@
 .trendWrap h3 { font-size: 15px; margin-bottom: 8px; }
 .inlineForm { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto; gap: 12px; align-items: end; }
 @media (max-width: 640px) { .inlineForm { grid-template-columns: minmax(0, 1fr); } }
+.checked { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+.checked b { color: var(--heading); font-weight: 600; }

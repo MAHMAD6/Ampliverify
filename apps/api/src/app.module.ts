@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { PlatformModule } from './platform/platform.module';
+import { RetentionModule } from './retention/retention.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
 import { PlatformGuard } from './platform/platform.guard';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
@@ -65,9 +68,16 @@ import { InsightsModule } from './insights/insights.module';
     CmsModule,
     InsightsModule,
     PlatformModule,
+    RetentionModule,
+    // Per-user (or per-IP when anonymous) request budget; see RateLimitGuard.
+    ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MINUTE ?? 600) }] }),
   ],
   controllers: [HealthController],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwksAuthGuard,

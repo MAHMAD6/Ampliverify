@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { Archive, MoreHorizontal, Pause, Play, Settings, Trash2, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { setProjectStatus } from '@/app/app/projects/actions';
+import { apiAction } from '@/lib/actions';
 import { ButtonLink, Button } from '@/components/ui';
 import type { Project } from '@/lib/types';
 import s from './projects.module.css';
 
-/** What a permanent delete would remove (shown in the confirmation). */
+/** What deleting removes (shown in the confirmation). */
 const DELETE_SCOPE = [
   'Project settings and domain configuration',
   'SEO audits and analysis results',
@@ -23,6 +25,15 @@ export function ProjectRowActions({ project, openLabel = 'Open Project' }: { pro
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [confirmName, setConfirmName] = useState('');
+  const remove = () =>
+    start(async () => {
+      const result = await apiAction('DELETE', `/user/projects/${project.id}`, undefined, ['/app/projects', '/app/dashboard']);
+      if (!result.ok) return setError(result.message);
+      dialog.current?.close();
+      router.refresh();
+    });
 
   useEffect(() => {
     const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
@@ -99,8 +110,12 @@ export function ProjectRowActions({ project, openLabel = 'Open Project' }: { pro
           ))}
         </ul>
         <p className={s.confirmNote}>
-          Permanent deletion is not available yet. You can archive the project instead: it stops all activity and can be restored later.
+          The project disappears for everyone immediately and is permanently purged with all its files after 30 days. Archiving instead stops all activity and can be undone.
         </p>
+        <label style={{ display: 'grid', gap: 6, fontSize: 14, margin: '0 20px 12px' }}>
+          Type <b>{project.name}</b> to confirm
+          <input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} aria-label="Project name" style={{ padding: '8px 10px', border: '1px solid var(--line-strong)', borderRadius: 8 }} />
+        </label>
         <div className={s.confirmActions}>
           <Button variant="secondary" onClick={() => dialog.current?.close()}>
             Cancel
@@ -117,8 +132,8 @@ export function ProjectRowActions({ project, openLabel = 'Open Project' }: { pro
               Archive Instead
             </Button>
           )}
-          <Button className={s.deleteBtn} disabled>
-            Delete Project
+          <Button className={s.deleteBtn} disabled={pending || confirmName.trim() !== project.name.trim()} onClick={remove}>
+            {pending ? 'Deleting…' : 'Delete Project'}
           </Button>
         </div>
       </dialog>

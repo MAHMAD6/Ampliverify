@@ -105,7 +105,9 @@ function readFilters(form: HTMLFormElement): Filters {
 
 function toCsv(rows: KeywordIdea[]) {
   const head = 'keyword,intent,volume,difficulty,cpc';
-  return [head, ...rows.map((r) => [JSON.stringify(r.keyword), r.intent ?? '', r.volume ?? '', r.difficulty ?? '', r.cpc ?? ''].join(','))].join('\n');
+  // Quote text and neutralize spreadsheet formulas (CSV injection).
+  const cell = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
+  return [head, ...rows.map((r) => [cell(r.keyword), r.intent ?? '', r.volume ?? '', r.difficulty ?? '', r.cpc ?? ''].join(','))].join('\n');
 }
 
 /**

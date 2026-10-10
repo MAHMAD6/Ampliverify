@@ -38,6 +38,24 @@ export const authOptions = {
   baseURL,
   secret: process.env.BETTER_AUTH_SECRET,
   database: authPool,
+  // Brute-force protection on every auth endpoint, stricter on credential and
+  // email-sending routes. Counters live in the auth database so they hold
+  // across server instances and restarts.
+  rateLimit: {
+    enabled: true,
+    storage: 'database',
+    window: 60,
+    max: 100,
+    customRules: {
+      '/sign-in/email': { window: 60, max: 5 },
+      '/sign-up/email': { window: 60, max: 5 },
+      '/request-password-reset': { window: 300, max: 3 },
+      '/reset-password': { window: 300, max: 5 },
+      '/send-verification-email': { window: 300, max: 3 },
+      '/two-factor/verify-totp': { window: 60, max: 5 },
+      '/two-factor/verify-backup-code': { window: 60, max: 5 },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,

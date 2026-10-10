@@ -8,6 +8,7 @@ import { StateView } from '@/components/ui/StateView';
 import { apiGet, apiList, qs } from '@/lib/api';
 import type { BillingOverview, GeoOverview, GeoPlatformStatus, WorkspaceView } from '@/lib/app-types';
 import { appCrumbs } from '@/lib/nav';
+import { formatDateTime } from '@/lib/format';
 import { getAppContext } from '@/lib/project';
 import { AddPromptDialog } from './AddPromptDialog';
 import s from './geo.module.css';
@@ -100,6 +101,14 @@ export async function GeoShell({ tab, period, children }: { tab: GeoTab; period:
           </>
         }
       />
+      <p className={s.checked}>
+        <span>
+          <b>Last checked:</b> {o?.lastCheckedAt ? formatDateTime(o.lastCheckedAt) : 'Not checked yet'}
+        </span>
+        <span>
+          <b>Reporting range:</b> {PERIODS.find(([v]) => v === period)?.[1] ?? 'Last 30 days'}
+        </span>
+      </p>
       <div className={s.metrics}>
         {metrics.map((m) => (
           <div key={m.label} className={s.metric}>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import DOMPurify from 'dompurify';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
@@ -94,6 +95,8 @@ const QUICK: { label: string; focus?: string; instruction?: string; analyze?: bo
 ];
 const SUGGESTION_TABS: Record<string, string[] | null> = { All: null, Content: ['CONTENT', 'STRUCTURE', 'READABILITY'], SEO: ['KEYWORD', 'METADATA', 'LINK', 'TECHNICAL'] };
 const AI_OFF = 'AI suggestions are not configured on this server yet.';
+/** AI output and imported pages are untrusted: allow formatting markup only. */
+const clean = (html: string) => DOMPurify.sanitize(html, { USE_PROFILES: { html: true }, FORBID_TAGS: ['style', 'form', 'input', 'button', 'iframe', 'object', 'embed', 'svg', 'math'], FORBID_ATTR: ['style'] });
 
 const metaOf = (c: Content | null, doc: EditorDoc): Meta => ({ title: c?.title ?? doc.title, metaDescription: c?.metaDescription ?? '', slug: c?.slug ?? '', focusKeyword: c?.focusKeyword ?? '' });
 const payload = (sections: Section[], meta: Meta): Content => ({
@@ -692,7 +695,7 @@ export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; p
           {mode === 'html' ? (
             <pre className={e.html} aria-label="Generated HTML">{html}</pre>
           ) : preview ? (
-            <div className={e.preview} dangerouslySetInnerHTML={{ __html: html }} />
+            <div className={e.preview} dangerouslySetInnerHTML={{ __html: clean(html) }} />
           ) : (
             <div className={e.canvas}>
               {sections.map((s) => (
@@ -831,7 +834,7 @@ export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; p
                     <small>{s.type.toLowerCase()}</small>
                     <p>{s.explanation}</p>
                     {s.original && <del>{s.original}</del>}
-                    <ins dangerouslySetInnerHTML={{ __html: s.replacement }} />
+                    <ins dangerouslySetInnerHTML={{ __html: clean(s.replacement) }} />
                     <span style={{ display: 'flex', gap: 6 }}>
                       <Button size="sm" onClick={() => decide(s, 'ACCEPTED')} disabled={!!busy}>
                         Accept

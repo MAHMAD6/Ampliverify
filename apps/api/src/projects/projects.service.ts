@@ -154,7 +154,7 @@ export class ProjectsService {
 
   /**
    * Resolves a live project and asserts `permissionKey` on its scope. Used by
-   * every project-scoped module (audits, keywords, GEO, reports…).
+   * every project-scoped module (audits, keywords, GEO, reports, ...).
    */
   async requireProject(userId: string, projectId: string, permissionKey: string) {
     const project = await this.getOrThrow(projectId);

@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import { Body, Controller, Delete, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UploadedFile, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { Type } from 'class-transformer';
@@ -316,6 +317,7 @@ export class CmsController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('public/careers/:slug/apply')
   @UseInterceptors(FileFieldsInterceptor([{ name: 'resume', maxCount: 1 }, { name: 'coverLetter', maxCount: 1 }], uploadLimits))
   apply(@Param('slug') slug: string, @Body() dto: ApplyDto, @UploadedFiles() files: { resume?: MulterFile[]; coverLetter?: MulterFile[] }, @Req() req: Request) {

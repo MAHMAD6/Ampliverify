@@ -17,5 +17,11 @@
     "db:deploy": "npm run db:deploy --workspace apps/api",
     "dev:api": "npm run start:dev --workspace apps/api",
     "dev:web": "npm run dev --workspace apps/web"
+  },
+  "overrides": {
+    "deepmerge-ts": "$deepmerge-ts"
+  },
+  "devDependencies": {
+    "deepmerge-ts": "^8.0.2"
   }
 }

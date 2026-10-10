@@ -38,6 +38,7 @@ export async function startApp(env: Record<string, string> = {}) {
     BETTER_AUTH_AUDIENCE: AUDIENCE,
     AUTH_SYNC_SECRET: SYNC_SECRET,
     JOBS_WORKER: 'off',
+    RATE_LIMIT_PER_MINUTE: '100000',
     AUDIT_ALLOW_PRIVATE_HOSTS: 'true',
     EMAIL_LOG_ONLY: 'true',
     ...env,
