@@ -19,6 +19,11 @@ class SettingsDto {
 export class InsightsController {
   constructor(private readonly insights: InsightsService) {}
 
+  @Get('onboarding')
+  onboarding(@CurrentActor() a: AuthenticatedActor) {
+    return this.insights.onboarding(a.userId);
+  }
+
   @Get('dashboard')
   dashboard(@CurrentActor() a: AuthenticatedActor) {
     return this.insights.dashboard(a.userId);

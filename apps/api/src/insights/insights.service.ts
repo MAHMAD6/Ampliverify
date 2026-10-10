@@ -177,6 +177,22 @@ export class InsightsService implements OnModuleInit {
   }
 
   /** Dashboard rows for all accessible projects. */
+  /** Getting Started checklist: which core workflow steps the user's accessible projects have completed. */
+  async onboarding(actorId: string) {
+    const projects = await this.projects.listAccessible(actorId);
+    const ids = projects.map((p) => p.id);
+    if (!ids.length) return { projects: 0, pages: 0, audits: 0, tasksStarted: 0, editorDocuments: 0, reports: 0 };
+    const where = { projectId: { in: ids } };
+    const [pages, audits, tasksStarted, editorDocuments, reports] = await Promise.all([
+      this.prisma.page.count({ where: { domain: { projectId: { in: ids } } } }),
+      this.prisma.auditRun.count({ where: { ...where, status: 'SUCCEEDED' } }),
+      this.prisma.optimizationTask.count({ where: { ...where, status: { in: ['IN_PROGRESS', 'DONE'] } } }),
+      this.prisma.editorDocument.count({ where }),
+      this.prisma.report.count({ where: { ...where, status: 'SUCCEEDED' } }),
+    ]);
+    return { projects: ids.length, pages, audits, tasksStarted, editorDocuments, reports };
+  }
+
   async dashboard(actorId: string) {
     const projects = await this.projects.listAccessible(actorId);
     const ids = projects.map((p) => p.id);

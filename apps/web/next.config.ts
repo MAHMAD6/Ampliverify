@@ -10,6 +10,11 @@ const RENAMED: [string, string][] = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  experimental: {
+    // The persistent Turbopack dev cache intermittently dropped the
+    // /api/auth/[...all] route after restarts (404s); rebuild it each start.
+    turbopackFileSystemCacheForDev: false,
+  },
   async redirects() {
     return [
       ...RENAMED.flatMap(([from, to]) => [
