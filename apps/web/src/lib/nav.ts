@@ -63,8 +63,8 @@ export function appCrumbs(...trail: { label: string; href?: string }[]) {
 
 /**
  * Super Admin navigation: collapsible groups from the admin redesign (chat
- * images 2026-10-06; docs/INPUTS.md). Older content items (categories,
- * authors, videos, events, case studies) remain routable but are not listed.
+ * images 2026-10-06; docs/INPUTS.md), plus the content types added by the
+ * Content Management redesign (#50) and the support inbox.
  */
 export type AdminNavGroup = { key: string; label: string; href?: string; items?: { key: string; label: string; href: string }[] };
 
@@ -89,8 +89,23 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { key: 'content', label: 'Content Overview', href: '/admin/content' },
       { key: 'blog', label: 'Blog Posts', href: '/admin/blog' },
       { key: 'resources', label: 'Resources', href: '/admin/resources' },
+      { key: 'help', label: 'Help Articles', href: '/admin/help' },
+      { key: 'case-studies', label: 'Case Studies', href: '/admin/case-studies' },
+      { key: 'videos', label: 'Videos', href: '/admin/videos' },
+      { key: 'events', label: 'Webinars & Events', href: '/admin/events' },
+      { key: 'categories', label: 'Categories & Tags', href: '/admin/categories' },
+      { key: 'authors', label: 'Authors', href: '/admin/authors' },
       { key: 'media', label: 'Media Library', href: '/admin/media' },
       { key: 'careers', label: 'Careers / Job Openings', href: '/admin/careers' },
+      { key: 'applications', label: 'Applications', href: '/admin/careers/applications' },
+    ],
+  },
+  {
+    key: 'support-group',
+    label: 'Support',
+    items: [
+      { key: 'support', label: 'Support Requests', href: '/admin/support' },
+      { key: 'contact', label: 'Contact Messages', href: '/admin/support/contact' },
     ],
   },
   {
@@ -122,6 +137,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'Settings',
     items: [
       { key: 'settings', label: 'General', href: '/admin/settings' },
+      { key: 'settings-billing', label: 'Credits & Billing', href: '/admin/settings/billing' },
       { key: 'settings-notifications', label: 'Notifications', href: '/admin/settings/notifications' },
       { key: 'settings-security', label: 'Security', href: '/admin/settings/security' },
       { key: 'settings-appearance', label: 'Appearance', href: '/admin/settings/appearance' },

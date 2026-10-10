@@ -91,3 +91,6 @@ export async function adminGet<T>(path: string) {
 
 export const SUB_TONE = { ACTIVE: 'green', TRIALING: 'blue', PAST_DUE: 'red', CANCELED: 'slate', INCOMPLETE: 'amber' } as const;
 export const INVOICE_TONE = { PAID: 'green', OPEN: 'amber', DRAFT: 'slate', VOID: 'slate', UNCOLLECTIBLE: 'red' } as const;
+
+export const TICKET_TONE: Record<string, 'blue' | 'amber' | 'green' | 'slate' | 'red'> = { OPEN: 'blue', IN_PROGRESS: 'amber', WAITING_ON_CUSTOMER: 'amber', RESOLVED: 'green', CLOSED: 'slate' };
+export const ticketLabel = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');

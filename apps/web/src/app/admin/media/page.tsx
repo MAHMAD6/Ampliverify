@@ -1,108 +1,103 @@
 import Link from 'next/link';
-import { FileText, ImageIcon, LayoutGrid, Link2, List, Plus, RefreshCw, Download, Search, Trash2, Upload } from 'lucide-react';
-import { Button, Input, Select } from '@/components/ui';
+import { ImageIcon, Search } from 'lucide-react';
+import { EmptyState, Field, Input, Panel } from '@/components/ui';
+import { ActionButton, ApiForm, UploadForm } from '@/components/ui/actions';
 import { AdminHeader } from '@/components/admin/AdminParts';
+import { adminGet, dateTime, matchesQ } from '@/lib/admin-data';
 import s from '@/components/admin/media.module.css';
 
 export const metadata = { title: 'Media Library' };
 
-const TABS = [
-  ['all', 'All Media'],
-  ['images', 'Images'],
-  ['videos', 'Videos'],
-  ['documents', 'Documents'],
-] as const;
+type Asset = { id: string; mimeType: string; sizeBytes: string; altText: string | null; createdAt: string; uploader: { displayName: string | null; email: string }; _count: { blogPosts: number } };
+
+const kb = (b: string) => `${Math.max(1, Math.round(Number(b) / 1024)).toLocaleString('en-US')} KB`;
 
 /**
- * Media Library (chat design 2026-10-06). Assets live in `media_assets` with
- * storage keys; there is no admin media API or upload pipeline (validation,
- * scanning, storage) yet, so upload and file actions are disabled.
+ * Media Library (chat design 2026-10-06). Images are validated by content
+ * (PNG, JPEG, GIF, WebP; 10 MB), stored privately and served at /media/:id.
+ * An image used as a featured image cannot be deleted.
  */
-export default async function MediaLibraryPage({ searchParams }: { searchParams: Promise<{ tab?: string; view?: string }> }) {
-  const { tab = 'all', view = 'grid' } = await searchParams;
+export default async function MediaLibraryPage({ searchParams }: { searchParams: Promise<{ q?: string; id?: string }> }) {
+  const { q, id } = await searchParams;
+  const assets = await adminGet<Asset[]>('/admin/media');
+  const list = (assets ?? []).filter((a) => matchesQ(q, a.altText, a.id));
+  const selected = list.find((a) => a.id === id) ?? list[0] ?? null;
   return (
     <>
-      <AdminHeader
-        section="Content Management"
-        title="Media Library"
-        description="Upload, organize, and manage images, videos, and documents for your content."
-        actions={
-          <Button icon={<Plus size={18} />} disabled title="Uploads need the media API (storage, validation and scanning).">
-            Upload Media
-          </Button>
-        }
-      />
-      <section className={s.panel}>
-        <nav className={s.tabs} aria-label="Media type">
-          {TABS.map(([k, l]) => (
-            <Link key={k} href={k === 'all' ? '/admin/media' : `/admin/media?tab=${k}`} className={k === tab ? s.on : undefined} aria-current={k === tab ? 'page' : undefined}>
-              {l}
-            </Link>
-          ))}
-        </nav>
-        <div className={s.filters}>
-          <Input icon={<Search size={16} />} placeholder="Search files..." aria-label="Search files" disabled />
-          <Select disabled aria-label="Type">
-            <option>All Types</option>
-          </Select>
-          <Select disabled aria-label="Usage">
-            <option>All Usage</option>
-          </Select>
-          <Select disabled aria-label="Sort">
-            <option>Newest First</option>
-          </Select>
-          <span className={s.views}>
-            <Link href={`/admin/media?${new URLSearchParams({ ...(tab !== 'all' && { tab }), view: 'grid' })}`} aria-label="Grid view" className={view === 'grid' ? s.viewOn : undefined}>
-              <LayoutGrid size={18} />
-            </Link>
-            <Link href={`/admin/media?${new URLSearchParams({ ...(tab !== 'all' && { tab }), view: 'list' })}`} aria-label="List view" className={view === 'list' ? s.viewOn : undefined}>
-              <List size={18} />
-            </Link>
-          </span>
-        </div>
-        <div className={s.body}>
-          <div className={s.drop} aria-disabled="true">
-            <span className={s.dropIcon}>
-              <ImageIcon size={40} />
-            </span>
-            <b>No media files yet</b>
-            <p>Upload images, videos, or documents to use in your blog posts, resources, and other content.</p>
-            <Button icon={<Upload size={18} />} disabled>
-              Upload Media
-            </Button>
-            <span>Or drag and drop files here</span>
-            <small>Supported formats: JPG, PNG, GIF, WebP, MP4, MOV, PDF and more.</small>
+      <AdminHeader section="Content Management" title="Media Library" description="Upload and manage images for blog posts, resources and case studies." />
+      <Panel title="Upload Image" description="PNG, JPEG, GIF or WebP up to 10 MB. Alt text describes the image for search engines and screen readers.">
+        <UploadForm path="/admin/media" submitLabel="Upload">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+            <Field label="Image" htmlFor="m-file">
+              <Input id="m-file" name="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" required />
+            </Field>
+            <Field label="Alt text" htmlFor="m-alt">
+              <Input id="m-alt" name="altText" maxLength={300} placeholder="Describe the image" />
+            </Field>
           </div>
-          <aside className={s.details}>
-            <span className={s.fileIcon}>
-              <FileText size={36} />
-            </span>
-            <b>No file selected</b>
-            <p>Select a file from the library to view details and manage options.</p>
-            <dl>
-              {['File name', 'File type', 'File size', 'Dimensions', 'Uploaded', 'Used in'].map((k) => (
-                <div key={k}>
-                  <dt>{k}</dt>
-                  <dd>—</dd>
-                </div>
+        </UploadForm>
+      </Panel>
+      <section className={s.panel} style={{ marginTop: 16 }}>
+        <form className={s.filters} role="search">
+          <Input name="q" defaultValue={q} icon={<Search size={16} />} placeholder="Search by alt text..." aria-label="Search media" />
+        </form>
+        {!assets ? (
+          <EmptyState icon={<ImageIcon size={28} />} title="Media unavailable" description="Your account cannot manage content, or the API is unavailable." />
+        ) : list.length === 0 ? (
+          <EmptyState icon={<ImageIcon size={28} />} title={assets.length ? 'No matches' : 'No media yet'} description="Uploaded images will appear here." />
+        ) : (
+          <div className={s.body}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, alignContent: 'start' }}>
+              {list.map((a) => (
+                <Link key={a.id} href={`/admin/media?${new URLSearchParams({ ...(q ? { q } : {}), id: a.id })}`} style={{ border: `2px solid ${a.id === selected?.id ? 'var(--blue)' : 'var(--line)'}`, borderRadius: 10, overflow: 'hidden', background: 'var(--surface-alt)' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/media/${a.id}`} alt={a.altText ?? ''} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+                  <small style={{ display: 'block', padding: '6px 8px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.altText || 'No alt text'}</small>
+                </Link>
               ))}
-            </dl>
-            <Button variant="secondary" block disabled icon={<Link2 size={16} />}>
-              Copy URL
-            </Button>
-            <div className={s.actions}>
-              <Button variant="secondary" size="sm" disabled icon={<RefreshCw size={14} />}>
-                Replace
-              </Button>
-              <Button variant="secondary" size="sm" disabled icon={<Download size={14} />}>
-                Download
-              </Button>
-              <Button variant="secondary" size="sm" disabled icon={<Trash2 size={14} />}>
-                Delete
-              </Button>
             </div>
-          </aside>
-        </div>
+            {selected && (
+              <aside className={s.details}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/media/${selected.id}`} alt={selected.altText ?? ''} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                <dl>
+                  <div>
+                    <dt>Type</dt>
+                    <dd>{selected.mimeType}</dd>
+                  </div>
+                  <div>
+                    <dt>Size</dt>
+                    <dd>{kb(selected.sizeBytes)}</dd>
+                  </div>
+                  <div>
+                    <dt>Uploaded</dt>
+                    <dd>{dateTime(selected.createdAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>By</dt>
+                    <dd>{selected.uploader.displayName ?? selected.uploader.email}</dd>
+                  </div>
+                  <div>
+                    <dt>Used by</dt>
+                    <dd>{selected._count.blogPosts} post(s)</dd>
+                  </div>
+                  <div>
+                    <dt>URL</dt>
+                    <dd>
+                      <code>/media/{selected.id}</code>
+                    </dd>
+                  </div>
+                </dl>
+                <ApiForm key={selected.id} method="PATCH" path={`/admin/media/${selected.id}`} submitLabel="Save Alt Text" successMessage="Saved.">
+                  <Input name="altText" data-type="nullable" defaultValue={selected.altText ?? ''} maxLength={300} aria-label="Alt text" />
+                </ApiForm>
+                <ActionButton variant="ghost" method="DELETE" path={`/admin/media/${selected.id}`} confirm="Delete this image permanently?" redirectTo="/admin/media" disabled={selected._count.blogPosts > 0} title={selected._count.blogPosts ? 'Used as a featured image' : undefined}>
+                  Delete
+                </ActionButton>
+              </aside>
+            )}
+          </div>
+        )}
       </section>
     </>
   );

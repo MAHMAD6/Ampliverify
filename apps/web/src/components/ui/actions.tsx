@@ -129,6 +129,7 @@ function readForm(form: HTMLFormElement) {
       } else if (kind === 'bool') value = el.value === 'on' || el.value === 'true';
       else if (kind === 'code') value = el.value.trim() ? el.value.trim().toUpperCase() : null;
       else if (kind === 'date') value = el.value ? new Date(el.value).toISOString() : null;
+      else if (kind === 'utc') value = el.value ? new Date(`${el.value}Z`).toISOString() : null;
       else if (kind === 'nullable') value = el.value.trim() === '' ? null : el.value;
       else if (kind === 'json') {
         try {
@@ -149,7 +150,7 @@ function readForm(form: HTMLFormElement) {
 
 /**
  * Form that submits its fields as JSON to an API path. Field types via
- * `data-type` (number, bool, list, optional-list, date, nullable, code, json,
+ * `data-type` (number, bool, list, optional-list, date, utc, nullable, code, json,
  * optional, array). `wrap` nests the values under a dotted path and `extra`
  * adds fixed fields; both are serializable so server components can use
  * them (`transform` only works from client components).
