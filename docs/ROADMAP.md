@@ -10,7 +10,7 @@ routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 | Schema (`apps/api/prisma`) | Models from the database guide plus the INPUTS gaps (workspace timezone/language, featured plan, contact/support tickets, videos/events/case studies, credit packs, privacy), migrations, integrity constraints | — |
 | API (`apps/api/src`) | All modules below, unit + DB integration tests | Load testing |
 | Web (`apps/web`) | Every public, user-app and admin screen wired to the API | Visual QA against each design at all breakpoints |
-| Infra | Postgres (docker), Postgres-backed job queue with worker in the API process, local/S3 storage, Resend email, Stripe, ClamAV | CI pipeline, production deployment, backups, monitoring/alerting |
+| Infra | Postgres (docker), Postgres-backed job queue with worker in the API process, local/S3 storage, Resend email, Stripe, ClamAV, GitHub Actions CI, API and web Dockerfiles | Production hosting, backups, monitoring/alerting |
 
 ## Batches
 
@@ -21,14 +21,14 @@ routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 | C — Workspace, account, settings | Done | Members/invitations/roles, MFA (TOTP), passkeys, sessions, notification preferences + feed, project defaults, data export and retention, AI & GEO preferences |
 | D — SEO audit engine | Done | Crawler (SSRF-safe, robots.txt), rule catalogue from the SEO Audit Guide, scoring, scheduled audits |
 | E — Optimization & verification | Done | Tasks from findings, statuses, assignment, verification re-checks |
-| F — Editor & CMS publishing | Done | Versioned documents, page import, live scoring, Claude suggestions, WordPress publish (encrypted credentials) |
+| F — Editor & CMS publishing | Done | Versioned documents, page import, live scoring, Claude suggestions, publishing to WordPress, Webflow, Shopify and signed custom webhooks (encrypted credentials) |
 | G — Keyword research | Done | DataForSEO explorer/related/questions/competitors/SERP, lists, saved keywords, clusters |
 | H — Content strategy | Done | AI ideas and briefs, plans, clusters, optimized content, brief → editor |
 | I — AI Search (GEO) | Done | Prompts, schedules, checks on ChatGPT/Claude/Gemini/Perplexity, mentions, citations, competitors, snapshots, opportunities |
 | J — Reports | Done | HTML/PDF/CSV generation, schedules, share links |
 | K — Admin CMS & careers | Done | Blog/guides/help/case studies, categories, authors, media, videos, events; jobs, applications with scanned uploads; contact and support inbox |
 | L — Admin operations | Done | Module controls, feature flags with rules, platform settings that take effect (maintenance mode, sign-up gate, admin MFA, passkeys, invitation expiry, workspace defaults, staff alerts), usage & costs, system health, incidents, admin search, sessions/devices |
-| M — Launch hardening | Open | CI (typecheck, tests, build), deployment (web, API + worker, Postgres, storage), backups, monitoring and alerting, CSP review, load tests for crawler and GEO checks, legal text approval |
+| M — Launch hardening | In progress | Done: CI (audit, typecheck, tests, build), Dockerfiles, CSP and security headers, API and auth rate limits, HTML sanitization, CSV formula neutralization, production env guards, project purge and audit retention. Open: hosting, backups, monitoring and alerting, load tests for crawler and GEO checks, legal text approval |
 
 ## Decisions taken
 

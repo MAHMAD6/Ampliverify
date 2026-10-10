@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, ahmad, 'claude/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ampliverify_test
+          POSTGRES_USER: ampliverify
+          POSTGRES_PASSWORD: ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ampliverify -d ampliverify_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://ampliverify:ci-only@localhost:5432/ampliverify_test
+      DATABASE_URL: postgresql://ampliverify:ci-only@localhost:5432/ampliverify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Dependency audit (production)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Prisma
+        run: |
+          npx --workspace apps/api prisma validate
+          npx --workspace apps/api prisma generate
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Database integration tests
+        run: npm run test:db
+      - name: Build
+        env:
+          API_URL: http://localhost:4000
+          BETTER_AUTH_URL: http://localhost:3000
+          BETTER_AUTH_SECRET: ci-build-only-secret-0123456789abcdef
+          AUTH_DATABASE_URL: postgresql://ampliverify:ci-only@localhost:5432/ampliverify_test
+          AUTH_SYNC_SECRET: ci-build-only-sync-secret-0123456789
+        run: npm run build

@@ -74,12 +74,22 @@ Every external provider is optional; the dependent feature is disabled with an e
 | AI ideas, briefs, editor suggestions, Claude GEO checks | `ANTHROPIC_API_KEY` |
 | GEO checks on ChatGPT / Gemini / Perplexity | `OPENAI_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY` |
 | Keyword research | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` |
-| WordPress / Google credentials encryption | `INTEGRATION_ENCRYPTION_KEY` |
+| CMS (WordPress, Webflow, Shopify, custom webhook) and Google credentials encryption | `INTEGRATION_ENCRYPTION_KEY` (32+ characters) |
 | Google Search Console / GA4 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
 | File storage | `STORAGE_DRIVER=s3` + `S3_*` (default: local `STORAGE_DIR`) |
 | Applicant file malware scanning | `CLAMAV_HOST`, `CLAMAV_PORT` (files stay undownloadable until scanned clean) |
 
 Credit costs, credit packs, the default plan, sign-up credits, maintenance mode, the sign-up gate, admin MFA and staff alert recipients are set in **Super Admin → Settings**.
+
+## Security and retention
+
+- Web: Content-Security-Policy, HSTS, `X-Frame-Options: DENY` and related headers (`apps/web/next.config.ts`); editor HTML is sanitized with DOMPurify.
+- Auth: Better Auth rate limits stored in the auth database (sign-in, sign-up, password reset, verification email and MFA verification have tighter per-route limits).
+- API: per-user/per-IP rate limit (`RATE_LIMIT_PER_MINUTE`, default 600); public contact and job-application forms are limited to 10 per minute. `TRUST_PROXY` controls which proxies' `X-Forwarded-For` is trusted.
+- Outbound requests (audits, CMS, webhooks) go through the SSRF-safe fetcher; CMS and Google credentials are encrypted at rest. Custom-website webhooks are signed: `X-AmpliVerify-Signature: t=<unix>,v1=<hex HMAC-SHA256 of "t.body">` with the `whsec_` secret shown once at connection time.
+- CSV exports neutralize spreadsheet formulas.
+- Production start-up refuses `AUDIT_ALLOW_PRIVATE_HOSTS=true`, `EMAIL_LOG_ONLY=true` and short encryption keys.
+- Retention (daily job): deleted projects are purged after `PROJECT_PURGE_GRACE_DAYS` (default 30); audits, GEO checks, keyword research and reports older than the workspace retention setting are removed (the latest completed audit per project is kept); expired export files are deleted.
 
 ## Checks
 
@@ -95,3 +105,19 @@ The integration suite covers onboarding, cross-tenant denial, RBAC anti-escalati
 ## Schema changes
 
 Edit `apps/api/prisma/schema.prisma`, then run `npm run db:migrate --workspace apps/api -- --name <change>`. Review the generated SQL before committing. Rules Prisma cannot express (CHECKs, triggers, partial indexes) go in hand-written SQL inside a migration and are documented in `docs/DATA_MODEL.md`. Follow guide §20: expand → backfill → switch → contract.
+
+## CI and deployment
+
+`.github/workflows/ci.yml` runs on pushes and pull requests: `npm ci`, production dependency audit, Prisma validate/generate, typecheck, unit tests, integration tests against a Postgres 16 service, and the production build.
+
+Container images (build from the repository root):
+
+```bash
+docker build -f docker/api.Dockerfile -t ampliverify-api .
+```
+
+```bash
+docker build -f docker/web.Dockerfile -t ampliverify-web .
+```
+
+The API image runs `prisma migrate deploy` and then starts the API with the job worker (`JOBS_WORKER=off` on extra replicas that should only serve HTTP). The web image is the Next.js standalone server on port 3000; run `npm run auth:migrate --workspace apps/web` against `AUTH_DATABASE_URL` once per release. Configure both with the variables from the `.env.example` files; never bake secrets into images.

@@ -182,6 +182,9 @@ Generated from the NestJS controllers (`apps/api/src/**/*.controller.ts`). All r
 | GET | `/user/projects/:projectId/search-performance` | user |
 | GET | `/user/workspaces/:id/integrations` | user |
 | POST | `/user/workspaces/:id/integrations/google/start` | user |
+| POST | `/user/workspaces/:id/integrations/shopify` | user |
+| POST | `/user/workspaces/:id/integrations/webflow` | user |
+| POST | `/user/workspaces/:id/integrations/webhook` | user |
 | POST | `/user/workspaces/:id/integrations/wordpress` | user |
 
 ## Keyword research

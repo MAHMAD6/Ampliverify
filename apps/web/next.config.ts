@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 /** Routes renamed to follow the locked navigation page map (docs/design/navigation-batch1). */
@@ -40,6 +41,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for the Docker image (docker/web.Dockerfile).
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }];
   },
