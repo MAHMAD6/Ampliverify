@@ -10,6 +10,8 @@ const RESOURCES = [
   ['Blog', '/blog'],
   ['Guides', '/guides'],
   ['Help Center', '/help'],
+  ['Case Studies', '/case-studies'],
+  ['Webinars & Videos', '/webinars'],
 ] as const;
 const COMPANY = [
   ['About Us', '/about'],

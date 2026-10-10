@@ -26,6 +26,7 @@ export default async function BlogPostPage({ params }: Props) {
   const related = [...sameTopic, ...others.filter((p) => !sameTopic.includes(p))].map((p) => ({ href: `/blog/${p.slug}`, title: p.title, category: p.category?.name }));
   return (
     <ArticleLayout
+      coverImage={post.featuredMediaId}
       category={post.category?.name ?? 'Article'}
       title={post.title}
       summary={post.excerpt}

@@ -5,7 +5,7 @@ import s from './site.module.css';
 
 const COLUMNS = [
   { title: 'Product', links: [['Features', '/features'], ['Pricing', '/pricing'], ['How It Works', '/how-it-works']] },
-  { title: 'Resources', links: [['Blog', '/blog'], ['Guides', '/guides'], ['Help Center', '/help']] },
+  { title: 'Resources', links: [['Blog', '/blog'], ['Guides', '/guides'], ['Help Center', '/help'], ['Case Studies', '/case-studies'], ['Webinars & Videos', '/webinars']] },
   { title: 'Company', links: [['About Us', '/about'], ['Careers', '/careers'], ['Contact', '/contact']] },
   { title: 'Legal', links: [['Privacy Policy', '/legal#privacy'], ['Terms of Service', '/legal#terms'], ['Cookie Policy', '/legal#cookies']] },
 ] as const;

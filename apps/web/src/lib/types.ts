@@ -4,6 +4,8 @@ export type Category = { name: string; slug: string } | null;
 
 export type ContentSummary = {
   slug: string;
+  /** Blog posts only: image from the Media Library (served at /media/:id). */
+  featuredMediaId?: string | null;
   title: string;
   excerpt: string | null;
   publishedAt: string;

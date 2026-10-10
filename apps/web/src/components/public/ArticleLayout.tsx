@@ -21,6 +21,7 @@ export function ArticleLayout({
   footer,
   related = [],
   cover = true,
+  coverImage,
   emptyBody = 'The full content for this page is not available right now.',
 }: {
   category: string;
@@ -35,6 +36,8 @@ export function ArticleLayout({
   footer?: ReactNode;
   related?: Related[];
   cover?: boolean;
+  /** Media Library image id shown instead of the default artwork. */
+  coverImage?: string | null;
   emptyBody?: string;
 }) {
   const headings = markdownHeadings(body);
@@ -82,7 +85,12 @@ export function ArticleLayout({
         <div>
           {cover && (
             <div className={s.cover} style={{ height: 240, borderRadius: 16, overflow: 'hidden', background: 'var(--g900)', marginBottom: 28 }}>
-              <TrendArt dark />
+              {coverImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/media/${coverImage}`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <TrendArt dark />
+              )}
             </div>
           )}
           {body ? <Markdown source={body} className={s.prose} /> : <p className={s.prose}>{emptyBody}</p>}
