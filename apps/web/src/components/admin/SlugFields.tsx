@@ -13,10 +13,10 @@ const slugify = (v: string) =>
     .slice(0, 120);
 
 /** Title + slug: the slug follows the title until the admin edits it. */
-export function SlugFields({ titleLabel, titlePlaceholder }: { titleLabel: string; titlePlaceholder: string }) {
-  const [title, setTitle] = useState('');
-  const [slug, setSlug] = useState('');
-  const [touched, setTouched] = useState(false);
+export function SlugFields({ titleLabel, titlePlaceholder, defaultTitle = '', defaultSlug = '' }: { titleLabel: string; titlePlaceholder: string; defaultTitle?: string; defaultSlug?: string }) {
+  const [title, setTitle] = useState(defaultTitle);
+  const [slug, setSlug] = useState(defaultSlug);
+  const [touched, setTouched] = useState(!!defaultSlug);
   return (
     <>
       <Field label={titleLabel} htmlFor="f-title">
@@ -25,6 +25,7 @@ export function SlugFields({ titleLabel, titlePlaceholder }: { titleLabel: strin
           name="title"
           value={title}
           maxLength={200}
+          required
           placeholder={titlePlaceholder}
           onChange={(e) => {
             setTitle(e.target.value);

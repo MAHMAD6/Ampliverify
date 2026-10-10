@@ -27,9 +27,9 @@ export type ContentBlock = { label: string; hint: string; icon: React.ReactNode;
  * site), word count and optional insertable content blocks. Raw HTML is never
  * rendered.
  */
-export function MarkdownField({ id, name, placeholder, blocks, minHeight = 260 }: { id: string; name: string; placeholder: string; blocks?: ContentBlock[]; minHeight?: number }) {
+export function MarkdownField({ id, name, placeholder, blocks, minHeight = 260, defaultValue = '' }: { id: string; name: string; placeholder: string; blocks?: ContentBlock[]; minHeight?: number; defaultValue?: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(defaultValue);
   const [past, setPast] = useState<string[]>([]);
   const [future, setFuture] = useState<string[]>([]);
   const [preview, setPreview] = useState(false);

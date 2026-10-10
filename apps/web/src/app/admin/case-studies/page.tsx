@@ -1,8 +1,9 @@
 import { Layers } from 'lucide-react';
-import { PendingScreen } from '@/components/ui/PendingScreen';
+import { ContentList } from '@/components/admin/ContentList';
 
 export const metadata = { title: 'Case Studies' };
 
-export default function Page() {
-  return <PendingScreen title="Case Studies" description="Showcase customer stories and success examples." crumbs={[{ label: 'Command Center', href: '/admin' }, { label: 'Content Management', href: '/admin/content' }, { label: 'Case Studies' }]} icon={<Layers size={28} />} />;
+export default async function Page({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
+  const { tab, q } = await searchParams;
+  return <ContentList kind="case-studies" description="Showcase customer stories and measured results." icon={<Layers size={40} />} emptyText="Create your first case study to show real customer results." tab={tab} q={q} />;
 }
