@@ -33,3 +33,11 @@ export async function setUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDE
   revalidatePath('/admin/security');
   return { ok: true, data: { status: r.data.status } };
 }
+
+/** Admin view of one valuation (test runs included), for polling a test calculation. */
+export async function getAdminValuation(id: string): Promise<ActionResult<unknown>> {
+  if (!UUID.test(id)) return { ok: false, message: 'Unknown valuation.' };
+  const { apiGet } = await import('./api');
+  const r = await apiGet<unknown>(`/admin/valuation/valuations/${id}`, { auth: true });
+  return r.ok ? { ok: true, data: r.data } : { ok: false, message: r.reason === 'forbidden' ? 'You do not have access.' : 'Could not load the valuation.' };
+}

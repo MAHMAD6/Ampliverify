@@ -24,6 +24,7 @@ class WebhookDto {
 }
 class GoogleStartDto {
   @IsIn(['google_search_console', 'google_analytics']) provider: 'google_search_console' | 'google_analytics';
+  @IsOptional() @IsString() @MaxLength(300) returnTo?: string;
 }
 class GoogleCallbackDto {
   @IsString() @MaxLength(2048) code: string;
@@ -72,7 +73,7 @@ export class IntegrationsController {
 
   @Post('workspaces/:id/integrations/google/start')
   googleStart(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: GoogleStartDto) {
-    return this.integrations.googleStart(a.userId, id, dto.provider);
+    return this.integrations.googleStart(a.userId, id, dto.provider, dto.returnTo);
   }
   @Post('workspaces/:id/integrations/google/import-projects')
   importProjects(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ImportSitesDto, @Req() req: Request) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { apiSend } from '@/lib/api';
+import { safeNext } from '@/lib/safe-next';
 
 /**
  * Google OAuth redirect target. Exchanges the code through the API (which
@@ -15,7 +16,12 @@ export async function GET(request: Request) {
     back.searchParams.set('error', 'Google access was not granted.');
     return NextResponse.redirect(back);
   }
-  const result = await apiSend('POST', '/user/integrations/google/callback', { code, state });
+  const result = await apiSend<{ returnTo?: string | null }>('POST', '/user/integrations/google/callback', { code, state });
+  if (result.ok && result.data.returnTo) {
+    const to = new URL(safeNext(result.data.returnTo, '/app/settings/integrations'), url.origin);
+    to.searchParams.set('connected', '1');
+    return NextResponse.redirect(to);
+  }
   if (result.ok) back.searchParams.set('connected', '1');
   else back.searchParams.set('error', result.message ?? 'The connection could not be completed.');
   return NextResponse.redirect(back);

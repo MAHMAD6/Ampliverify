@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { getAccessToken } from './session';
 
 const API_URL = (process.env.API_URL ?? 'http://localhost:4000').replace(/\/$/, '');
 
@@ -38,4 +39,32 @@ export async function submitApplication(slug: string, form: FormData) {
   }
   for (const [key, value] of Array.from(form.entries())) if (typeof value === 'string' && !value.trim()) form.delete(key);
   return send<{ received: boolean; receipt: string | null }>(`/public/careers/${encodeURIComponent(slug)}/apply`, { method: 'POST', body: form });
+}
+
+/** Starts a website valuation: as the signed-in user when there is a session, else anonymously. */
+export async function startValuation(domain: string) {
+  const token = await getAccessToken();
+  const body = JSON.stringify({ domain: domain.slice(0, 2048) });
+  if (token) {
+    return send<{ id: string; cached: boolean }>('/user/valuations', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body });
+  }
+  return send<{ id: string; cached: boolean }>('/public/valuations', { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+}
+
+/** Projected range and confidence for the enhance page (nothing is saved). */
+export async function previewValuation(id: string, business: { monthlyRevenue?: number; annualRevenue?: number; profitMargin?: string; monthlyVisits?: number }, planned: string[]) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false as const, message: 'Valuation not found.' };
+  return send<{ valueLow: number; valueHigh: number; valueMid: number; currency: string; confidence: number; confidenceLabel: string }>(`/public/valuations/${id}/preview`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ business, planned }),
+  });
+}
+
+/** Verified valuation (signed-in): connected GA4 / Search Console and business details. */
+export async function verifyValuation(id: string, inputs: Record<string, unknown>) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false as const, message: 'Valuation not found.' };
+  const token = await getAccessToken();
+  if (!token) return { ok: false as const, message: 'Please sign in to connect your data.' };
+  return send<{ id: string }>(`/user/valuations/${id}/verify`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(inputs) });
 }

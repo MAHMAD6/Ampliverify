@@ -101,6 +101,18 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
+    key: 'valuation-group',
+    label: 'Website Value Calculator',
+    items: [
+      { key: 'valuation-calculator', label: 'Calculator Settings', href: '/admin/valuation/calculator' },
+      { key: 'valuation-engine', label: 'Valuation Engine Settings', href: '/admin/valuation' },
+      { key: 'valuation-sources', label: 'Data Sources', href: '/admin/valuation/sources' },
+      { key: 'valuation-limits', label: 'Usage & Limits', href: '/admin/valuation/limits' },
+      { key: 'valuation-templates', label: 'Report Templates', href: '/admin/valuation/templates' },
+      { key: 'valuation-history', label: 'Calculation History', href: '/admin/valuation/history' },
+    ],
+  },
+  {
     key: 'support-group',
     label: 'Support',
     items: [

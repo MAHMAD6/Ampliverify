@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { ChevronDown, CreditCard, FileText, Home, Settings2, SlidersHorizontal, Users } from 'lucide-react';
+import { Calculator, ChevronDown, CreditCard, FileText, Home, Settings2, SlidersHorizontal, Users } from 'lucide-react';
 import { ADMIN_NAV } from '@/lib/nav';
 import { Logo } from '../brand/Logo';
 import s from './admin.module.css';
@@ -13,13 +13,14 @@ const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   'users-group': Users,
   'content-group': FileText,
   'billing-group': CreditCard,
+  'valuation-group': Calculator,
   'ops-group': Settings2,
   'settings-group': SlidersHorizontal,
 };
 
 function matches(pathname: string, href: string) {
   if (href === '/admin') return pathname === '/admin';
-  if (href === '/admin/settings') return pathname === href;
+  if (href === '/admin/settings' || href === '/admin/valuation') return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

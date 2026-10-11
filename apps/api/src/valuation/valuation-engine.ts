@@ -55,7 +55,7 @@ export type ValuationSettings = {
   /** Keyed by plan code; `free` covers visitors without an account or plan. */
   access: Record<string, PlanAccessLevel>;
   limits: { freePerMonth: number; paidPerMonth: number; pdfPerMonth: number; apiAccess: boolean };
-  exports: { pdf: boolean; csv: boolean; json: boolean };
+  exports: { pdf: boolean; json: boolean };
   features: { verifiedValuation: boolean; opportunities: boolean; socialSection: boolean };
   calculator: { enabled: boolean; cacheHours: number; country: string; language: string };
   report: { sections: Record<ReportSection, boolean>; disclaimer: string };
@@ -76,7 +76,7 @@ export const DEFAULT_SETTINGS: ValuationSettings = {
   thresholds: { low: 40, high: 70 },
   access: { free: 'limited' },
   limits: { freePerMonth: 3, paidPerMonth: 50, pdfPerMonth: 10, apiAccess: true },
-  exports: { pdf: true, csv: true, json: true },
+  exports: { pdf: true, json: true },
   features: { verifiedValuation: true, opportunities: true, socialSection: true },
   calculator: { enabled: true, cacheHours: 24, country: 'us', language: 'en' },
   report: {

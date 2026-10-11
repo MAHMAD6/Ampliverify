@@ -325,12 +325,12 @@ export class IntegrationsService {
     if (!body || !sig || sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
       throw new BadRequestException({ code: 'INVALID_STATE', message: 'The connection request expired. Please try again.' });
     }
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as { workspaceId: string; userId: string; provider: GoogleProvider; exp: number };
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as { workspaceId: string; userId: string; provider: GoogleProvider; exp: number; returnTo?: string };
     if (payload.exp < Date.now()) throw new BadRequestException({ code: 'INVALID_STATE', message: 'The connection request expired. Please try again.' });
     return payload;
   }
 
-  async googleStart(userId: string, workspaceId: string, provider: GoogleProvider) {
+  async googleStart(userId: string, workspaceId: string, provider: GoogleProvider, returnTo?: string) {
     await this.rbac.requireWorkspace(userId, workspaceId, 'integration.manage');
     if (!GOOGLE_PROVIDERS.includes(provider)) throw new BadRequestException({ code: 'UNKNOWN_PROVIDER', message: 'Unknown Google integration.' });
     if (!this.googleConfigured) throw new ServiceUnavailableException({ code: 'GOOGLE_NOT_CONFIGURED', message: 'Google integrations are not available yet.' });
@@ -345,7 +345,8 @@ export class IntegrationsService {
       access_type: 'offline',
       prompt: 'consent',
       include_granted_scopes: 'true',
-      state: this.signState({ workspaceId, userId, provider, exp: Date.now() + 10 * 60_000 }),
+      // returnTo is a same-site path the web app redirects to after the callback.
+      state: this.signState({ workspaceId, userId, provider, exp: Date.now() + 10 * 60_000, ...(returnTo && /^\/(?![/\\])/.test(returnTo) ? { returnTo } : {}) }),
     });
     return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
   }
@@ -368,7 +369,8 @@ export class IntegrationsService {
     if (!res.ok || !token.refresh_token) throw new BadRequestException({ code: 'GOOGLE_AUTH_FAILED', message: token.error_description ?? 'Google did not grant offline access. Try again.' });
     const email = token.id_token ? (JSON.parse(Buffer.from(token.id_token.split('.')[1], 'base64url').toString('utf8')) as { email?: string }).email : undefined;
     const secret: GoogleSecret = { refreshToken: token.refresh_token, accessToken: token.access_token, expiresAt: Date.now() + (token.expires_in ?? 3600) * 1000 };
-    return this.storeConnection(userId, s.workspaceId, s.provider, email ?? 'Google account', secret, meta);
+    const connection = await this.storeConnection(userId, s.workspaceId, s.provider, email ?? 'Google account', secret, meta);
+    return { ...connection, returnTo: s.returnTo ?? null };
   }
 
   private async googleAccessToken(integrationId: string) {
