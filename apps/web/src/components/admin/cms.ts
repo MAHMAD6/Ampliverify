@@ -3,7 +3,7 @@ export type CmsKind = 'blog' | 'guides' | 'help' | 'case-studies';
 
 export const CMS_KINDS: Record<CmsKind, { noun: string; plural: string; admin: string; publicBase: string; categoryType: 'BLOG' | 'GUIDE' | 'HELP' | null }> = {
   blog: { noun: 'Blog Post', plural: 'Blog Posts', admin: '/admin/blog', publicBase: '/blog', categoryType: 'BLOG' },
-  guides: { noun: 'Resource', plural: 'Resources', admin: '/admin/resources', publicBase: '/guides', categoryType: 'GUIDE' },
+  guides: { noun: 'Guide', plural: 'Guides', admin: '/admin/resources', publicBase: '/guides', categoryType: 'GUIDE' },
   help: { noun: 'Help Article', plural: 'Help Articles', admin: '/admin/help', publicBase: '/help', categoryType: 'HELP' },
   'case-studies': { noun: 'Case Study', plural: 'Case Studies', admin: '/admin/case-studies', publicBase: '/case-studies', categoryType: null },
 };

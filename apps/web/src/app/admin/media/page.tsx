@@ -8,7 +8,7 @@ import s from '@/components/admin/media.module.css';
 
 export const metadata = { title: 'Media Library' };
 
-type Asset = { id: string; mimeType: string; sizeBytes: string; altText: string | null; createdAt: string; uploader: { displayName: string | null; email: string }; _count: { blogPosts: number } };
+type Asset = { id: string; mimeType: string; sizeBytes: string; altText: string | null; createdAt: string; uploader: { displayName: string | null; email: string }; _count: { blogPosts: number; guides?: number; authorAvatars?: number } };
 
 const kb = (b: string) => `${Math.max(1, Math.round(Number(b) / 1024)).toLocaleString('en-US')} KB`;
 
@@ -24,12 +24,12 @@ export default async function MediaLibraryPage({ searchParams }: { searchParams:
   const selected = list.find((a) => a.id === id) ?? list[0] ?? null;
   return (
     <>
-      <AdminHeader section="Content Management" title="Media Library" description="Upload and manage images for blog posts, resources and case studies." />
-      <Panel title="Upload Image" description="PNG, JPEG, GIF or WebP up to 10 MB. Alt text describes the image for search engines and screen readers.">
+      <AdminHeader section="Content Management" title="Media Library" description="Upload and manage images and videos for blog posts, guides and case studies." />
+      <Panel title="Upload Media" description="Images: PNG, JPEG, GIF or WebP up to 10 MB. Videos: MP4, WebM or MOV up to 50 MB. Alt text (or a video title) describes the file for search engines and screen readers.">
         <UploadForm path="/admin/media" submitLabel="Upload">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
             <Field label="Image" htmlFor="m-file">
-              <Input id="m-file" name="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" required />
+              <Input id="m-file" name="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime" required />
             </Field>
             <Field label="Alt text" htmlFor="m-alt">
               <Input id="m-alt" name="altText" maxLength={300} placeholder="Describe the image" />
@@ -44,22 +44,30 @@ export default async function MediaLibraryPage({ searchParams }: { searchParams:
         {!assets ? (
           <EmptyState icon={<ImageIcon size={28} />} title="Media unavailable" description="Your account cannot manage content, or the API is unavailable." />
         ) : list.length === 0 ? (
-          <EmptyState icon={<ImageIcon size={28} />} title={assets.length ? 'No matches' : 'No media yet'} description="Uploaded images will appear here." />
+          <EmptyState icon={<ImageIcon size={28} />} title={assets.length ? 'No matches' : 'No media yet'} description="Uploaded images and videos will appear here." />
         ) : (
           <div className={s.body}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, alignContent: 'start' }}>
               {list.map((a) => (
                 <Link key={a.id} href={`/admin/media?${new URLSearchParams({ ...(q ? { q } : {}), id: a.id })}`} style={{ border: `2px solid ${a.id === selected?.id ? 'var(--blue)' : 'var(--line)'}`, borderRadius: 10, overflow: 'hidden', background: 'var(--surface-alt)' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/media/${a.id}`} alt={a.altText ?? ''} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+                  {a.mimeType.startsWith('video/') ? (
+                    <video src={`/media/${a.id}`} preload="metadata" muted style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block', background: '#0b1b35' }} />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/media/${a.id}`} alt={a.altText ?? ''} style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }} />
+                  )}
                   <small style={{ display: 'block', padding: '6px 8px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.altText || 'No alt text'}</small>
                 </Link>
               ))}
             </div>
             {selected && (
               <aside className={s.details}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/media/${selected.id}`} alt={selected.altText ?? ''} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                {selected.mimeType.startsWith('video/') ? (
+                  <video src={`/media/${selected.id}`} controls preload="metadata" style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 8 }} />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/media/${selected.id}`} alt={selected.altText ?? ''} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8 }} />
+                )}
                 <dl>
                   <div>
                     <dt>Type</dt>
@@ -79,7 +87,9 @@ export default async function MediaLibraryPage({ searchParams }: { searchParams:
                   </div>
                   <div>
                     <dt>Used by</dt>
-                    <dd>{selected._count.blogPosts} post(s)</dd>
+                    <dd>
+                      {selected._count.blogPosts} post(s), {selected._count.guides ?? 0} guide(s), {selected._count.authorAvatars ?? 0} author photo(s)
+                    </dd>
                   </div>
                   <div>
                     <dt>URL</dt>
@@ -91,7 +101,7 @@ export default async function MediaLibraryPage({ searchParams }: { searchParams:
                 <ApiForm key={selected.id} method="PATCH" path={`/admin/media/${selected.id}`} submitLabel="Save Alt Text" successMessage="Saved.">
                   <Input name="altText" data-type="nullable" defaultValue={selected.altText ?? ''} maxLength={300} aria-label="Alt text" />
                 </ApiForm>
-                <ActionButton variant="ghost" method="DELETE" path={`/admin/media/${selected.id}`} confirm="Delete this image permanently?" redirectTo="/admin/media" disabled={selected._count.blogPosts > 0} title={selected._count.blogPosts ? 'Used as a featured image' : undefined}>
+                <ActionButton variant="ghost" method="DELETE" path={`/admin/media/${selected.id}`} confirm="Delete this file permanently?" redirectTo="/admin/media" disabled={selected._count.blogPosts + (selected._count.guides ?? 0) + (selected._count.authorAvatars ?? 0) > 0} title={selected._count.blogPosts + (selected._count.guides ?? 0) + (selected._count.authorAvatars ?? 0) ? 'Used as a featured image or author photo' : undefined}>
                   Delete
                 </ActionButton>
               </aside>

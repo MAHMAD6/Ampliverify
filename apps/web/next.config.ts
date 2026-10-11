@@ -51,6 +51,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   experimental: {
+    // Media Library uploads (images up to 10 MB, videos up to 50 MB) go through server actions.
+    serverActions: { bodySizeLimit: '52mb' },
     // The persistent Turbopack dev cache intermittently dropped the
     // /api/auth/[...all] route after restarts (404s); rebuild it each start.
     turbopackFileSystemCacheForDev: false,

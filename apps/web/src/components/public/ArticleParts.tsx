@@ -78,7 +78,10 @@ export function extractKeyTakeaways(body: string) {
   const after = body.slice(start + m[0].length);
   const next = after.search(/^##\s+/m);
   const section = (next === -1 ? after : after.slice(0, next)).trim();
-  return { takeaways: section || null, rest: body.slice(0, start) + (next === -1 ? '' : after.slice(next)) };
+  // Only the first block (a list or paragraph) is the highlight; anything after it stays in the article.
+  const [first, ...others] = section.split(/\n\s*\n(?![ \t]*(?:[-*+]|\d+\.)\s)/);
+  const leftover = others.join('\n\n').trim();
+  return { takeaways: first?.trim() || null, rest: body.slice(0, start) + (leftover ? `${leftover}\n\n` : '') + (next === -1 ? '' : after.slice(next)) };
 }
 
 export function KeyTakeaway({ children }: { children: React.ReactNode }) {

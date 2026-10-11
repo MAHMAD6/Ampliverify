@@ -5,11 +5,25 @@ import { adminGet, loadUsers } from '@/lib/admin-data';
 
 export const metadata = { title: 'Authors' };
 
-type Author = { id: string; displayName: string; slug: string; bio: string | null; userId: string | null; user: { id: string; email: string } | null; _count: { blogPosts: number } };
+type Author = { id: string; displayName: string; slug: string; bio: string | null; userId: string | null; avatarMediaId?: string | null; user: { id: string; email: string } | null; _count: { blogPosts: number } };
+type Media = { id: string; mimeType: string; altText: string | null };
 
 /** Author profiles shown on blog posts; optionally linked to a user account. */
 export default async function AuthorsPage() {
-  const [authors, users] = await Promise.all([adminGet<Author[]>('/admin/authors'), loadUsers()]);
+  const [authors, users, media] = await Promise.all([adminGet<Author[]>('/admin/authors'), loadUsers(), adminGet<Media[]>('/admin/media')]);
+  const images = (media ?? []).filter((m) => m.mimeType.startsWith('image/'));
+  const photoField = (id: string, value?: string | null) => (
+    <Field label="Photo (optional)" htmlFor={id} hint="Upload headshots in the Media Library; shown next to the author's name.">
+      <Select id={id} name="avatarMediaId" data-type="nullable" defaultValue={value ?? ''}>
+        <option value="">Initials only</option>
+        {images.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.altText || `Image ${m.id.slice(0, 8)}`}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
   const userField = (id: string, value?: string | null) => (
     <Field label="Linked account (optional)" htmlFor={id}>
       <Select id={id} name="userId" data-type="nullable" defaultValue={value ?? ''}>
@@ -33,6 +47,7 @@ export default async function AuthorsPage() {
                 <Input id="a-name" name="displayName" required maxLength={120} />
               </Field>
               {userField('a-user')}
+              {photoField('a-photo')}
             </div>
             <Field label="Bio" htmlFor="a-bio">
               <Textarea id="a-bio" name="bio" data-type="nullable" rows={2} maxLength={2000} />
@@ -55,6 +70,7 @@ export default async function AuthorsPage() {
                     <Input id={`an-${a.id}`} name="displayName" required maxLength={120} defaultValue={a.displayName} />
                   </Field>
                   {userField(`au-${a.id}`, a.userId)}
+                  {photoField(`ap-${a.id}`, a.avatarMediaId)}
                   <Field label="Bio" htmlFor={`ab-${a.id}`}>
                     <Textarea id={`ab-${a.id}`} name="bio" data-type="nullable" rows={2} maxLength={2000} defaultValue={a.bio ?? ''} />
                   </Field>

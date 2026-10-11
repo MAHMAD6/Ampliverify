@@ -88,7 +88,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     items: [
       { key: 'content', label: 'Content Overview', href: '/admin/content' },
       { key: 'blog', label: 'Blog Posts', href: '/admin/blog' },
-      { key: 'resources', label: 'Resources', href: '/admin/resources' },
+      { key: 'resources', label: 'Guides', href: '/admin/resources' },
       { key: 'help', label: 'Help Articles', href: '/admin/help' },
       { key: 'case-studies', label: 'Case Studies', href: '/admin/case-studies' },
       { key: 'videos', label: 'Videos', href: '/admin/videos' },
@@ -96,6 +96,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { key: 'categories', label: 'Categories & Tags', href: '/admin/categories' },
       { key: 'authors', label: 'Authors', href: '/admin/authors' },
       { key: 'media', label: 'Media Library', href: '/admin/media' },
+      { key: 'comments', label: 'Comments', href: '/admin/comments' },
+      { key: 'newsletter', label: 'Newsletter', href: '/admin/newsletter' },
       { key: 'careers', label: 'Careers / Job Openings', href: '/admin/careers' },
       { key: 'applications', label: 'Applications', href: '/admin/careers/applications' },
     ],
