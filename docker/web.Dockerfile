@@ -7,7 +7,7 @@ WORKDIR /repo
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY apps/api/package.json apps/api/
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --workspace apps/web --include-workspace-root
 COPY apps/web apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build --workspace apps/web
