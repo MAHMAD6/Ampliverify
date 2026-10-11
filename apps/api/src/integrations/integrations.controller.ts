@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
 import { Request } from 'express';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
 import { requestMeta } from '../common/types/request-meta.type';
@@ -33,6 +33,10 @@ class PublishDto {
   @IsUUID() integrationId: string;
   @IsIn(['draft', 'publish']) status: 'draft' | 'publish';
   @IsOptional() @IsIn(['posts', 'pages']) type?: 'posts' | 'pages';
+}
+class ImportSitesDto {
+  @IsUUID() integrationId: string;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(25) @IsString({ each: true }) @MaxLength(2048, { each: true }) siteUrls: string[];
 }
 class LinkDto {
   @IsUUID() integrationId: string;
@@ -69,6 +73,10 @@ export class IntegrationsController {
   @Post('workspaces/:id/integrations/google/start')
   googleStart(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: GoogleStartDto) {
     return this.integrations.googleStart(a.userId, id, dto.provider);
+  }
+  @Post('workspaces/:id/integrations/google/import-projects')
+  importProjects(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ImportSitesDto, @Req() req: Request) {
+    return this.integrations.importSearchConsoleSites(a.userId, id, dto, requestMeta(req));
   }
   @Post('integrations/google/callback')
   googleCallback(@CurrentActor() a: AuthenticatedActor, @Body() dto: GoogleCallbackDto, @Req() req: Request) {

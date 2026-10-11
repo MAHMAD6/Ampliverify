@@ -19,7 +19,7 @@ import {
 import { AutoSubmitSelect } from '@/components/ui/AutoSubmitSelect';
 import { DismissibleBanner } from '@/components/app/projects/DismissibleBanner';
 import { ProjectRowActions } from '@/components/app/projects/ProjectRowActions';
-import { Badge, Button, ButtonLink, EmptyState, IconCircle, Input, PageHeader, Panel, Select } from '@/components/ui';
+import { Button, ButtonLink, EmptyState, IconCircle, Input, PageHeader, Panel, Select } from '@/components/ui';
 import { formatDate, humanize } from '@/lib/format';
 import { getAppContext } from '@/lib/project';
 import type { Project } from '@/lib/types';
@@ -94,9 +94,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         title="My Projects"
         description="Manage your websites and domains. Each project includes SEO audits, content strategy, AI search tracking, and reports — all in one place."
         actions={
-          <ButtonLink href="/app/projects/new" icon={<Plus size={18} />}>
-            Add Project
-          </ButtonLink>
+          <>
+            <ButtonLink href="/app/projects/import" variant="outline" icon={<Link2 size={18} />}>
+              Import from Search Console
+            </ButtonLink>
+            <ButtonLink href="/app/projects/new" icon={<Plus size={18} />}>
+              Add Project
+            </ButtonLink>
+          </>
         }
       />
 
@@ -177,10 +182,9 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                 </ButtonLink>
               </div>
               <div className={s.or}>or</div>
-              <Button variant="secondary" disabled icon={<Link2 size={18} />}>
-                Import from Google Search Console <Badge tone="blue">Coming Soon</Badge>
-              </Button>
-              <p style={{ fontSize: 13, marginTop: 10 }}>Manual add is available now. Search Console import will be available in a future release.</p>
+              <ButtonLink href="/app/projects/import" variant="secondary" icon={<Link2 size={18} />}>
+                Import from Google Search Console
+              </ButtonLink>
             </div>
             <div className={s.capabilities}>
               <h3>What you can do with a project</h3>

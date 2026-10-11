@@ -181,6 +181,7 @@ Generated from the NestJS controllers (`apps/api/src/**/*.controller.ts`). All r
 | POST | `/user/projects/:projectId/data-sources` | user |
 | GET | `/user/projects/:projectId/search-performance` | user |
 | GET | `/user/workspaces/:id/integrations` | user |
+| POST | `/user/workspaces/:id/integrations/google/import-projects` | user |
 | POST | `/user/workspaces/:id/integrations/google/start` | user |
 | POST | `/user/workspaces/:id/integrations/shopify` | user |
 | POST | `/user/workspaces/:id/integrations/webflow` | user |

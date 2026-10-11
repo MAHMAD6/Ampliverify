@@ -102,7 +102,5 @@ Checksums are the first 12 hex characters of SHA-256 of the file as uploaded.
 - Admin batch 4 (see #7).
 - User-app pages without a dedicated design (page-map sub-pages such as Keyword Clusters, GEO sub-pages, Scheduled/Shared reports, Credit History, Invoices; editor and brief detail pages) follow the nearest supplied design.
 - Approved legal text (privacy, terms, cookies) has not been supplied; `/legal` shows the section structure.
-- The Integrations catalog (#48) mentions a marketplace and lists Webflow, Shopify and a custom API connector; only WordPress and Google (Search Console, GA4) connectors exist, the others are shown as "Coming soon".
-- There is no hard-delete workflow for projects; delete confirmations offer Archive instead (the API archives, never deletes).
 
-Resolved since earlier batches (schema and API added): workspace timezone/language (#54), featured plan flag (#55), contact submissions and support tickets, videos/events/case studies (#50), credit packs (#47), Data & Privacy storage (#12, #16), AI & GEO preferences (#64), job applications with scanned uploads (#85), auth email delivery (Resend).
+Resolved since earlier batches (schema and API added): workspace timezone/language (#54), featured plan flag (#55), contact submissions and support tickets, videos/events/case studies (#50), credit packs (#47), Data & Privacy storage (#12, #16), AI & GEO preferences (#64), job applications with scanned uploads (#85), auth email delivery (Resend), Webflow / Shopify / custom-webhook publishing connectors (#48), project deletion with a 30-day purge, Import from Google Search Console.

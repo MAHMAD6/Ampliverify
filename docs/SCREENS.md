@@ -41,10 +41,11 @@ Navigation follows the locked spec in `docs/design/navigation-batch1/`. Renamed 
 | Screen | Route | Data |
 |---|---|---|
 | Dashboard | `/app/dashboard` | Projects with latest audit scores, high issues, open tasks; credits; next steps |
-| My Projects / Add Project / Project Overview | `/app/projects`, `/app/projects/new`, `/app/projects/[id]` | CRUD, status, project summary and settings |
+| My Projects / Add Project / Project Overview | `/app/projects`, `/app/projects/new`, `/app/projects/[id]` | CRUD, status, project summary and settings; delete requires typing the project name (purged after 30 days) |
+| Import from Google Search Console | `/app/projects/import` | Choose sites from the connected Search Console account; creates projects (plan limits apply) linked to their property, or links an existing project with the same domain |
 | On-Page SEO Audit | `/app/audit` (`?url=&mode=&tab=`) | Runs audits (credit-charged), live progress, scores, findings by category, tasks; scheduled audits |
 | Optimization Center | `/app/optimize` | Tasks from findings, status, assignment, verification re-checks |
-| On-Page SEO Editor | `/app/editor`, `/app/editor/[id]` | Documents (new/import page), versioned saves, live rule-engine scoring, Claude suggestions (accept/reject), section/quick AI actions, version history, WordPress publish, device backup of unsaved work |
+| On-Page SEO Editor | `/app/editor`, `/app/editor/[id]` | Documents (new/import page), versioned saves, live rule-engine scoring, Claude suggestions (accept/reject), section/quick AI actions, version history, publish to WordPress / Webflow / Shopify / custom webhook, device backup of unsaved work |
 | Content Strategy | `/app/content/{ideas,clusters,plan,briefs,optimized}`, `/app/content/briefs/[id]` | AI topic ideas, manual ideas, keyword clusters, briefs (AI-drafted outline/questions/keywords/GEO notes) → "Write in Editor", content plans with dated items, optimized documents |
 | Keyword Research | `/app/keywords/{explorer,related,questions,competitors,serp,lists,clusters}` | DataForSEO research (credit-charged), filters, CSV export, save keywords, lists, clusters |
 | AI Search (GEO) | `/app/geo` (+ `history`, `citations`, `platforms`, `competitors`, `opportunities`), `/app/geo/prompts/[id]` | Prompt tracking with Add Prompt (platforms, cadence, country, tags), checks across ChatGPT/Claude/Gemini/Perplexity, visibility/citation/position/share-of-voice metrics, trends, cited sources, competitors, opportunities, prompt detail with answers, edit/duplicate/pause/archive |
@@ -55,7 +56,7 @@ Navigation follows the locked spec in `docs/design/navigation-batch1/`. Renamed 
 | Help & Support | `/app/help` | Help search, support requests with staff replies |
 | Getting Started | `/app/getting-started` | Checklist progress from real data (`GET /user/onboarding`) |
 | Search | `/app/search?q=` | Projects, editor documents, reports, keyword lists, Help Center, guides |
-| Connect Your Website | `/app/integrations/cms` | WordPress connect (application password), test, browse content |
+| Connect Your Website | `/app/integrations/cms` | WordPress (application password), Webflow (API token + collection), Shopify (Admin API token, `*.myshopify.com` only), custom website (signed webhook; secret shown once); test, disconnect |
 | Settings | `/app/settings/{account,workspace,project-defaults,integrations,ai-geo,notifications,billing,privacy}` | Profile, password, MFA, passkeys, sessions; workspace, members, invitations; project defaults; Google Search Console/GA4; AI & GEO preferences; notification preferences; data export and retention |
 
 ## Super Admin (`/admin`)

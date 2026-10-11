@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../commerce/entitlements.service';
 import { EditorService } from '../editor/editor.service';
 import { RequestMeta } from '../common/types/request-meta.type';
+import { normalizeHost } from '../common/utils/domain';
 import { parsePublicUrl, safeFetch } from '../common/utils/safe-fetch';
 import { SecretBox } from '../common/utils/secret-box';
 import { randomBytes } from 'crypto';
@@ -406,6 +407,47 @@ export class IntegrationsService {
     }
     const r = await this.googleGet<{ accountSummaries?: { displayName: string; propertySummaries?: { property: string; displayName: string }[] }[] }>(integrationId, 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries');
     return (r.accountSummaries ?? []).flatMap((a) => (a.propertySummaries ?? []).map((p) => ({ id: p.property, name: `${a.displayName} › ${p.displayName}` })));
+  }
+
+  /**
+   * Creates projects from Search Console sites ("Import from Google Search
+   * Console"). Only sites the connected account can see are accepted. A site
+   * whose domain already belongs to a project in the workspace is linked to
+   * that project instead of creating a duplicate.
+   */
+  async importSearchConsoleSites(userId: string, workspaceId: string, input: { integrationId: string; siteUrls: string[] }, meta?: RequestMeta) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'project.create');
+    const integ = await this.prisma.workspaceIntegration.findUnique({ where: { id: input.integrationId }, include: { provider: true } });
+    if (!integ || integ.workspaceId !== workspaceId || integ.provider.key !== 'google_search_console') {
+      throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Search Console connection not found in this workspace.' });
+    }
+    if (integ.status !== 'CONNECTED') throw new BadRequestException({ code: 'INTEGRATION_NOT_CONNECTED', message: 'Reconnect Google Search Console first.' });
+    const available = new Set((await this.googleProperties(userId, integ.id)).map((p) => p.id));
+    const results: { siteUrl: string; status: 'created' | 'linked' | 'failed'; projectId?: string; message?: string }[] = [];
+    for (const siteUrl of [...new Set(input.siteUrls)]) {
+      if (!available.has(siteUrl)) {
+        results.push({ siteUrl, status: 'failed', message: 'This site is not available on the connected Google account.' });
+        continue;
+      }
+      const host = normalizeHost(siteUrl.replace(/^sc-domain:/, ''));
+      if (!host) {
+        results.push({ siteUrl, status: 'failed', message: 'Not a public website domain.' });
+        continue;
+      }
+      try {
+        const existing = await this.prisma.domain.findFirst({ where: { host, project: { workspaceId, deletedAt: null } }, select: { projectId: true } });
+        const projectId = existing?.projectId ?? (await this.projects.create(userId, { workspaceId, name: host, domain: host }, meta)).id;
+        await this.linkProject(userId, projectId, { integrationId: integ.id, propertyId: siteUrl }, meta);
+        results.push({ siteUrl, status: existing ? 'linked' : 'created', projectId });
+      } catch (e) {
+        const message = (e as { response?: { message?: string } }).response?.message ?? 'Could not import this site.';
+        results.push({ siteUrl, status: 'failed', message });
+      }
+    }
+    if (results.length && results.every((r) => r.status === 'failed')) {
+      throw new BadRequestException({ code: 'IMPORT_FAILED', message: results.map((r) => `${r.siteUrl}: ${r.message}`).join(' ') });
+    }
+    return results;
   }
 
   async linkProject(userId: string, projectId: string, input: { integrationId: string; propertyId?: string }, meta?: RequestMeta) {

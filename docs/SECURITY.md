@@ -23,7 +23,8 @@
 
 - Audit records are written in the same transaction as the mutation they describe. `audit_logs` is append-only at the database layer.
 - Credits: an append-only ledger with unique idempotency keys, and a wallet cache maintained by trigger. See `DATA_MODEL.md`.
-- Webhooks (later batch): verify signature → insert into `webhook_events` (unique per provider event id) → acknowledge → process asynchronously.
+- Stripe webhooks: verify signature → insert into `webhook_events` (unique per provider event id) → acknowledge → process asynchronously on the job queue.
+- Outbound custom-website webhooks are signed (`X-AmpliVerify-Signature: t=…,v1=…`, HMAC-SHA256 over `t.body`).
 
 ## Secrets and credentials
 
@@ -31,6 +32,17 @@
 - `AUTH_SYNC_SECRET` must be at least 32 characters. It is compared in constant time via SHA-256 digests.
 - The first Super Admin is granted with `apps/api/scripts/bootstrap-super-admin.sql`, keyed by the Better Auth subject. Passwords never touch this API.
 
-## Not yet implemented (deliberately not simulated)
+## Abuse controls and hardening
 
-Email delivery for auth links (no provider chosen; production sending fails rather than pretends), MFA / step-up policy, production-grade login rate limiting (Better Auth's built-in limiter is in-memory, per instance), invitations, session/device management, billing and credit services, SEO/GEO jobs, provider secrets, full pagination, and abuse/risk controls. Launch gates are listed in guide §24.
+- Rate limits: Better Auth limits stored in the auth database (shared across instances; tighter limits on sign-in, sign-up, password reset, verification email and MFA verification). API limit per user or IP (`RATE_LIMIT_PER_MINUTE`), 10/min on public contact and job-application forms. Public forms also use a honeypot.
+- MFA (TOTP, backup codes), passkeys, and an admin-MFA policy enforced by the API from the JWT `twoFactorEnabled` claim.
+- Sessions and devices can be listed and revoked by the user and by staff; suspension signs a user out everywhere.
+- Content-Security-Policy, HSTS, frame denial and related headers on the web app; editor HTML is sanitized with DOMPurify.
+- Outbound requests (audits, CMS, webhooks) go through the SSRF-safe fetcher; private addresses are refused in production.
+- Provider credentials (CMS, Google) are encrypted at rest with `INTEGRATION_ENCRYPTION_KEY` (32+ characters).
+- CSV exports neutralize spreadsheet formulas. Uploaded application files stay undownloadable until a ClamAV scan marks them clean.
+- Retention: deleted projects are purged after `PROJECT_PURGE_GRACE_DAYS`; workspace retention settings are applied daily.
+
+## Open before launch
+
+Production hosting, backups, monitoring and alerting, load tests for the crawler and GEO checks, approved legal text, and production provider keys. Launch gates are listed in guide §24.
