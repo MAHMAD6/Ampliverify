@@ -57,3 +57,39 @@ jobs:
           AUTH_DATABASE_URL: postgresql://ampliverify:ci-only@localhost:5432/ampliverify_test
           AUTH_SYNC_SECRET: ci-build-only-sync-secret-0123456789
         run: npm run build
+
+  images:
+    # Builds both production images (not pushed) and smoke-tests the API image.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f docker/api.Dockerfile -t ampliverify-api:ci .
+      - name: Build web image
+        run: docker build -f docker/web.Dockerfile -t ampliverify-web:ci .
+      - name: Smoke-test API image (migrations + health)
+        run: |
+          docker network create smoke
+          docker run -d --name pg --network smoke -e POSTGRES_PASSWORD=ci-only -e POSTGRES_DB=ampliverify postgres:16-alpine
+          until docker exec pg pg_isready -U postgres -h 127.0.0.1; do sleep 2; done
+          docker run -d --name api --network smoke -p 4000:4000 \
+            -e DATABASE_URL=postgresql://postgres:ci-only@pg:5432/ampliverify \
+            -e BETTER_AUTH_JWKS_URL=http://localhost:3000/api/auth/jwks \
+            -e BETTER_AUTH_ISSUER=http://localhost:3000 \
+            -e BETTER_AUTH_AUDIENCE=http://localhost:3000 \
+            -e AUTH_SYNC_SECRET=ci-only-sync-secret-0123456789abcdef \
+            ampliverify-api:ci
+          for i in $(seq 1 30); do curl -sf http://localhost:4000/api/v1/health && exit 0; sleep 3; done
+          docker logs api; exit 1
+      - name: Smoke-test web image (serves pages)
+        run: |
+          docker run -d --name web -p 3000:3000 \
+            -e API_URL=http://localhost:4000 \
+            -e BETTER_AUTH_URL=http://localhost:3000 \
+            -e BETTER_AUTH_SECRET=ci-only-secret-0123456789abcdef0123 \
+            -e AUTH_DATABASE_URL=postgresql://postgres:ci-only@localhost:5432/ampliverify \
+            -e AUTH_SYNC_SECRET=ci-only-sync-secret-0123456789abcdef \
+            ampliverify-web:ci
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://localhost:3000/ && exit 0; sleep 3; done
+          docker logs web; exit 1
