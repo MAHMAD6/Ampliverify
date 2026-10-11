@@ -3,6 +3,16 @@ import { SettingsService, SETTING } from '../commerce/settings.service';
 import { EmailService } from '../notifications/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+/** Only absolute https URLs are published (no javascript: or relative links). */
+function httpsUrl(v: string | undefined) {
+  try {
+    const u = new URL(v?.trim() ?? '');
+    return u.protocol === 'https:' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Shapes of the platform.* settings edited in Super Admin → Settings. Every field is optional; unset = default. */
 export type GeneralSettings = {
   platformName?: string;
@@ -14,6 +24,11 @@ export type GeneralSettings = {
   maintenanceMode?: boolean;
   maintenanceMessage?: string;
   lowCreditThreshold?: number;
+  /** Public social profile URLs (footer icons). */
+  socialLinkedin?: string;
+  socialX?: string;
+  socialYoutube?: string;
+  socialInstagram?: string;
 };
 export type SecuritySettings = { requireAdminMfa?: boolean; allowPasskeys?: boolean; invitationExpiryDays?: number };
 export type StaffAlertKind = 'contact' | 'support' | 'application' | 'payment_failed' | 'incident';
@@ -71,6 +86,12 @@ export class PlatformService {
       allowSignup: g.allowSignup !== false,
       allowPasskeys: s.allowPasskeys !== false,
       maintenance: { enabled: g.maintenanceMode === true, message: g.maintenanceMessage?.trim() || null },
+      social: {
+        linkedin: httpsUrl(g.socialLinkedin),
+        x: httpsUrl(g.socialX),
+        youtube: httpsUrl(g.socialYoutube),
+        instagram: httpsUrl(g.socialInstagram),
+      },
     };
   }
 

@@ -6,7 +6,7 @@ import { loadSettings, SettingsGrid, SettingsSection, SettingsShell } from '@/co
 
 export const metadata = { title: 'General · Settings' };
 
-type General = { platformName?: string; platformUrl?: string; supportEmail?: string; defaultTimezone?: string; defaultLanguage?: string; allowSignup?: boolean; maintenanceMode?: boolean; maintenanceMessage?: string; lowCreditThreshold?: number };
+type General = { platformName?: string; platformUrl?: string; supportEmail?: string; defaultTimezone?: string; defaultLanguage?: string; allowSignup?: boolean; maintenanceMode?: boolean; maintenanceMessage?: string; lowCreditThreshold?: number; socialLinkedin?: string; socialX?: string; socialYoutube?: string; socialInstagram?: string };
 
 const TIMEZONES = ['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Sao_Paulo', 'Europe/London', 'Europe/Berlin', 'Europe/Paris', 'Europe/Madrid', 'Africa/Johannesburg', 'Asia/Dubai', 'Asia/Karachi', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney'];
 const LANGUAGES = [
@@ -39,6 +39,18 @@ export default async function GeneralSettingsPage() {
               <Field label="Support email" htmlFor="g-mail" hint="Also receives staff alerts (see Notifications).">
                 <Input id="g-mail" name="supportEmail" type="email" maxLength={254} defaultValue={g.supportEmail ?? ''} placeholder="support@yourcompany.com" />
               </Field>
+              {(
+                [
+                  ['socialLinkedin', 'LinkedIn URL', 'https://www.linkedin.com/company/…'],
+                  ['socialX', 'X (Twitter) URL', 'https://x.com/…'],
+                  ['socialYoutube', 'YouTube URL', 'https://www.youtube.com/@…'],
+                  ['socialInstagram', 'Instagram URL', 'https://www.instagram.com/…'],
+                ] as const
+              ).map(([name, label, ph]) => (
+                <Field key={name} label={label} htmlFor={`g-${name}`} hint="Shown as a footer icon on the website when set (https only).">
+                  <Input id={`g-${name}`} name={name} type="url" maxLength={300} defaultValue={g[name] ?? ''} placeholder={ph} />
+                </Field>
+              ))}
             </SettingsSection>
             <SettingsSection icon={<Globe2 size={24} />} tone="green" title="New Workspace Defaults" description="Applied when a workspace is created; owners can change them later.">
               <Field label="Default time zone" htmlFor="g-tz">
