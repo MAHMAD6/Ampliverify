@@ -68,3 +68,29 @@ export async function verifyValuation(id: string, inputs: Record<string, unknown
   if (!token) return { ok: false as const, message: 'Please sign in to connect your data.' };
   return send<{ id: string }>(`/user/valuations/${id}/verify`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(inputs) });
 }
+
+const ARTICLE_KINDS = ['blog', 'guides'] as const;
+const SLUG = /^[a-z0-9][a-z0-9-]{0,199}$/i;
+
+/** Newsletter sign-up (double opt-in; POST /public/newsletter). */
+export async function subscribeNewsletter(values: { email: string; source?: string; website?: string }) {
+  return send<{ received: boolean }>('/public/newsletter', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(values) });
+}
+
+/** "Was this article helpful?" vote. */
+export async function voteArticle(kind: (typeof ARTICLE_KINDS)[number], slug: string, helpful: boolean) {
+  if (!ARTICLE_KINDS.includes(kind) || !SLUG.test(slug)) return { ok: false as const, message: 'Article not found.' };
+  return send<{ recorded: boolean }>(`/public/${kind}/${slug}/feedback`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ helpful }) });
+}
+
+/** Reader comment (held for moderation). */
+export async function postComment(kind: (typeof ARTICLE_KINDS)[number], slug: string, values: { name: string; email: string; body: string; website?: string }) {
+  if (!ARTICLE_KINDS.includes(kind) || !SLUG.test(slug)) return { ok: false as const, message: 'Article not found.' };
+  return send<{ received: boolean }>(`/public/${kind}/${slug}/comments`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(values) });
+}
+
+/** Newsletter confirmation / unsubscribe links. */
+export async function newsletterToken(action: 'confirm' | 'unsubscribe', token: string) {
+  if (!/^[\w-]{10,100}$/.test(token)) return { ok: false as const, message: 'This link is invalid.' };
+  return send<{ subscribed?: boolean; unsubscribed?: boolean; unsubscribeToken?: string }>(`/public/newsletter/${action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }) });
+}

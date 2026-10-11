@@ -2,16 +2,20 @@
 
 export type Category = { name: string; slug: string } | null;
 
+export type ContentAuthor = { displayName: string; slug: string; bio?: string | null; avatarUrl?: string | null };
+
 export type ContentSummary = {
   slug: string;
-  /** Blog posts only: image from the Media Library (served at /media/:id). */
+  /** Image from the Media Library (served at /media/:id). */
   featuredMediaId?: string | null;
+  imageUrl?: string | null;
   title: string;
   excerpt: string | null;
   publishedAt: string;
   updatedAt?: string;
   category: Category;
-  author?: { displayName: string; slug: string } | null;
+  author?: ContentAuthor | null;
+  readingMinutes?: number;
 };
 
 export type ContentDetail = ContentSummary & {
@@ -19,7 +23,10 @@ export type ContentDetail = ContentSummary & {
   metaDescription: string | null;
   body: string | null;
   tags?: { name: string; slug: string }[];
-  author?: { displayName: string; slug: string; bio: string | null } | null;
+  showToc?: boolean;
+  showKeyTakeaways?: boolean;
+  allowComments?: boolean;
+  related?: ContentSummary[];
 };
 
 export type JobSummary = {
