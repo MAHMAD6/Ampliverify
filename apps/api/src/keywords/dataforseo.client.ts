@@ -70,6 +70,15 @@ export class DataForSeoClient {
     }
   }
 
+  /** Raw task result for callers that normalize other DataForSEO endpoints (website valuation). */
+  request(path: string, task: Record<string, unknown>, operation: string) {
+    return this.post(path, task, operation);
+  }
+
+  locationName(country: string) {
+    return this.location(country);
+  }
+
   private normalize(item: Item): KeywordRow {
     const data = (item.keyword_data as Item | undefined) ?? item;
     const info = (data.keyword_info as Item | undefined) ?? {};

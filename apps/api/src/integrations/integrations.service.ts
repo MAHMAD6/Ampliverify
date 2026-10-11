@@ -409,6 +409,71 @@ export class IntegrationsService {
     return (r.accountSummaries ?? []).flatMap((a) => (a.propertySummaries ?? []).map((p) => ({ id: p.property, name: `${a.displayName} › ${p.displayName}` })));
   }
 
+  /** Checks the caller may read the connection and that the property belongs to it. */
+  private async requireGoogleProperty(userId: string, integrationId: string, providerKey: 'google_analytics' | 'google_search_console', propertyId: string) {
+    const integ = await this.prisma.workspaceIntegration.findUnique({ where: { id: integrationId }, include: { provider: true } });
+    if (!integ || integ.provider.key !== providerKey || integ.status !== 'CONNECTED') {
+      throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Google connection not found.' });
+    }
+    const props = await this.googleProperties(userId, integrationId);
+    if (!props.some((p) => p.id === propertyId)) throw new BadRequestException({ code: 'PROPERTY_NOT_FOUND', message: 'That property is not available on the connected Google account.' });
+    return integ;
+  }
+
+  /** GA4 traffic summary for website valuation: last 30 days by channel, social sources, 12-month trends. */
+  async ga4ValuationSummary(userId: string, integrationId: string, propertyId: string) {
+    await this.requireGoogleProperty(userId, integrationId, 'google_analytics', propertyId);
+    type Rows = { rows?: { dimensionValues: { value: string }[]; metricValues: { value: string }[] }[] };
+    const run = (body: unknown) => this.googleGet<Rows>(integrationId, `https://analyticsdata.googleapis.com/v1beta/${propertyId}:runReport`, { method: 'POST', body });
+    const [channels, social, monthly] = await Promise.all([
+      run({ dateRanges: [{ startDate: '30daysAgo', endDate: 'yesterday' }], dimensions: [{ name: 'sessionDefaultChannelGroup' }], metrics: [{ name: 'sessions' }] }),
+      run({
+        dateRanges: [{ startDate: '30daysAgo', endDate: 'yesterday' }],
+        dimensions: [{ name: 'sessionSource' }],
+        metrics: [{ name: 'sessions' }],
+        dimensionFilter: { filter: { fieldName: 'sessionDefaultChannelGroup', stringFilter: { value: 'Organic Social' } } },
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+        limit: 10,
+      }),
+      run({ dateRanges: [{ startDate: '365daysAgo', endDate: 'yesterday' }], dimensions: [{ name: 'yearMonth' }, { name: 'sessionDefaultChannelGroup' }], metrics: [{ name: 'sessions' }], limit: 1000 }),
+    ]);
+    const byChannel = new Map((channels.rows ?? []).map((r) => [r.dimensionValues[0].value, Number(r.metricValues[0].value)]));
+    const total = [...byChannel.values()].reduce((a, b) => a + b, 0);
+    const months = new Map<string, { organic: number; social: number }>();
+    for (const r of monthly.rows ?? []) {
+      const ym = r.dimensionValues[0].value;
+      const key = `${ym.slice(0, 4)}-${ym.slice(4, 6)}`;
+      const m = months.get(key) ?? { organic: 0, social: 0 };
+      if (r.dimensionValues[1].value === 'Organic Search') m.organic += Number(r.metricValues[0].value);
+      if (r.dimensionValues[1].value === 'Organic Social') m.social += Number(r.metricValues[0].value);
+      months.set(key, m);
+    }
+    const trend = [...months.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-12);
+    return {
+      totalSessions: total,
+      organicSessions: byChannel.get('Organic Search') ?? 0,
+      socialSessions: byChannel.get('Organic Social') ?? 0,
+      socialSources: (social.rows ?? []).map((r) => ({ source: r.dimensionValues[0].value, sessions: Number(r.metricValues[0].value) })),
+      organicTrend: trend.map(([month, v]) => ({ month, value: v.organic })),
+      socialTrend: trend.map(([month, v]) => ({ month, value: v.social })),
+    };
+  }
+
+  /** Search Console totals for website valuation: last 28 days, and pages with impressions. */
+  async gscValuationSummary(userId: string, integrationId: string, siteUrl: string) {
+    await this.requireGoogleProperty(userId, integrationId, 'google_search_console', siteUrl);
+    type Rows = { rows?: { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number }[] };
+    const end = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const url = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`;
+    const [totals, pages] = await Promise.all([
+      this.googleGet<Rows>(integrationId, url, { method: 'POST', body: { startDate: start, endDate: end } }),
+      this.googleGet<Rows>(integrationId, url, { method: 'POST', body: { startDate: start, endDate: end, dimensions: ['page'], rowLimit: 25000 } }),
+    ]);
+    const t = totals.rows?.[0];
+    return { clicks: t?.clicks ?? 0, impressions: t?.impressions ?? 0, ctr: t?.ctr ?? 0, position: t?.position ?? null, pagesWithImpressions: pages.rows?.length ?? 0 };
+  }
+
   /**
    * Creates projects from Search Console sites ("Import from Google Search
    * Console"). Only sites the connected account can see are accepted. A site

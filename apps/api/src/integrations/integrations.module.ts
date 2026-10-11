@@ -8,5 +8,6 @@ import { IntegrationsService } from './integrations.service';
   imports: [ProjectsModule, EditorModule],
   controllers: [IntegrationsController],
   providers: [IntegrationsService],
+  exports: [IntegrationsService],
 })
 export class IntegrationsModule {}

@@ -508,6 +508,7 @@ model User {
   dataExports       DataExportRequest[]
   supportTickets    SupportTicket[]
   supportMessages   SupportTicketMessage[]
+  websiteValuations WebsiteValuation[]
 
   @@index([status])
   @@map("users")
@@ -651,6 +652,7 @@ model Workspace {
   invitations          WorkspaceInvitation[]
   dataExports          DataExportRequest[]
   supportTickets       SupportTicket[]
+  websiteValuations    WebsiteValuation[]
 
   @@unique([organizationId, slug])
   /// Target of the projects composite FK (project org must match workspace org).
@@ -2672,4 +2674,57 @@ model CaseStudy {
 
   @@index([status, publishedAt(sort: Desc)])
   @@map("case_studies")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Website Value Calculator
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ValuationKind {
+  ESTIMATE
+  VERIFIED
+  TEST
+}
+
+enum ValuationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+/// One website valuation. Anonymous estimates carry only a salted hash of the
+/// requester's IP (for usage limits); results are snapshots of the engine
+/// settings and provider data at calculation time.
+model WebsiteValuation {
+  id            String          @id @default(uuid()) @db.Uuid
+  domain        String          @db.Citext
+  kind          ValuationKind   @default(ESTIMATE)
+  status        ValuationStatus @default(PENDING)
+  userId        String?         @map("user_id") @db.Uuid
+  workspaceId   String?         @map("workspace_id") @db.Uuid
+  /// The estimate a verified valuation improves on.
+  parentId      String?         @map("parent_id") @db.Uuid
+  requesterHash String?         @map("requester_hash")
+  inputsJson    Json?           @map("inputs_json")
+  resultJson    Json?           @map("result_json")
+  valueLow      Int?            @map("value_low")
+  valueHigh     Int?            @map("value_high")
+  valueMid      Int?            @map("value_mid")
+  currency      String          @default("USD") @db.Char(3)
+  confidence    Int?
+  error         String?
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt   DateTime?       @map("completed_at") @db.Timestamptz(6)
+
+  user      User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workspace Workspace?         @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  parent    WebsiteValuation?  @relation("ValuationParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children  WebsiteValuation[] @relation("ValuationParent")
+
+  @@index([domain, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([requesterHash, createdAt(sort: Desc)])
+  @@index([kind, createdAt(sort: Desc)])
+  @@map("website_valuations")
 }

@@ -8,6 +8,6 @@ import { KeywordsService } from './keywords.service';
   imports: [ProjectsModule],
   controllers: [KeywordsController],
   providers: [DataForSeoClient, KeywordsService],
-  exports: [KeywordsService],
+  exports: [KeywordsService, DataForSeoClient],
 })
 export class KeywordsModule {}
