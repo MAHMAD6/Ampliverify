@@ -13,6 +13,31 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace", "apps/web"],
       "port": 3000
+    },
+    {
+      "name": "api-alt",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file=.env", "dist/main.js"],
+      "cwd": "apps/api",
+      "port": 4100,
+      "env": {
+        "PORT": "4100",
+        "BETTER_AUTH_JWKS_URL": "http://localhost:3100/api/auth/jwks",
+        "BETTER_AUTH_ISSUER": "http://localhost:3100",
+        "CORS_ORIGINS": "http://localhost:3100",
+        "WEB_URL": "http://localhost:3100"
+      }
+    },
+    {
+      "name": "web-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace", "apps/web", "--", "-p", "3100"],
+      "port": 3100,
+      "env": {
+        "API_URL": "http://localhost:4100",
+        "BETTER_AUTH_URL": "http://localhost:3100",
+        "BETTER_AUTH_ISSUER": "http://localhost:3100"
+      }
     }
   ]
 }

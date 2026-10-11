@@ -368,7 +368,8 @@ export class ValuationService implements OnModuleInit {
       verifiedChild: v.children?.[0] ?? null,
       access: level,
       showRange: s.showRange,
-      exports: { pdf: s.exports.pdf && (level === 'full' || level === 'full_api'), json: s.exports.json && level === 'full_api' },
+      // Exports are counted per workspace, so visitor estimates (no workspace) never export.
+      exports: { pdf: !!v.workspaceId && s.exports.pdf && (level === 'full' || level === 'full_api'), json: !!v.workspaceId && s.exports.json && level === 'full_api' },
       disclaimer: s.report.disclaimer,
       verifiedValuation: s.features.verifiedValuation,
     };
