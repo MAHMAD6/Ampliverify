@@ -7,7 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { ContentStorageService } from '../storage/content-storage.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { slugify } from '../common/utils/slug';
-import { detectFileType, IMAGE_TYPES } from '../storage/file-safety';
+import { detectFileType, IMAGE_TYPES, VIDEO_TYPES } from '../storage/file-safety';
 
 export type ArticleKind = 'BLOG' | 'GUIDE' | 'HELP' | 'CASE_STUDY';
 
@@ -27,7 +27,18 @@ export type ArticleInput = {
   customerName?: string;
   industry?: string | null;
   results?: { label: string; value: string }[];
+  readingMinutes?: number | null;
+  showToc?: boolean;
+  showKeyTakeaways?: boolean;
+  allowComments?: boolean;
+  /** Guides only: hand-picked related guides, in order. */
+  relatedIds?: string[];
 };
+
+/** Blog posts and guides share author, featured image, tags and display settings. */
+const RICH: ArticleKind[] = ['BLOG', 'GUIDE'];
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 
 const delegate = (prisma: PrismaService, kind: ArticleKind) =>
   ({ BLOG: prisma.blogPost, GUIDE: prisma.guide, HELP: prisma.helpArticle, CASE_STUDY: prisma.caseStudy })[kind] as unknown as {
@@ -107,7 +118,13 @@ export class CmsService {
     await this.guard(userId);
     const row = await delegate(this.prisma, kind).findUnique({
       where: { id },
-      ...(kind === 'BLOG' ? { include: { author: true, category: true, tags: { include: { tag: true } }, featuredMedia: true } } : kind === 'CASE_STUDY' ? {} : { include: { category: true } }),
+      ...(kind === 'BLOG'
+        ? { include: { author: true, category: true, tags: { include: { tag: true } }, featuredMedia: true } }
+        : kind === 'GUIDE'
+          ? { include: { author: true, category: true, tags: { include: { tag: true } }, featuredMedia: true, related: { orderBy: { position: 'asc' }, include: { related: { select: { id: true, title: true, slug: true, status: true } } } } } }
+          : kind === 'CASE_STUDY'
+            ? {}
+            : { include: { category: true } }),
     });
     if (!row) throw new NotFoundException({ code: 'CONTENT_NOT_FOUND', message: 'Content not found.' });
     const { bodyRef, ...rest } = row as Record<string, unknown> & { bodyRef: string };
@@ -150,16 +167,18 @@ export class CmsService {
       ...this.publishFields(input),
     };
     if (kind !== 'CASE_STUDY') data.categoryId = input.categoryId ?? null;
-    if (kind === 'BLOG') {
+    if (RICH.includes(kind)) {
       data.authorId = input.authorId ?? null;
       data.featuredMediaId = input.featuredMediaId ?? null;
+      Object.assign(data, this.displaySettings(input));
     }
     if (kind === 'CASE_STUDY') {
       Object.assign(data, { customerName: input.customerName!.trim(), industry: input.industry ?? null, summary: input.excerpt ?? null, coverMediaId: input.featuredMediaId ?? null, resultsJson: input.results ?? Prisma.DbNull });
       delete data.excerpt;
     }
     const row = await delegate(this.prisma, kind).create({ data });
-    if (kind === 'BLOG' && input.tags) await this.setTags(id, input.tags);
+    if (RICH.includes(kind) && input.tags) await this.setTags(kind, id, input.tags);
+    if (kind === 'GUIDE' && input.relatedIds) await this.setRelated(id, input.relatedIds);
     await this.audit(userId, `content.${kind.toLowerCase()}.create`, kind.toLowerCase(), id, { title: data.title as string, status: String(row.status) }, meta);
     return this.getArticle(userId, kind, id);
   }
@@ -187,11 +206,14 @@ export class CmsService {
     } else {
       Object.assign(data, { ...(input.excerpt !== undefined && { excerpt: input.excerpt }), ...(input.categoryId !== undefined && { categoryId: input.categoryId }) });
     }
-    if (kind === 'BLOG') Object.assign(data, { ...(input.authorId !== undefined && { authorId: input.authorId }), ...(input.featuredMediaId !== undefined && { featuredMediaId: input.featuredMediaId }) });
+    if (RICH.includes(kind)) {
+      Object.assign(data, { ...(input.authorId !== undefined && { authorId: input.authorId }), ...(input.featuredMediaId !== undefined && { featuredMediaId: input.featuredMediaId }), ...this.displaySettings(input) });
+    }
     // Touch updatedAt even when only the body changed.
     data.updatedAt = new Date();
     await delegate(this.prisma, kind).update({ where: { id }, data });
-    if (kind === 'BLOG' && input.tags) await this.setTags(id, input.tags);
+    if (RICH.includes(kind) && input.tags) await this.setTags(kind, id, input.tags);
+    if (kind === 'GUIDE' && input.relatedIds) await this.setRelated(id, input.relatedIds);
     const action = input.status === 'PUBLISHED' && current.status !== 'PUBLISHED' ? 'publish' : input.status === 'ARCHIVED' ? 'archive' : 'update';
     await this.audit(userId, `content.${kind.toLowerCase()}.${action}`, kind.toLowerCase(), id, { title: (data.title as string) ?? current.title, status: (data.status as string) ?? current.status }, meta);
     return this.getArticle(userId, kind, id);
@@ -209,15 +231,42 @@ export class CmsService {
     return { id, deleted: true };
   }
 
-  private async setTags(postId: string, names: string[]) {
+  private displaySettings(input: ArticleInput) {
+    if (input.readingMinutes !== undefined && input.readingMinutes !== null && !(Number.isInteger(input.readingMinutes) && input.readingMinutes >= 1 && input.readingMinutes <= 600)) {
+      throw new BadRequestException({ code: 'INVALID_READING_TIME', message: 'Reading time must be between 1 and 600 minutes.' });
+    }
+    return {
+      ...(input.readingMinutes !== undefined && { readingMinutes: input.readingMinutes }),
+      ...(input.showToc !== undefined && { showToc: input.showToc }),
+      ...(input.showKeyTakeaways !== undefined && { showKeyTakeaways: input.showKeyTakeaways }),
+      ...(input.allowComments !== undefined && { allowComments: input.allowComments }),
+    };
+  }
+
+  private async setTags(kind: ArticleKind, id: string, names: string[]) {
     const tags = [];
     for (const name of [...new Set(names.map((n) => n.trim()).filter(Boolean))].slice(0, 20)) {
       const slug = slugify(name, 'tag');
       tags.push(await this.prisma.cmsTag.upsert({ where: { slug }, create: { name, slug }, update: {} }));
     }
+    if (kind === 'GUIDE') {
+      await this.prisma.$transaction([this.prisma.guideTag.deleteMany({ where: { guideId: id } }), this.prisma.guideTag.createMany({ data: tags.map((t) => ({ guideId: id, tagId: t.id })) })]);
+      return;
+    }
     await this.prisma.$transaction([
-      this.prisma.blogPostTag.deleteMany({ where: { postId } }),
-      this.prisma.blogPostTag.createMany({ data: tags.map((t) => ({ postId, tagId: t.id })) }),
+      this.prisma.blogPostTag.deleteMany({ where: { postId: id } }),
+      this.prisma.blogPostTag.createMany({ data: tags.map((t) => ({ postId: id, tagId: t.id })) }),
+    ]);
+  }
+
+  /** Hand-picked related guides (max 6, never itself). */
+  private async setRelated(guideId: string, ids: string[]) {
+    const wanted = [...new Set(ids)].filter((x) => x !== guideId).slice(0, 6);
+    const found = await this.prisma.guide.findMany({ where: { id: { in: wanted } }, select: { id: true } });
+    if (found.length !== wanted.length) throw new BadRequestException({ code: 'RELATED_NOT_FOUND', message: 'A related guide no longer exists.' });
+    await this.prisma.$transaction([
+      this.prisma.guideRelated.deleteMany({ where: { guideId } }),
+      this.prisma.guideRelated.createMany({ data: wanted.map((relatedId, position) => ({ guideId, relatedId, position })) }),
     ]);
   }
 
@@ -266,9 +315,9 @@ export class CmsService {
     return this.prisma.cmsAuthor.findMany({ orderBy: { displayName: 'asc' }, include: { _count: { select: { blogPosts: true } }, user: { select: { id: true, email: true } } } });
   }
 
-  async upsertAuthor(userId: string, id: string | null, input: { displayName: string; slug?: string; bio?: string | null; userId?: string | null }, meta?: RequestMeta) {
+  async upsertAuthor(userId: string, id: string | null, input: { displayName: string; slug?: string; bio?: string | null; userId?: string | null; avatarMediaId?: string | null }, meta?: RequestMeta) {
     await this.guard(userId);
-    const data = { displayName: input.displayName.trim(), slug: slugify(input.slug || input.displayName, 'author'), bio: input.bio ?? null, userId: input.userId ?? null };
+    const data = { displayName: input.displayName.trim(), slug: slugify(input.slug || input.displayName, 'author'), bio: input.bio ?? null, userId: input.userId ?? null, ...(input.avatarMediaId !== undefined && { avatarMediaId: input.avatarMediaId }) };
     try {
       const a = id ? await this.prisma.cmsAuthor.update({ where: { id }, data }) : await this.prisma.cmsAuthor.create({ data });
       await this.audit(userId, id ? 'content.author.update' : 'content.author.create', 'cms_author', a.id, { displayName: a.displayName }, meta);
@@ -292,17 +341,20 @@ export class CmsService {
       where: q ? { OR: [{ altText: { contains: q, mode: 'insensitive' } }, { storageKey: { contains: q, mode: 'insensitive' } }] } : {},
       orderBy: { createdAt: 'desc' },
       take: 500,
-      include: { uploader: { select: { displayName: true, email: true } }, _count: { select: { blogPosts: true } } },
+      include: { uploader: { select: { displayName: true, email: true } }, _count: { select: { blogPosts: true, guides: true, authorAvatars: true } } },
     });
-    return rows.map((m) => ({ ...m, url: `/api/v1/public/media/${m.id}` }));
+    return rows.map((m) => ({ ...m, kind: m.mimeType.startsWith('video/') ? 'video' : 'image', url: `/api/v1/public/media/${m.id}` }));
   }
 
   async upload(userId: string, file: { buffer: Buffer; originalname: string; size: number } | undefined, altText: string | undefined, meta?: RequestMeta) {
     await this.guard(userId);
-    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', message: 'Choose an image to upload.' });
-    if (file.size > 10 * 1024 * 1024) throw new BadRequestException({ code: 'FILE_TOO_LARGE', message: 'Images must be 10 MB or smaller.' });
-    const type = detectFileType(file.buffer, IMAGE_TYPES);
-    if (!type) throw new BadRequestException({ code: 'UNSUPPORTED_FILE', message: 'Upload a PNG, JPEG, GIF or WebP image.' });
+    if (!file) throw new BadRequestException({ code: 'FILE_REQUIRED', message: 'Choose an image or video to upload.' });
+    const type = detectFileType(file.buffer, [...IMAGE_TYPES, ...VIDEO_TYPES]);
+    if (!type) throw new BadRequestException({ code: 'UNSUPPORTED_FILE', message: 'Upload a PNG, JPEG, GIF or WebP image, or an MP4, WebM or MOV video.' });
+    const video = type.mime.startsWith('video/');
+    if (file.size > (video ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES)) {
+      throw new BadRequestException({ code: 'FILE_TOO_LARGE', message: video ? 'Videos must be 50 MB or smaller.' : 'Images must be 10 MB or smaller.' });
+    }
     const id = randomUUID();
     const storageKey = `media/${id}.${type.ext}`;
     await this.storage.writeBuffer(storageKey, file.buffer, type.mime);
@@ -318,9 +370,11 @@ export class CmsService {
 
   async deleteMedia(userId: string, id: string, meta?: RequestMeta) {
     await this.guard(userId);
-    const asset = await this.prisma.mediaAsset.findUnique({ where: { id }, include: { _count: { select: { blogPosts: true } } } });
+    const asset = await this.prisma.mediaAsset.findUnique({ where: { id }, include: { _count: { select: { blogPosts: true, guides: true, authorAvatars: true } } } });
     if (!asset) throw new NotFoundException({ code: 'MEDIA_NOT_FOUND', message: 'File not found.' });
-    if (asset._count.blogPosts) throw new ConflictException({ code: 'MEDIA_IN_USE', message: 'This image is used by a blog post.' });
+    if (asset._count.blogPosts || asset._count.guides || asset._count.authorAvatars) {
+      throw new ConflictException({ code: 'MEDIA_IN_USE', message: 'This file is used as a featured image or author photo.' });
+    }
     await this.prisma.mediaAsset.delete({ where: { id } });
     await this.storage.delete(asset.storageKey).catch(() => undefined);
     await this.audit(userId, 'content.media.delete', 'media_asset', id, undefined, meta);

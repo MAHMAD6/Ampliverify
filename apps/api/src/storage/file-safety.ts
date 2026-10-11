@@ -9,6 +9,11 @@ const SIGNATURES: { mime: string; ext: string; test: (b: Buffer) => boolean }[] 
   { mime: 'image/webp', ext: 'webp', test: (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
   // DOCX is a ZIP container; accepted only where the caller allows it.
   { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', ext: 'docx', test: (b) => b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04 },
+  // ISO base media (MP4 / QuickTime): "ftyp" box at offset 4.
+  { mime: 'video/quicktime', ext: 'mov', test: (b) => b.subarray(4, 8).toString('latin1') === 'ftyp' && b.subarray(8, 10).toString('latin1') === 'qt' },
+  { mime: 'video/mp4', ext: 'mp4', test: (b) => b.subarray(4, 8).toString('latin1') === 'ftyp' },
+  // WebM / Matroska (EBML header).
+  { mime: 'video/webm', ext: 'webm', test: (b) => b.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) },
   { mime: 'application/msword', ext: 'doc', test: (b) => b.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) },
 ];
 
@@ -18,6 +23,7 @@ export function detectFileType(buffer: Buffer, allowed: string[]) {
 }
 
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+export const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 export const DOCUMENT_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
 
 export type ScanResult = 'CLEAN' | 'INFECTED' | 'FAILED';

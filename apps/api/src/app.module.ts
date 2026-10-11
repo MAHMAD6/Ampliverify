@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { PlatformModule } from './platform/platform.module';
 import { RetentionModule } from './retention/retention.module';
 import { ValuationModule } from './valuation/valuation.module';
+import { EngagementModule } from './engagement/engagement.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
 import { PlatformGuard } from './platform/platform.guard';
@@ -71,6 +72,7 @@ import { InsightsModule } from './insights/insights.module';
     PlatformModule,
     RetentionModule,
     ValuationModule,
+    EngagementModule,
     // Per-user (or per-IP when anonymous) request budget; see RateLimitGuard.
     ThrottlerModule.forRoot({ throttlers: [{ name: 'default', ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MINUTE ?? 600) }] }),
   ],

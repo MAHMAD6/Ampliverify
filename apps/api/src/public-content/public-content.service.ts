@@ -8,6 +8,12 @@ const MAX_LIMIT = 50;
 export type ListQuery = { q?: string; category?: string; limit?: number };
 
 const categorySelect = { select: { name: true, slug: true } } as const;
+const authorSelect = { select: { displayName: true, slug: true, bio: true, avatarMediaId: true } } as const;
+const media = (id: string | null | undefined) => (id ? `/api/v1/public/media/${id}` : null);
+/** ~225 words per minute, at least one minute. */
+const minutes = (text: string | null) => Math.max(1, Math.round((text ?? '').trim().split(/\s+/).filter(Boolean).length / 225));
+type AuthorRow = { displayName: string; slug: string; bio: string | null; avatarMediaId: string | null } | null;
+const author = (a: AuthorRow) => (a ? { displayName: a.displayName, slug: a.slug, bio: a.bio, avatarUrl: media(a.avatarMediaId) } : null);
 
 /**
  * Read-only content for the public website. Every query applies the
@@ -61,12 +67,27 @@ export class PublicContentService {
         excerpt: true,
         publishedAt: true,
         featuredMediaId: true,
+        readingMinutes: true,
+        bodyRef: true,
         category: categorySelect,
-        author: { select: { displayName: true, slug: true } },
+        author: authorSelect,
       },
       orderBy: { publishedAt: 'desc' },
       take: this.take(query.limit),
-    });
+    }).then((rows) => this.withReading(rows));
+  }
+
+  /** List rows gain author photo, image URL and reading time; body refs never leave the API. */
+  private async withReading<T extends { bodyRef: string; readingMinutes: number | null; featuredMediaId?: string | null; author?: AuthorRow }>(rows: T[]) {
+    return Promise.all(
+      rows.map(async ({ bodyRef, readingMinutes, featuredMediaId, author: a, ...rest }) => ({
+        ...rest,
+        featuredMediaId: featuredMediaId ?? null,
+        imageUrl: media(featuredMediaId),
+        author: author(a ?? null),
+        readingMinutes: readingMinutes ?? minutes(await this.storage.readText(bodyRef)),
+      })),
+    );
   }
 
   async getBlogPost(slug: string) {
@@ -82,36 +103,75 @@ export class PublicContentService {
         updatedAt: true,
         bodyRef: true,
         featuredMediaId: true,
+        readingMinutes: true,
+        showToc: true,
+        showKeyTakeaways: true,
+        allowComments: true,
+        categoryId: true,
+        id: true,
         category: categorySelect,
-        author: { select: { displayName: true, slug: true, bio: true } },
+        author: authorSelect,
         tags: { select: { tag: { select: { name: true, slug: true } } } },
       },
     });
     if (!post) throw this.notFound();
-    const { bodyRef, tags, ...rest } = post;
-    return { ...rest, tags: tags.map((t) => t.tag), body: await this.storage.readText(bodyRef) };
+    const { bodyRef, tags, author: a, id, categoryId, ...rest } = post;
+    const body = await this.storage.readText(bodyRef);
+    const related = await this.prisma.blogPost.findMany({
+      where: { ...this.live(), id: { not: id }, ...(categoryId ? { categoryId } : {}) },
+      select: { slug: true, title: true, excerpt: true, publishedAt: true, featuredMediaId: true, readingMinutes: true, bodyRef: true, category: categorySelect, author: authorSelect },
+      orderBy: { publishedAt: 'desc' },
+      take: 3,
+    });
+    return {
+      ...rest,
+      author: author(a),
+      imageUrl: media(post.featuredMediaId),
+      tags: tags.map((t) => t.tag),
+      readingMinutes: post.readingMinutes ?? minutes(body),
+      body,
+      related: await this.withReading(related),
+    };
   }
 
   listGuides(query: ListQuery) {
     return this.prisma.guide.findMany({
       where: { ...this.live(), ...this.searchFilter(query.q), ...(query.category && { category: { slug: query.category } }) },
-      select: { slug: true, title: true, excerpt: true, publishedAt: true, updatedAt: true, category: categorySelect },
+      select: { slug: true, title: true, excerpt: true, publishedAt: true, updatedAt: true, featuredMediaId: true, readingMinutes: true, bodyRef: true, category: categorySelect, author: authorSelect },
       orderBy: { publishedAt: 'desc' },
       take: this.take(query.limit),
-    });
+    }).then((rows) => this.withReading(rows));
   }
 
   async getGuide(slug: string) {
     const guide = await this.prisma.guide.findFirst({
       where: { slug, ...this.live() },
       select: {
-        slug: true, title: true, excerpt: true, seoTitle: true, metaDescription: true,
-        publishedAt: true, updatedAt: true, bodyRef: true, category: categorySelect,
+        id: true, slug: true, title: true, excerpt: true, seoTitle: true, metaDescription: true,
+        publishedAt: true, updatedAt: true, bodyRef: true, category: categorySelect, categoryId: true,
+        featuredMediaId: true, readingMinutes: true, showToc: true, showKeyTakeaways: true, allowComments: true,
+        author: authorSelect,
+        tags: { select: { tag: { select: { name: true, slug: true } } } },
+        related: { orderBy: { position: 'asc' }, select: { relatedId: true } },
       },
     });
     if (!guide) throw this.notFound();
-    const { bodyRef, ...rest } = guide;
-    return { ...rest, body: await this.storage.readText(bodyRef) };
+    const { bodyRef, tags, author: a, id, categoryId, related: picked, ...rest } = guide;
+    const body = await this.storage.readText(bodyRef);
+    const relSelect = { slug: true, title: true, excerpt: true, publishedAt: true, featuredMediaId: true, readingMinutes: true, bodyRef: true, category: categorySelect, author: authorSelect } as const;
+    // Hand-picked related guides first (published only), then the latest in the same category.
+    const chosen = picked.length ? await this.prisma.guide.findMany({ where: { ...this.live(), id: { in: picked.map((r) => r.relatedId) } }, select: { ...relSelect, id: true } }) : [];
+    const ordered = picked.map((r) => chosen.find((c) => c.id === r.relatedId)).filter((c): c is (typeof chosen)[number] => !!c);
+    const fill = ordered.length < 3 ? await this.prisma.guide.findMany({ where: { ...this.live(), id: { notIn: [id, ...ordered.map((c) => c.id)] }, ...(categoryId ? { categoryId } : {}) }, select: { ...relSelect, id: true }, orderBy: { publishedAt: 'desc' }, take: 3 - ordered.length }) : [];
+    return {
+      ...rest,
+      author: author(a),
+      imageUrl: media(guide.featuredMediaId),
+      tags: tags.map((t) => t.tag),
+      readingMinutes: guide.readingMinutes ?? minutes(body),
+      body,
+      related: await this.withReading([...ordered, ...fill].map(({ id: _id, ...r }) => r)),
+    };
   }
 
   listHelpArticles(query: ListQuery) {

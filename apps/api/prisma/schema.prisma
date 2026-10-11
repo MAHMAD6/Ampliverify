@@ -2034,16 +2034,20 @@ model NotificationDelivery {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model CmsAuthor {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String?  @unique @map("user_id") @db.Uuid
-  displayName String   @map("display_name")
-  slug        String   @unique @db.Citext
-  bio         String?
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String?  @unique @map("user_id") @db.Uuid
+  displayName   String   @map("display_name")
+  slug          String   @unique @db.Citext
+  bio           String?
+  /// Optional headshot from the media library.
+  avatarMediaId String?  @map("avatar_media_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  avatar    MediaAsset? @relation("AuthorAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
   blogPosts BlogPost[]
+  guides    Guide[]
 
   @@map("cms_authors")
 }
@@ -2069,26 +2073,32 @@ model CmsTag {
   slug      String   @unique @db.Citext
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  posts BlogPostTag[]
+  posts  BlogPostTag[]
+  guides GuideTag[]
 
   @@map("cms_tags")
 }
 
 model BlogPost {
-  id              String        @id @default(uuid()) @db.Uuid
-  authorId        String?       @map("author_id") @db.Uuid
-  categoryId      String?       @map("category_id") @db.Uuid
-  featuredMediaId String?       @map("featured_media_id") @db.Uuid
-  title           String
-  slug            String        @unique @db.Citext
-  status          PublishStatus @default(DRAFT)
-  excerpt         String?
-  bodyRef         String        @map("body_ref")
-  seoTitle        String?       @map("seo_title")
-  metaDescription String?       @map("meta_description")
-  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String        @id @default(uuid()) @db.Uuid
+  authorId         String?       @map("author_id") @db.Uuid
+  categoryId       String?       @map("category_id") @db.Uuid
+  featuredMediaId  String?       @map("featured_media_id") @db.Uuid
+  title            String
+  slug             String        @unique @db.Citext
+  status           PublishStatus @default(DRAFT)
+  excerpt          String?
+  bodyRef          String        @map("body_ref")
+  seoTitle         String?       @map("seo_title")
+  metaDescription  String?       @map("meta_description")
+  /// Admin override of the estimated reading time (minutes).
+  readingMinutes   Int?          @map("reading_minutes")
+  showToc          Boolean       @default(true) @map("show_toc")
+  showKeyTakeaways Boolean       @default(true) @map("show_key_takeaways")
+  allowComments    Boolean       @default(false) @map("allow_comments")
+  publishedAt      DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   author        CmsAuthor?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
   category      CmsCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
@@ -2114,23 +2124,61 @@ model BlogPostTag {
 
 /// Shown as "Resources" in Super Admin and "Guides" on the public site.
 model Guide {
-  id              String        @id @default(uuid()) @db.Uuid
-  categoryId      String?       @map("category_id") @db.Uuid
-  title           String
-  slug            String        @unique @db.Citext
-  status          PublishStatus @default(DRAFT)
-  excerpt         String?
-  bodyRef         String        @map("body_ref")
-  seoTitle        String?       @map("seo_title")
-  metaDescription String?       @map("meta_description")
-  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String        @id @default(uuid()) @db.Uuid
+  categoryId       String?       @map("category_id") @db.Uuid
+  authorId         String?       @map("author_id") @db.Uuid
+  featuredMediaId  String?       @map("featured_media_id") @db.Uuid
+  title            String
+  slug             String        @unique @db.Citext
+  status           PublishStatus @default(DRAFT)
+  excerpt          String?
+  bodyRef          String        @map("body_ref")
+  seoTitle         String?       @map("seo_title")
+  metaDescription  String?       @map("meta_description")
+  /// Admin override of the estimated reading time (minutes).
+  readingMinutes   Int?          @map("reading_minutes")
+  showToc          Boolean       @default(true) @map("show_toc")
+  showKeyTakeaways Boolean       @default(true) @map("show_key_takeaways")
+  allowComments    Boolean       @default(false) @map("allow_comments")
+  publishedAt      DateTime?     @map("published_at") @db.Timestamptz(6)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  category CmsCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category      CmsCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author        CmsAuthor?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  featuredMedia MediaAsset?    @relation("GuideFeaturedMedia", fields: [featuredMediaId], references: [id], onDelete: SetNull)
+  tags          GuideTag[]
+  related       GuideRelated[] @relation("GuideRelatedFrom")
+  relatedTo     GuideRelated[] @relation("GuideRelatedTo")
 
   @@index([status, publishedAt(sort: Desc)])
+  @@index([authorId])
   @@map("guides")
+}
+
+model GuideTag {
+  guideId String @map("guide_id") @db.Uuid
+  tagId   String @map("tag_id") @db.Uuid
+
+  guide Guide  @relation(fields: [guideId], references: [id], onDelete: Cascade)
+  tag   CmsTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([guideId, tagId])
+  @@index([tagId])
+  @@map("guide_tags")
+}
+
+/// Hand-picked related guides, in display order.
+model GuideRelated {
+  guideId   String @map("guide_id") @db.Uuid
+  relatedId String @map("related_id") @db.Uuid
+  position  Int    @default(0)
+
+  guide   Guide @relation("GuideRelatedFrom", fields: [guideId], references: [id], onDelete: Cascade)
+  related Guide @relation("GuideRelatedTo", fields: [relatedId], references: [id], onDelete: Cascade)
+
+  @@id([guideId, relatedId])
+  @@map("guide_related")
 }
 
 model HelpArticle {
@@ -2163,8 +2211,10 @@ model MediaAsset {
   uploadedBy String   @map("uploaded_by") @db.Uuid
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  uploader  User       @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
-  blogPosts BlogPost[]
+  uploader      User        @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
+  blogPosts     BlogPost[]
+  guides        Guide[]     @relation("GuideFeaturedMedia")
+  authorAvatars CmsAuthor[] @relation("AuthorAvatar")
 
   @@index([mimeType, uploadedBy])
   @@map("media_assets")
@@ -2727,4 +2777,71 @@ model WebsiteValuation {
   @@index([requesterHash, createdAt(sort: Desc)])
   @@index([kind, createdAt(sort: Desc)])
   @@map("website_valuations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public engagement: comments, article feedback, newsletter
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum CommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SPAM
+}
+
+/// Reader comments on blog posts and guides (only where the article allows
+/// comments). Everything is held for moderation; only APPROVED is public.
+model ArticleComment {
+  id          String         @id @default(uuid()) @db.Uuid
+  contentType CmsContentType @map("content_type")
+  articleId   String         @map("article_id") @db.Uuid
+  authorName  String         @map("author_name")
+  authorEmail String         @map("author_email") @db.Citext
+  body        String
+  status      CommentStatus  @default(PENDING)
+  ipHash      String?        @map("ip_hash")
+  moderatedBy String?        @map("moderated_by") @db.Uuid
+  moderatedAt DateTime?      @map("moderated_at") @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([contentType, articleId, status, createdAt])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("article_comments")
+}
+
+/// "Was this article helpful?" votes, one per article per visitor.
+model ArticleFeedback {
+  id          String         @id @default(uuid()) @db.Uuid
+  contentType CmsContentType @map("content_type")
+  articleId   String         @map("article_id") @db.Uuid
+  helpful     Boolean
+  voterHash   String         @map("voter_hash")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([contentType, articleId, voterHash])
+  @@index([contentType, articleId])
+  @@map("article_feedback")
+}
+
+enum NewsletterStatus {
+  PENDING
+  SUBSCRIBED
+  UNSUBSCRIBED
+}
+
+/// Double opt-in newsletter list. Tokens are stored hashed.
+model NewsletterSubscriber {
+  id             String           @id @default(uuid()) @db.Uuid
+  email          String           @unique @db.Citext
+  status         NewsletterStatus @default(PENDING)
+  tokenHash      String           @unique @map("token_hash")
+  source         String?
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  confirmedAt    DateTime?        @map("confirmed_at") @db.Timestamptz(6)
+  unsubscribedAt DateTime?        @map("unsubscribed_at") @db.Timestamptz(6)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("newsletter_subscribers")
 }

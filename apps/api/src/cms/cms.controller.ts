@@ -17,6 +17,7 @@ import {
   IsUrl,
   IsUUID,
   MaxLength,
+  Max,
   Min,
   MinLength,
   ValidateIf,
@@ -26,7 +27,7 @@ import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
 import { requestMeta } from '../common/types/request-meta.type';
-import { ArticleKind, CmsService } from './cms.service';
+import { ArticleKind, CmsService, MAX_VIDEO_BYTES } from './cms.service';
 import { CareersService } from './careers.service';
 
 const KINDS: Record<string, ArticleKind> = { blog: 'BLOG', guides: 'GUIDE', help: 'HELP', 'case-studies': 'CASE_STUDY' };
@@ -56,6 +57,11 @@ class ArticleDto {
   @IsOptional() @IsString() @MaxLength(160) customerName?: string;
   @IsOptional() @IsString() @MaxLength(120) industry?: string | null;
   @IsOptional() @IsArray() @ArrayMaxSize(10) @ValidateNested({ each: true }) @Type(() => ResultDto) results?: ResultDto[];
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() @Min(1) @Max(600) readingMinutes?: number | null;
+  @IsOptional() @IsBoolean() showToc?: boolean;
+  @IsOptional() @IsBoolean() showKeyTakeaways?: boolean;
+  @IsOptional() @IsBoolean() allowComments?: boolean;
+  @IsOptional() @IsArray() @ArrayMaxSize(6) @IsUUID('4', { each: true }) relatedIds?: string[];
 }
 class CategoryDto {
   @IsEnum(CmsContentType) contentType: CmsContentType;
@@ -71,6 +77,7 @@ class AuthorDto {
   @IsOptional() @IsString() @MaxLength(120) slug?: string;
   @IsOptional() @IsString() @MaxLength(2000) bio?: string | null;
   @IsOptional() @ValidateIf((_, v) => v !== null) @IsUUID() userId?: string | null;
+  @IsOptional() @ValidateIf((_, v) => v !== null) @IsUUID() avatarMediaId?: string | null;
 }
 class MediaDto {
   @IsOptional() @IsString() @MaxLength(300) altText?: string | null;
@@ -210,7 +217,7 @@ export class CmsController {
     return this.cms.media(a.userId, q);
   }
   @Post('admin/media')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_VIDEO_BYTES } }))
   upload(@CurrentActor() a: AuthenticatedActor, @UploadedFile() file: MulterFile | undefined, @Body() dto: MediaDto, @Req() req: Request) {
     return this.cms.upload(a.userId, file, dto.altText ?? undefined, requestMeta(req));
   }
