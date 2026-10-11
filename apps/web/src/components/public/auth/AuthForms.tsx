@@ -192,59 +192,6 @@ export function TwoFactorForm({ next }: { next?: string }) {
   );
 }
 
-export function SignupForm({ website, providers, footer }: { website?: string; providers: Provider[]; footer?: ReactNode }) {
-  const router = useRouter();
-  const { pending, error, setError, run } = useSubmit();
-
-  const submit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const email = String(f.get('email'));
-    run(async () => {
-      const { error: err } = await authClient.signUp.email({
-        name: String(f.get('name')).trim(),
-        email,
-        password: String(f.get('password')),
-        callbackURL: continueUrl({ website: String(f.get('website') ?? '').trim() || undefined }),
-      });
-      if (!err) return router.push(`/verify-email?email=${encodeURIComponent(email)}`);
-      if (err.status === 429) return setError('Too many attempts. Please wait a moment and try again.');
-      if (err.code === 'PASSWORD_TOO_SHORT') return setError('Use at least 8 characters for your password.');
-      setError(err.status === 422 || err.status === 400 ? 'Please check your details and try again.' : 'Your account could not be created. Please try again.');
-    });
-  };
-
-  return (
-    <>
-      <SocialButtons providers={providers} callbackURL={continueUrl({})} />
-      <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--mute)', margin: '14px 0' }}>or with email</div>
-      <form className={s.form} style={{ gridTemplateColumns: '1fr' }} onSubmit={submit}>
-        <Messages error={error} notice={null} />
-        <label>
-          Full name
-          <input className={s.input} name="name" autoComplete="name" placeholder="Your name" maxLength={160} required />
-        </label>
-        <label>
-          Work email
-          <input className={s.input} type="email" name="email" autoComplete="email" placeholder="you@company.com" required />
-        </label>
-        <label>
-          Password
-          <input className={s.input} type="password" name="password" autoComplete="new-password" minLength={8} maxLength={128} placeholder="At least 8 characters" required />
-        </label>
-        <label>
-          Website to audit
-          <input className={s.input} name="website" defaultValue={website} placeholder="yourwebsite.com" />
-        </label>
-        {footer}
-        <button type="submit" className={s.btn} disabled={pending}>
-          {pending ? 'Creating account…' : 'Create Account'} <ArrowRight size={18} />
-        </button>
-      </form>
-    </>
-  );
-}
-
 export function ForgotPasswordForm() {
   const { pending, error, notice, setNotice, run } = useSubmit();
   const submit = (e: FormEvent<HTMLFormElement>) => {

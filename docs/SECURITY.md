@@ -40,7 +40,11 @@
 - Content-Security-Policy, HSTS, frame denial and related headers on the web app; editor HTML is sanitized with DOMPurify.
 - Outbound requests (audits, CMS, webhooks) go through the SSRF-safe fetcher; private addresses are refused in production.
 - Provider credentials (CMS, Google) are encrypted at rest with `INTEGRATION_ENCRYPTION_KEY` (32+ characters).
-- CSV exports neutralize spreadsheet formulas. Uploaded application files stay undownloadable until a ClamAV scan marks them clean.
+- CSV exports neutralize spreadsheet formulas.
+- Passwords need 8+ characters with upper and lower case, a number and a symbol, enforced by the auth server on sign-up, reset and change.
+- Reader comments are held for moderation (honeypot, 5 per hour per visitor, 5 per minute per IP); emails are never published. Article votes and valuation limits identify visitors only by salted IP hashes.
+- Newsletter sign-up is double opt-in; tokens are stored hashed; confirm/unsubscribe run on a button press, never on link preview.
+- Website valuations: visitor estimates are rate-limited and capped per month; verified valuations only read Google properties the user's own connection can see. Uploaded application files stay undownloadable until a ClamAV scan marks them clean.
 - Retention: deleted projects are purged after `PROJECT_PURGE_GRACE_DAYS`; workspace retention settings are applied daily.
 
 ## Open before launch

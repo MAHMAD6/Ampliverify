@@ -6,7 +6,8 @@ import { twoFactor } from 'better-auth/plugins/two-factor';
 import { passkey } from '@better-auth/passkey';
 import { authPool } from './auth-db';
 import { sendAuthEmail } from './auth-email';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
+import { passwordProblems } from './password-policy';
 import { canRegister, syncUserToApi } from './auth-sync';
 
 const baseURL = (process.env.BETTER_AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, '');
@@ -74,6 +75,17 @@ export const authOptions = {
     },
   },
   socialProviders,
+  // Password policy (8+ characters, upper and lower case, a number and a symbol) for every path that sets a password.
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (!['/sign-up/email', '/reset-password', '/change-password'].includes(ctx.path)) return;
+      const body = (ctx.body ?? {}) as { password?: unknown; newPassword?: unknown };
+      const pw = typeof body.newPassword === 'string' ? body.newPassword : body.password;
+      if (typeof pw !== 'string') return;
+      const problems = passwordProblems(pw);
+      if (problems.length) throw new APIError('BAD_REQUEST', { code: 'PASSWORD_TOO_WEAK', message: `Password needs ${problems.join(', ')}.` });
+    }),
+  },
   databaseHooks: {
     user: {
       create: {

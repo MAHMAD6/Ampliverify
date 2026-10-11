@@ -1,7 +1,7 @@
 import { LibraryBig } from 'lucide-react';
 import { ContentList } from '@/components/admin/ContentList';
 
-export const metadata = { title: 'Resources' };
+export const metadata = { title: 'Guides' };
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
   const { tab, q } = await searchParams;

@@ -17,10 +17,18 @@ Visual system: public-website-v2 (green, Plus Jakarta Sans, `components/public/s
 
 | Screen | Route | Design | Data |
 |---|---|---|---|
-| Home / Features / How It Works / About | `/`, `/features`, `/how-it-works`, `/about` | public-website-v2 | Static |
+| Home / Features / How It Works | `/`, `/features`, `/how-it-works` | public-frontend-v3 (Home_Page, Features-Final, How-It_Works) | Static; laptop dashboard and examples are labelled sample data; Website Value Calculator teaser is live |
+| About | `/about` | public-website-v2 | Static |
+| Website Value Calculator | `/website-value` | website-value/Website_Value_HPge | `POST /public/valuations` (visitor) or `/user/valuations` (signed in); disabled with an explanation until DataForSEO is configured |
+| Website Value Report | `/website-value/report/[id]` (`?tab=`) | website-value/Detailed_Report | Polls while calculating; tabs Overview, Traffic & Search, Backlinks, Content, Social Media, Technical Health, Domain, Value Breakdown, Opportunities; detail tabs and PDF only on plans with full access (Super Admin → Valuation Engine Settings) |
+| Enhanced / Verified Valuation | `/website-value/report/[id]/enhance` | website-value/Enhanced_Valuation_Report | Connect GA4 / Search Console (returns to this page after Google consent), business inputs, live projected range and confidence, Generate Verified Valuation |
+| Newsletter confirm / unsubscribe | `/newsletter/confirm`, `/newsletter/unsubscribe` | — | Double opt-in; actions run on a button press, never on page load |
 | Pricing | `/pricing` (`?interval=annual`) | public-website-v2/Pricing | `GET /public/plans`: plan cards, compare table, saving %, the admin-flagged plan badged "Most Popular" |
-| Blog / Guides | `/blog`, `/guides` (`?q=&category=`) | public-website-v2/Resources | Published articles; blog posts show their featured image |
-| Article | `/blog/[slug]`, `/guides/[slug]`, `/help/[slug]` | public-website-v2/Guide article | Markdown, TOC, related articles |
+| Blog | `/blog` (`?q=&category=`) | public-frontend-v3/Blog_Landing_Page | Featured + latest posts with author photo, date and reading time; newsletter sign-up |
+| Guides | `/guides` (`?q=&category=`) | public-frontend-v3/Resources_Page | Featured guide, latest guides by category, newsletter sign-up |
+| Blog post | `/blog/[slug]` | public-frontend-v3/Blog_Details | Key takeaways, numbered contents, share (LinkedIn, X, Facebook, copy link), related articles, tags, subscribe, “Was this helpful?”, moderated comments when enabled |
+| Guide | `/guides/[slug]` | public-frontend-v3/Guide | Contents, featured image, callouts, tables, embedded videos, CTA, hand-picked or same-category related guides, comments when enabled |
+| Help article | `/help/[slug]` | public-website-v2/Guide article | Markdown, TOC, related articles |
 | Help Center | `/help` | public-website-v2/Help | Topics from published help articles |
 | Case Studies | `/case-studies`, `/case-studies/[slug]` | admin content redesign (#50) | Published case studies with results |
 | Webinars & Videos | `/webinars` | admin content redesign (#50) | Upcoming/past events (registration links) and videos |
@@ -30,7 +38,7 @@ Visual system: public-website-v2 (green, Plus Jakarta Sans, `components/public/s
 | Contact | `/contact` (`?topic=`) | public-website-v2/Contact | Stored in `contact_submissions`, routed to the admin inbox and staff alerts; reference shown on success |
 | Legal | `/legal` | public-auth/05, public-system-pages | Section structure; policy text pending approval |
 | Log In / Two-factor / Forgot / Reset / Verify | `/login`, `/login/two-factor`, `/forgot-password`, `/reset-password`, `/verify-email` | public-auth/01–04 | Better Auth: password, TOTP/backup codes, passkeys (if allowed), Google/Microsoft when configured |
-| Sign Up | `/signup` (`?website=&plan=`) | public-website-v2/Sign Up | Better Auth; closed to non-invited people when sign-up is turned off |
+| Sign Up | `/signup` (`?website=&plan=&interval=&next=`) | public-frontend-v3/Pricing (= Signup_Login) | Plan cards from the public catalog with monthly/annual toggle, Enterprise → Contact Sales, Google sign-up, password rules (enforced by the auth server), optional website, plan select; paid plans continue to Billing after email verification |
 | Invitation / Shared report | `/invite?token=`, `/r/[token]` | page map | Workspace invitation accept; public read-only report share |
 | 404 / 500 / Maintenance | `not-found`, `error.tsx`, `/maintenance` | public-system-pages/03–05 | Static |
 
@@ -73,9 +81,13 @@ Collapsible sidebar from `ADMIN_NAV` (`lib/nav.ts`). List screens share `AdminLi
 | Admin Activity / Audit Logs / Event Detail | `/admin/activity`, `/admin/audit-logs`, `…/[id]` | Append-only audit log |
 | Security & Access | `/admin/security` (`?tab=`) | Active sessions and devices (auth server), invitations, suspensions, security policy summary |
 | Content Overview | `/admin/content` | Counts per content type, recent changes |
-| Blog / Resources / Help / Case Studies | `/admin/{blog,resources,help,case-studies}` (+ `/new`, `/[id]`) | Drafts, scheduling, publish/archive, categories, authors, tags, featured image, SEO metadata, results (case studies) |
-| Categories & Tags, Authors | `/admin/categories`, `/admin/authors` | CRUD (categories in use cannot be deleted) |
-| Media Library | `/admin/media` | Validated image upload, alt text, delete when unused |
+| Blog Posts / Guides | `/admin/{blog,resources}` (+ `/new`, `/[id]`) | Create Guide design: block-type toolbar, image and video insert (upload, URL, Media Library), content blocks, Write/Preview, full screen, auto-saved drafts, Publish menu with scheduling, featured image, author, category, tags, reading time, show contents / key takeaways, allow comments, related guides, SEO metadata |
+| Help Articles / Case Studies | `/admin/{help,case-studies}` (+ `/new`, `/[id]`) | Drafts, scheduling, publish/archive, categories, SEO metadata, results (case studies) |
+| Comments | `/admin/comments` (`?status=`) | Approve, reject, mark spam or delete reader comments |
+| Newsletter | `/admin/newsletter` (`?status=`) | Subscribed / pending / unsubscribed, delete, CSV export of confirmed subscribers (audited) |
+| Website Value Calculator | `/admin/valuation` (engine), `/admin/valuation/{calculator,sources,limits,templates,history}`, `/admin/valuation/history/[id]` | Weights (normalize to 100%), multipliers, industry range, currency, value per visit, data sources with 30-day usage, confidence rules and thresholds, plan access, monthly limits, exports, feature controls, test calculations, change history, formula details, reset to default (confirmed); calculation history |
+| Categories & Tags, Authors | `/admin/categories`, `/admin/authors` | CRUD (categories in use cannot be deleted); author photos from the Media Library |
+| Media Library | `/admin/media` | Validated image (10 MB) and video (MP4/WebM/MOV, 50 MB) upload, alt text, delete when unused |
 | Videos, Webinars & Events | `/admin/videos`, `/admin/events` | CRUD with publish status |
 | Careers / Job editor / Applications | `/admin/careers`, `/admin/careers/{new,[id]}`, `/admin/careers/applications{,/[id]}` | Openings; application review, status, private notes, malware-scanned file download |
 | Support Requests / Contact Messages | `/admin/support{,/[id]}`, `/admin/support/contact` | Staff replies (customer notified), statuses |

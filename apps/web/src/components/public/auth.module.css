@@ -20,3 +20,58 @@
 .side > :not(.art) { position: relative; z-index: 1; }
 .art { z-index: 0; height: 28%; opacity: 0.45; }
 .side { position: sticky; top: 0; height: 100vh; box-sizing: border-box; }
+
+/* Sign Up with plans (Signup_Login design) */
+.sideBlue { background: radial-gradient(120% 80% at 0% 0%, #12306b 0%, #0b1b45 55%, #071233 100%); }
+.side .sideTitle { font-size: clamp(36px, 4vw, 56px); line-height: 1.05; font-weight: 800; letter-spacing: -0.02em; color: #fff; margin: 0 0 18px; }
+.side .sideTitle span { color: #5cc23a; }
+.sideLead { font-size: 20px; color: #c9d6ee; margin-bottom: 28px; }
+.sidePoints { list-style: none; padding: 0; margin: 0; display: grid; gap: 26px; }
+.sidePoints li { display: flex; gap: 18px; align-items: center; }
+.sidePoints li > span:first-child { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; color: #fff; flex: none; }
+.sidePoints b { display: block; font-size: 18px; color: #fff; }
+.sidePoints small { color: #c9d6ee; font-size: 15px; }
+.scoreCard { display: flex; gap: 16px; align-items: center; background: rgba(20, 45, 110, 0.85); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 16px 20px; max-width: 360px; position: relative; z-index: 1; }
+.scoreCard b { display: block; color: #fff; font-size: 18px; }
+.scoreCard small { color: #c9d6ee; }
+.topRow { width: min(820px, 100%); display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
+.backInline { display: inline-flex; gap: 6px; align-items: center; color: #0b1b35; font-weight: 600; }
+.signup { width: min(820px, 100%); }
+.signupHead { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 18px; }
+.interval { display: inline-flex; gap: 4px; align-items: center; border: 1px solid #d6dde3; border-radius: 12px; padding: 4px; background: #fff; }
+.interval button { border: 0; background: none; padding: 8px 18px; border-radius: 8px; font: inherit; font-weight: 600; color: #1d4ed8; cursor: pointer; }
+.interval .intervalOn { background: #1d4ed8; color: #fff; }
+.saveBadge { background: #16a34a; color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
+.planGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.planCard { position: relative; display: grid; justify-items: center; align-content: start; gap: 2px; text-align: center; border: 1px solid #dbe3ea; border-radius: 14px; padding: 16px 10px 12px; background: #f8fbff; font: inherit; color: #0b1b35; cursor: pointer; }
+.planCard b { font-size: 18px; margin-top: 6px; }
+.planCard small { font-size: 12px; color: #5d6b7c; }
+.planCard em { display: block; font-style: normal; font-weight: 700; color: #15803d; }
+.planCard ul { list-style: none; padding: 0; margin: 10px 0 8px; display: grid; gap: 4px; font-size: 12px; text-align: left; justify-self: stretch; }
+.planCard li { display: flex; gap: 6px; align-items: flex-start; }
+.planCard li svg { color: #16a34a; flex: none; margin-top: 1px; }
+.planOn { border: 2px solid #16a34a; background: #f2fbf5; }
+.planFeatured { border-color: #86d19e; }
+.popular { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #1d4ed8; color: #fff; font-size: 12px; font-weight: 700; border-radius: 8px; padding: 3px 12px; white-space: nowrap; }
+.planIcon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; color: #15803d; }
+.planPrice { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+.planPick { color: #15803d; margin-top: auto; }
+.planCta { margin-top: 6px; border: 1px solid #1d4ed8; color: #1d4ed8; border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 700; justify-self: stretch; }
+.planCtaOn { border-color: #16a34a; background: #e6f6ec; color: #0e5e2b; }
+.googleBtn { width: 100%; height: 52px; display: flex; gap: 12px; align-items: center; justify-content: center; border: 1px solid #c9d2db; border-radius: 10px; background: #fff; font: inherit; font-size: 17px; font-weight: 700; color: #0b1b35; cursor: pointer; }
+.gMark { font-weight: 900; font-size: 20px; color: #4285f4; }
+.signupForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+.lbl { font-size: 14px; font-weight: 700; color: #0b1b35; display: flex; gap: 6px; align-items: center; }
+.help { font-size: 12px; color: #5d6b7c; font-weight: 400; }
+.pwWrap { position: relative; display: block; }
+.pwWrap input { padding-right: 44px; }
+.pwWrap button { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: 0; color: #5d6b7c; cursor: pointer; display: grid; }
+.rules { background: #f4f7f9; border-radius: 10px; padding: 10px 14px; display: grid; gap: 4px; font-size: 13px; color: #5d6b7c; }
+.rules b { color: #0b1b35; }
+.rules span { display: flex; gap: 8px; align-items: center; }
+.ruleOk { color: #0e5e2b; }
+.ruleOk svg { color: #16a34a; }
+.submit { grid-column: 1 / -1; height: 58px; font-size: 19px; background: #0e5e2b; }
+.terms { grid-column: 1 / -1; text-align: center; font-size: 14px; color: #3c4a5c; }
+.terms a { color: #15803d; font-weight: 600; }
+@media (max-width: 760px) { .signupForm { grid-template-columns: minmax(0, 1fr); } }

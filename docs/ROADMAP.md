@@ -28,6 +28,8 @@ routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 | J — Reports | Done | HTML/PDF/CSV generation, schedules, share links |
 | K — Admin CMS & careers | Done | Blog/guides/help/case studies, categories, authors, media, videos, events; jobs, applications with scanned uploads; contact and support inbox |
 | L — Admin operations | Done | Module controls, feature flags with rules, platform settings that take effect (maintenance mode, sign-up gate, admin MFA, passkeys, invitation expiry, workspace defaults, staff alerts), usage & costs, system health, incidents, admin search, sessions/devices |
+| N — Public site v3 & content | Done | Public_Frontend designs: header/footer, Home, Features, How It Works, Blog, Guides, article pages, Sign Up with plans and password rules; Create Guide editor; video in the Media Library; moderated comments; article feedback; double opt-in newsletter |
+| O — Website Value Calculator | Done | Valuation engine (weighted factors, multipliers, confidence), DataForSEO / PageSpeed Insights / RDAP / site checks, verified valuations from GA4 and Search Console plus business inputs, plan access and limits, PDF, Super Admin engine settings and history |
 | M — Launch hardening | In progress | Done: CI (audit, typecheck, tests, build), Dockerfiles, CSP and security headers, API and auth rate limits, HTML sanitization, CSV formula neutralization, production env guards, project purge and audit retention. Open: hosting, backups, monitoring and alerting, load tests for crawler and GEO checks, legal text approval |
 
 ## Decisions taken
@@ -39,3 +41,7 @@ routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 1. Hosting target (e.g. Vercel + Fly/Render, or AWS).
 2. Approved legal text (privacy, terms, cookies).
 3. Production values for credit costs and packs.
+
+## Future (deferred by the client)
+
+- Transcript-based video editor (`docs/design/public-frontend-v3/Video-Editor.txt`): edit a video by editing its transcript, remove filler words and pauses, caption styles, vertical export.

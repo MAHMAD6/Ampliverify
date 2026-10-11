@@ -400,3 +400,44 @@ Generated from the NestJS controllers (`apps/api/src/**/*.controller.ts`). All r
 | GET | `/user/workspaces/:id/members` | user |
 | DELETE | `/user/workspaces/:id/members/:userId` | user |
 | PUT | `/user/workspaces/:id/members/:userId/role` | user |
+
+## engagement
+
+| Method | Route | Access |
+|---|---|---|
+| GET | `/admin/comments` | admin |
+| PATCH | `/admin/comments/:id` | admin |
+| DELETE | `/admin/comments/:id` | admin |
+| GET | `/admin/feedback/:kind` | admin |
+| GET | `/admin/newsletter` | admin |
+| DELETE | `/admin/newsletter/:id` | admin |
+| GET | `/admin/newsletter/export` | admin |
+| GET | `/public/:kind/:slug/comments` | public |
+| POST | `/public/:kind/:slug/comments` | public |
+| POST | `/public/:kind/:slug/feedback` | public |
+| POST | `/public/newsletter` | public |
+| POST | `/public/newsletter/confirm` | public |
+| POST | `/public/newsletter/unsubscribe` | public |
+
+## valuation
+
+| Method | Route | Access |
+|---|---|---|
+| GET | `/admin/valuation/changes` | admin |
+| GET | `/admin/valuation/history` | admin |
+| GET | `/admin/valuation/settings` | admin |
+| PUT | `/admin/valuation/settings` | admin |
+| POST | `/admin/valuation/settings/reset` | admin |
+| GET | `/admin/valuation/sources` | admin |
+| POST | `/admin/valuation/test` | admin |
+| GET | `/admin/valuation/usage` | admin |
+| GET | `/admin/valuation/valuations/:id` | admin |
+| POST | `/public/valuations` | public |
+| GET | `/public/valuations/:id` | public |
+| GET | `/public/valuations/:id/json` | public |
+| GET | `/public/valuations/:id/pdf` | public |
+| POST | `/public/valuations/:id/preview` | public |
+| GET | `/public/valuations/config` | public |
+| GET | `/user/valuations` | user |
+| POST | `/user/valuations` | user |
+| POST | `/user/valuations/:id/verify` | user |

@@ -73,7 +73,7 @@ Every external provider is optional; the dependent feature is disabled with an e
 | Email | `RESEND_API_KEY`, `EMAIL_FROM` |
 | AI ideas, briefs, editor suggestions, Claude GEO checks | `ANTHROPIC_API_KEY` |
 | GEO checks on ChatGPT / Gemini / Perplexity | `OPENAI_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY` |
-| Keyword research | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` |
+| Keyword research, Website Value Calculator | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` (valuations also use Google PageSpeed Insights: optional `PAGESPEED_API_KEY`, and public RDAP) |
 | CMS (WordPress, Webflow, Shopify, custom webhook) and Google credentials encryption | `INTEGRATION_ENCRYPTION_KEY` (32+ characters) |
 | Google Search Console / GA4 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
 | File storage | `STORAGE_DRIVER=s3` + `S3_*` (default: local `STORAGE_DIR`) |
