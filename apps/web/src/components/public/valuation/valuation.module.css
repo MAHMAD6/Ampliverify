@@ -108,5 +108,15 @@
   .tile { border-left: 0; border-top: 1px solid var(--line2); }
   .tile:first-child { border-top: 0; }
   .calc { flex-direction: column; }
+  .calc label { padding: 0 8px; gap: 8px; }
+  .calc input { font-size: 14.5px; }
+  .floatTag { display: none; }
+  .heroCard { padding: 18px; }
+  .reportTop { gap: 18px; }
+  .shot { max-height: 220px; }
+  .tabs a { padding: 12px 10px; font-size: 14px; }
+  .panel { padding: 18px; }
+  .banner, .dark { flex-direction: column; align-items: stretch; }
+  .banner a, .dark a { justify-content: center; }
   .dark { padding: 26px 22px; }
 }

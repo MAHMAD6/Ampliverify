@@ -57,7 +57,7 @@ export default async function GuidesPage({ searchParams }: { searchParams: Promi
                   {featured.category?.name ?? 'Guide'}
                   {featured.readingMinutes ? ` · ${featured.readingMinutes} min read` : ''}
                 </small>
-                <h2 className={s.h2} style={{ fontSize: 32 }}>
+                <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 32px)' }}>
                   {featured.title}
                 </h2>
                 {featured.excerpt && <p className={s.cardText}>{featured.excerpt}</p>}
@@ -68,7 +68,7 @@ export default async function GuidesPage({ searchParams }: { searchParams: Promi
             </Link>
           )}
           <div className={s.sectionHead}>
-            <h2 className={s.h2} style={{ fontSize: 30, margin: 0 }}>
+            <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 30px)', margin: 0 }}>
               {filtered ? 'Results' : 'Latest Articles'}
             </h2>
             {categories.length > 0 && (

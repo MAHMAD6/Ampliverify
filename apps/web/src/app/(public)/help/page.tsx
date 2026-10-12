@@ -50,7 +50,7 @@ export default async function HelpCenterPage({ searchParams }: { searchParams: P
         <div className={s.container}>
           {searching ? (
             <>
-              <h2 className={s.h2} style={{ fontSize: 30 }}>
+              <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 30px)' }}>
                 {articles.length ? `Results for “${q ?? category}”` : 'No matching articles'}
               </h2>
               <div className={s.roles} style={{ marginTop: 18 }}>
@@ -68,7 +68,7 @@ export default async function HelpCenterPage({ searchParams }: { searchParams: P
             </>
           ) : (
             <>
-              <h2 className={s.h2} style={{ fontSize: 34 }}>
+              <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 34px)' }}>
                 Browse by Topic
               </h2>
               <div className={s.grid3} style={{ marginTop: 22 }}>

@@ -5,8 +5,6 @@
 .container { width: min(1264px, calc(100% - 40px)); margin: 0 auto; }
 
 /* Header */
-.header { position: sticky; top: 0; z-index: 30; background: #fff; border-bottom: 1px solid #e6ece8; }
-.headerIn { display: flex; align-items: center; gap: 24px; height: 80px; }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--navy); }
 .brand b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; line-height: 1; }
 .brandAccent { color: var(--g500); }
@@ -14,21 +12,6 @@
 .brandDark .brandAccent { color: #5cc23a; }
 .brandDark small { color: #9fe2b1; }
 .brand small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--g700); margin-top: 3px; }
-.nav { display: flex; align-items: center; gap: 28px; margin-left: auto; font-size: 15px; font-weight: 500; }
-.nav > a, .navMenu > summary { padding: 28px 0; color: var(--navy); cursor: pointer; list-style: none; display: inline-flex; gap: 4px; align-items: center; }
-.navMenu > summary::-webkit-details-marker { display: none; }
-.nav a.on, .navMenu.on > summary { color: var(--g900); font-weight: 700; box-shadow: inset 0 -3px 0 var(--g700); }
-.navMenu { position: relative; }
-.navMenu > div { position: absolute; top: 100%; left: -16px; min-width: 200px; background: #fff; border: 1px solid var(--line2); border-radius: 12px; box-shadow: 0 18px 40px -20px rgba(11, 27, 53, 0.35); padding: 8px; display: grid; }
-.navMenu > div a { padding: 10px 12px; border-radius: 8px; color: var(--navy); display: flex; gap: 10px; align-items: center; white-space: nowrap; }
-.navMenu > div a svg { color: var(--g700); }
-.searchLink { margin-left: 22px; color: var(--navy); display: inline-flex; }
-.mobileMenu { position: absolute; right: 20px; top: 72px; background: #fff; border: 1px solid #e3e9e5; border-radius: 12px; padding: 12px; display: grid; gap: 4px; min-width: 240px; box-shadow: 0 18px 40px -20px rgba(11, 27, 53, 0.35); }
-.mobileMenu a { color: var(--navy); padding: 8px 10px; border-radius: 8px; }
-.mobileMenu a:hover { background: var(--g25); }
-.navMenu > div a:hover { background: var(--g25); color: var(--g900); }
-.login { margin-left: 28px; font-weight: 700; font-size: 15px; color: var(--navy); }
-.menuBtn { display: none; margin-left: auto; background: none; border: 1px solid var(--line2); border-radius: 8px; padding: 8px; color: var(--navy); }
 
 /* Buttons */
 .btn, .btnOutline, .btnWhite { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 52px; padding: 0 24px; border-radius: 10px; font-weight: 700; font-size: 16px; border: 2px solid transparent; cursor: pointer; font-family: inherit; white-space: nowrap; }
@@ -330,8 +313,6 @@ textarea.input { height: auto; min-height: 140px; padding: 14px 16px; resize: ve
   .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .footerGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .stepArrow, .toc { display: none; }
-  .nav, .login, .searchLink { display: none; }
-  .menuBtn { display: inline-flex; }
 }
 @media (max-width: 640px) {
   .grid2, .grid3, .grid4, .posts, .steps, .form { grid-template-columns: minmax(0, 1fr); }
@@ -347,3 +328,66 @@ textarea.input { height: auto; min-height: 140px; padding: 14px 16px; resize: ve
 }
 .site h1, .site h2, .site h3, .site h4 { color: var(--navy); }
 .site .ctaDark h2, .site .ctaDark h3, .site .side h1 { color: #fff; }
+
+/* ── Phone layout (mobile designs 13-Mobile-Home / 14-Mobile-Pricing) ── */
+@media (max-width: 640px) {
+  .container { width: calc(100% - 32px); }
+  .hero { padding: 40px 0 44px; }
+  .h1 { font-size: clamp(34px, 9.5vw, 42px); margin: 10px 0 14px; }
+  .h2 { font-size: clamp(26px, 7.5vw, 32px); }
+  .lead { font-size: 17px; line-height: 1.55; }
+  .eyebrowSpaced { font-size: 13px; letter-spacing: 0.16em; }
+  /* Full-width actions, as in the mobile designs. */
+  .heroActions { flex-direction: column; align-items: stretch; }
+  .heroActions > a, .heroActions > button { width: 100%; }
+  .checks { gap: 10px 18px; font-size: 14px; }
+  .brand b { font-size: 22px; }
+  .brand small { font-size: 9.5px; }
+  .brand img { width: 38px; height: 38px; }
+  /* Feature strip becomes stacked cards. */
+  .strip { border: 0; background: transparent; padding: 8px 0 0; }
+  .stripIn { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .stripItem { border: 1px solid var(--line2); border-radius: 14px; background: #fff; padding: 14px 16px; }
+  /* Steps become a vertical timeline. */
+  .steps { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .step { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 14px; text-align: left !important; padding: 0 0 22px; position: relative; border: 0; background: none; }
+  .step::before { content: ''; position: absolute; left: 19px; top: 40px; bottom: 0; width: 2px; background: var(--g50); }
+  .step:last-child::before { display: none; }
+  .step .num { position: static; grid-row: 1 / span 3; }
+  .step .icon { display: none; }
+  .step .cardTitle { margin: 6px 0 4px; font-size: 17px; }
+  .step .cardText { font-size: 15px; }
+  .loop { flex-direction: row; text-align: left; }
+  .card { padding: 20px; }
+  .cta { padding: 40px 18px; border-radius: 20px; }
+  .cta .heroActions { align-items: stretch; }
+  .sectionHead { align-items: flex-start; }
+  /* Topic chips scroll sideways instead of wrapping into many rows. */
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips a { flex: none; }
+  .featured > div:last-child { padding: 22px; }
+  .featured .cover, .featuredBlog .cover { min-height: 200px; height: 200px; }
+  .featuredBlog { padding: 12px; gap: 16px; }
+  .newsBand { padding: 24px 20px; gap: 14px; text-align: left; }
+  .newsIcon { width: 56px; height: 56px; }
+  .newsForm .btn, .newsCompact .btn { width: 100%; }
+  .detailCover { aspect-ratio: 16 / 9; }
+  .shareRow { flex-wrap: wrap; }
+  .articleCta { flex-direction: column; align-items: stretch; text-align: left; }
+  .teaserValue { font-size: 38px; }
+  .laptop { padding: 0 0 18px; }
+  .laptopBase { margin: 0; }
+  .lapStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lapRing { grid-column: 1 / -1; justify-self: center; }
+  /* Footer: brand row on top, link columns in pairs, CTA full width. */
+  .footer { padding: 40px 0 24px; }
+  .footerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
+  .footerGrid > div:first-child, .footerGrid > div:last-child { grid-column: 1 / -1; }
+  .footerGrid > div:last-child .btn { width: 100%; }
+  .copy { text-align: center; }
+  .form { gap: 14px; }
+  .faq summary { font-size: 16px; }
+}
+.site .footer h4 { color: #fff; }
+.numBadge { width: 36px; height: 36px; border-radius: 50%; background: var(--g900); color: #fff; font-weight: 800; display: inline-grid; place-items: center; }

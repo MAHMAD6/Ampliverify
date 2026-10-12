@@ -16,7 +16,7 @@ const PRIORITY = { High: ['#fdecec', '#b42318'], Medium: ['#fff5e0', '#b45309'],
 
 function Num({ n }: { n: number }) {
   return (
-    <span className={s.num} style={{ position: 'static', display: 'inline-grid' }}>
+    <span className={s.numBadge}>
       {n}
     </span>
   );

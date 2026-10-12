@@ -75,3 +75,22 @@
 .terms { grid-column: 1 / -1; text-align: center; font-size: 14px; color: #3c4a5c; }
 .terms a { color: #15803d; font-weight: 600; }
 @media (max-width: 760px) { .signupForm { grid-template-columns: minmax(0, 1fr); } }
+.mobileBrand { display: none; }
+@media (max-width: 900px) {
+  .main { padding: 20px 16px 40px; }
+  .mobileBrand { display: flex; width: 100%; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .mobileBrand b { font-size: 22px; font-weight: 800; color: #0b1b35; }
+  .mobileBrand b span { color: #15803d; }
+  .topRow { flex-direction: column-reverse; align-items: stretch; }
+  .topRow .tabs { width: 100% !important; }
+  .backInline { display: none; }
+  .signupHead { gap: 12px; }
+  .interval { align-self: flex-start; }
+  .planGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .planCard { padding: 14px 8px 10px; }
+  .planPrice { font-size: 24px; }
+}
+@media (max-width: 380px) {
+  .planGrid { grid-template-columns: minmax(0, 1fr); }
+}
+.backMobile { display: inline-flex; gap: 6px; align-items: center; color: #0b1b35; font-weight: 600; font-size: 14px; }

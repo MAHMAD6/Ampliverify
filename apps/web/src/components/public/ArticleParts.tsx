@@ -156,7 +156,7 @@ export function NewsletterBand({ eyebrow, title, text, source }: { eyebrow?: str
           </span>
           <div>
             {eyebrow && <small className={s.eyebrow} style={{ fontSize: 12 }}>{eyebrow}</small>}
-            <h2 className={s.h2} style={{ fontSize: 30, margin: '4px 0' }}>
+            <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 30px)', margin: '4px 0' }}>
               {title}
             </h2>
             <p style={{ color: 'var(--ink2)' }}>{text}</p>

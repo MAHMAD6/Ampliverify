@@ -94,6 +94,17 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
         </div>
       </aside>
       <main className={a.main} style={{ placeItems: 'start center', paddingTop: 28 }}>
+        <div className={a.mobileBrand}>
+          <Link href="/" style={{ display: 'flex', gap: 10, alignItems: 'center' }} aria-label="AmpliVerify home">
+            <Image src="/brand/mark-transparent.png" alt="" width={36} height={36} />
+            <b>
+              Ampli<span>Verify</span>
+            </b>
+          </Link>
+          <Link href="/" className={a.backMobile}>
+            <ArrowLeft size={16} /> Back to Site
+          </Link>
+        </div>
         <div className={a.topRow}>
           <div className={a.tabs} role="tablist" style={{ margin: 0, width: 380 }}>
             <span role="tab" aria-selected="true" className={a.tabOn}>

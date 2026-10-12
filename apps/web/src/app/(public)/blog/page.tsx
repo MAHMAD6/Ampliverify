@@ -66,7 +66,7 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
               <Cover imageUrl={featured.imageUrl} alt="" dark />
               <div style={{ display: 'grid', gap: 12 }}>
                 {featured.category && <span className={s.chipSm}>{featured.category.name}</span>}
-                <h2 className={s.h2} style={{ fontSize: 34, margin: 0 }}>
+                <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 34px)', margin: 0 }}>
                   {featured.title}
                 </h2>
                 {featured.excerpt && <p className={s.cardText} style={{ fontSize: 16 }}>{featured.excerpt}</p>}
@@ -80,7 +80,7 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
             </Link>
           )}
           <div className={s.sectionHead}>
-            <h2 className={s.h2} style={{ fontSize: 30, margin: 0 }}>
+            <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 30px)', margin: 0 }}>
               {filtered ? 'Results' : 'Latest Articles'}
             </h2>
             {filtered && (

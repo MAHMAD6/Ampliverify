@@ -48,7 +48,7 @@ export default function LegalPage() {
           <div>
             {POLICIES.map((p) => (
               <section key={p.id} id={p.id} style={{ marginBottom: 48, scrollMarginTop: 100 }}>
-                <h2 className={s.h2} style={{ fontSize: 30 }}>
+                <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 30px)' }}>
                   {p.title}
                 </h2>
                 <p className={s.cardText}>{p.intro}</p>

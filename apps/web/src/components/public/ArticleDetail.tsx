@@ -206,7 +206,7 @@ export async function GuideArticle({ guide }: { guide: ContentDetail }) {
         </div>
         {guide.related && guide.related.length > 0 && (
           <section style={{ paddingBottom: 72 }}>
-            <h2 className={s.h2} style={{ fontSize: 30 }}>
+            <h2 className={s.h2} style={{ fontSize: 'clamp(24px, 6vw, 30px)' }}>
               Related Articles
             </h2>
             <div className={s.posts}>
