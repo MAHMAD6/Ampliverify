@@ -57,10 +57,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   const audit = detail.ok ? detail.data : null;
   const history = await apiGet<AuditRunView[]>(`/user/projects/${project.id}/audits?limit=10`, { auth: true });
   const running = audit?.status === 'QUEUED' || audit?.status === 'RUNNING';
-  const findings: Finding[] = audit?.status === 'SUCCEEDED' ? audit.pages.flatMap((p) => p.findings).filter((f) => f.severity !== 'INFO' || active !== 'Overview') : [];
+  const findings: Finding[] = (audit?.status === 'SUCCEEDED' || audit?.status === 'PARTIAL') ? audit.pages.flatMap((p) => p.findings).filter((f) => f.severity !== 'INFO' || active !== 'Overview') : [];
   const byCategory = (c: string) => findings.filter((f) => f.category === c);
   const top = findings.filter((f) => f.status !== 'IGNORED' && f.status !== 'RESOLVED').sort((a, b) => a.priority - b.priority).slice(0, 5);
-  const scores = audit?.status === 'SUCCEEDED' ? audit.scores : null;
+  const scores = (audit?.status === 'SUCCEEDED' || audit?.status === 'PARTIAL') ? audit.scores : null;
 
   const SCORES = [
     { label: 'SEO Score', value: scores?.seo, text: 'Titles, descriptions, headings and structured data.' },
@@ -143,7 +143,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 ].map(([k, v]) => (
                   <div key={k as string}>
                     <dt>{k}</dt>
-                    <dd>{v || (audit?.status === 'SUCCEEDED' ? 'Missing' : 'Not analyzed yet')}</dd>
+                    <dd>{v || ((audit?.status === 'SUCCEEDED' || audit?.status === 'PARTIAL') ? 'Missing' : 'Not analyzed yet')}</dd>
                   </div>
                 ))}
               </dl>
@@ -165,8 +165,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
               ) : (
                 <div className={s.empty}>
                   <ClipboardList size={36} />
-                  <b>{audit?.status === 'SUCCEEDED' ? 'No open issues' : 'No recommendations yet'}</b>
-                  <small>{audit?.status === 'SUCCEEDED' ? 'This page passed every check.' : 'Run an audit to get data-driven recommendations for this page.'}</small>
+                  <b>{(audit?.status === 'SUCCEEDED' || audit?.status === 'PARTIAL') ? 'No open issues' : 'No recommendations yet'}</b>
+                  <small>{(audit?.status === 'SUCCEEDED' || audit?.status === 'PARTIAL') ? 'This page passed every check.' : 'Run an audit to get data-driven recommendations for this page.'}</small>
                 </div>
               )}
               {top.length > 0 && (
@@ -212,7 +212,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                 <span className={s.icon}>{i}</span>
                 <span>
                   <b>{t}</b>
-                  <small>{audit?.status === 'SUCCEEDED' || k === 'Content Strategy' ? x : 'Run an audit to see results.'}</small>
+                  <small>{(audit?.status === 'SUCCEEDED' || audit?.status === 'PARTIAL') || k === 'Content Strategy' ? x : 'Run an audit to see results.'}</small>
                 </span>
                 <ChevronRight size={18} />
               </Link>
@@ -223,7 +223,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
 
       {['Recommendations', 'Content', 'Technical', 'AI Search (GEO)'].includes(active) && (
         <section className={s.card}>
-          {audit?.status === 'SUCCEEDED' ? (
+          {(audit?.status === 'SUCCEEDED' || audit?.status === 'PARTIAL') ? (
             <FindingList
               projectId={project.id}
               findings={
@@ -313,7 +313,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                   {r.request?.url ?? 'Audit'}
                 </Link>
                 <span style={{ color: 'var(--muted)' }}>
-                  {r.status === 'SUCCEEDED' ? `Score ${r.scores?.overall ?? '—'}` : r.status.toLowerCase()} · {r.request?.scope === 'SITE' ? `${r.pagesCrawled ?? 0} pages` : 'page'} · {formatDateTime(r.startedAt)}
+                  {r.status === 'SUCCEEDED' || r.status === 'PARTIAL' ? `Score ${r.scores?.overall ?? '—'}` : r.status.toLowerCase()} · {r.request?.scope === 'SITE' ? `${r.pagesCrawled ?? 0} pages` : 'page'} · {formatDateTime(r.startedAt)}
                 </span>
               </li>
             ))}

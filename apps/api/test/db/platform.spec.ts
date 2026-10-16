@@ -77,6 +77,22 @@ describe('Platform modules', () => {
     const wallet = await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } });
     expect(Number(wallet.balanceCache)).toBe(500);
     expect(await h.prisma.creditPurchase.count({ where: { workspaceId } })).toBe(1);
+
+    // Refund: the purchase is marked for reconciliation; consumed credits are never reversed silently.
+    const refund = { id: `evt_refund_${workspaceId}`, type: 'charge.refunded', data: { object: { id: 'ch_1', payment_intent: `pi_${workspaceId}`, metadata: { workspaceId } } } };
+    const r = signed(refund);
+    await h.api().post('/api/v1/webhooks/stripe').set('stripe-signature', r.header).set('content-type', 'application/json').send(r.body).expect(200);
+    await h.jobs.drain(['billing.webhook']);
+    expect((await h.prisma.creditPurchase.findFirstOrThrow({ where: { workspaceId } })).status).toBe('REFUNDED');
+    expect(Number((await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } })).balanceCache)).toBe(500);
+  });
+
+  it('enforces the Professional plan price rule ($199/month)', async () => {
+    const admin = await h.provision('admin-price');
+    await grantGlobal(h.prisma, admin.id, 'SUPER_ADMIN');
+    expect(await h.prisma.planPrice.findFirst({ where: { plan: { code: 'professional' }, billingInterval: 'MONTHLY', currency: 'USD', active: true } })).toMatchObject({ amountMinor: BigInt(19_900) });
+    const res = await h.api().post('/api/v1/admin/plans/professional/prices').set(as(admin.bearer)).send({ billingInterval: 'MONTHLY', currency: 'USD', amountMinor: 9_900 }).expect(400);
+    expect(res.body.error.code).toBe('PRICE_POLICY');
   });
 
   it('lets admins manage plans, entitlements and two-person credit adjustments', async () => {

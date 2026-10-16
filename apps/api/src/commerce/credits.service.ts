@@ -171,11 +171,19 @@ export class CreditsService {
     return db ? run(db) : this.prisma.$transaction(run);
   }
 
-  /** Marks a reservation used and records the usage event. Idempotent. */
-  async settle(reservationId: string, opts: { projectId?: string | null; units?: number } = {}) {
+  /**
+   * Marks a reservation used and records the usage event. With `actualAmount`
+   * below the reserved amount, the unused part is returned (V1 manual §3:
+   * settle actual usage, release the rest). Idempotent.
+   */
+  async settle(reservationId: string, opts: { projectId?: string | null; units?: number; actualAmount?: Prisma.Decimal } = {}) {
     return this.prisma.$transaction(async (tx) => {
       const r = await tx.creditReservation.findUnique({ where: { id: reservationId } });
       if (!r || r.status !== 'RESERVED') return r;
+      const unused = opts.actualAmount !== undefined ? new Prisma.Decimal(r.amount).sub(opts.actualAmount) : new Prisma.Decimal(0);
+      if (unused.greaterThan(0)) {
+        await this.applyEntry(tx, { workspaceId: r.workspaceId, delta: unused, reason: 'REVERSAL', referenceType: `${r.referenceType}:unused`.slice(0, 120), referenceId: r.referenceId, idempotencyKey: `settle-return:${r.idempotencyKey}` });
+      }
       const usageKey = `usage:${r.idempotencyKey}`;
       const usage = (await tx.usageEvent.findUnique({ where: { idempotencyKey: usageKey } })) ?? (await tx.usageEvent.create({ data: { workspaceId: r.workspaceId, projectId: opts.projectId ?? null, featureKey: r.featureKey, units: opts.units ?? 1, idempotencyKey: usageKey } }));
       const settled = await tx.creditReservation.update({ where: { id: r.id }, data: { status: 'SETTLED', settledAt: new Date() } });

@@ -131,7 +131,7 @@ export class ReportsService implements OnModuleInit {
     switch (key) {
       case 'overview': {
         const [audits, tasksDone, geoRuns, briefs] = await Promise.all([
-          this.prisma.auditRun.count({ where: { projectId, status: 'SUCCEEDED', completedAt: inPeriod } }),
+          this.prisma.auditRun.count({ where: { projectId, status: { in: ['SUCCEEDED', 'PARTIAL'] }, completedAt: inPeriod } }),
           this.prisma.optimizationTask.count({ where: { projectId, status: 'DONE', updatedAt: inPeriod } }),
           this.prisma.geoRun.count({ where: { prompt: { projectId }, status: 'SUCCEEDED', completedAt: inPeriod } }),
           this.prisma.contentBrief.count({ where: { projectId, createdAt: inPeriod } }),
@@ -148,7 +148,7 @@ export class ReportsService implements OnModuleInit {
         };
       }
       case 'audit': {
-        const run = await this.prisma.auditRun.findFirst({ where: { projectId, status: 'SUCCEEDED', completedAt: { lte: inPeriod.lte } }, orderBy: { completedAt: 'desc' } });
+        const run = await this.prisma.auditRun.findFirst({ where: { projectId, status: { in: ['SUCCEEDED', 'PARTIAL'] }, completedAt: { lte: inPeriod.lte } }, orderBy: { completedAt: 'desc' } });
         if (!run) return { title: 'SEO audit', empty: 'No audit has been completed for this project yet.' };
         const s = run.summaryJson as { scores?: Record<string, number>; counts?: Record<string, number>; pagesCrawled?: number; request?: { url?: string } };
         return {

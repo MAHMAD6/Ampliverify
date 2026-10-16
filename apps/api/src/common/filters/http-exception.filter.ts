@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -15,6 +15,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
+    const requestId = host.switchToHttp().getRequest<Request & { requestId?: string }>()?.requestId ?? null;
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let code = 'INTERNAL_SERVER_ERROR';
@@ -42,13 +43,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       code = 'UNIQUE_CONSTRAINT_VIOLATION';
       message = 'A record with these values already exists.';
     } else {
-      this.logger.error(exception instanceof Error ? exception.stack ?? exception.message : exception);
+      this.logger.error(`[${requestId ?? '-'}] ${exception instanceof Error ? (exception.stack ?? exception.message) : String(exception)}`);
     }
 
     response.status(status).json({
       data: null,
       meta: {},
-      error: { code, message },
+      error: { code, message, requestId },
     });
   }
 }

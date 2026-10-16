@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+import type { Request, Response } from 'express';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
@@ -12,6 +14,15 @@ export function configureApp(app: INestApplication, config: ConfigService) {
   const trust = config.get<string>('TRUST_PROXY') ?? 'loopback, uniquelocal';
   app.getHttpAdapter().getInstance().set('trust proxy', trust === 'true' ? true : trust === 'false' ? false : trust);
   app.use(helmet());
+  // Request ID for logs and the error model (V1 manual §8): a well-formed incoming
+  // X-Request-Id (from the web server or proxy) is kept, otherwise one is generated.
+  app.use((req: Request & { requestId?: string }, res: Response, next: () => void) => {
+    const incoming = req.headers['x-request-id'];
+    const id = typeof incoming === 'string' && /^[\w.:-]{8,100}$/.test(incoming) ? incoming : `req_${randomUUID().replace(/-/g, '')}`;
+    req.requestId = id;
+    res.setHeader('x-request-id', id);
+    next();
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

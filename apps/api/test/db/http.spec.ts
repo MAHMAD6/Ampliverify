@@ -136,7 +136,8 @@ describe('HTTP API', () => {
 
     await api().get(`/api/v1/user/projects/${projectId}`).set('authorization', alice.bearer).expect(200);
     const denied = await api().get(`/api/v1/user/projects/${projectId}`).set('authorization', bob.bearer).expect(403);
-    expect(denied.body).toEqual({ data: null, meta: {}, error: { code: 'PERMISSION_DENIED', message: expect.any(String) } });
+    expect(denied.body).toEqual({ data: null, meta: {}, error: { code: 'PERMISSION_DENIED', message: expect.any(String), requestId: expect.stringMatching(/^req_[0-9a-f]{32}$/) } });
+    expect(denied.headers['x-request-id']).toBe(denied.body.error.requestId);
 
     const bobList = await api().get('/api/v1/user/projects').set('authorization', bob.bearer).expect(200);
     expect(bobList.body.data).toEqual([]);

@@ -93,7 +93,7 @@ export class RetentionService implements OnModuleInit {
       // Keep each project's latest completed audit, whatever its age.
       const latest = await this.prisma.$queryRaw<{ id: string }[]>`
         SELECT DISTINCT ON ("project_id") "id" FROM "audit_runs"
-         WHERE "project_id" = ANY(${ids}::uuid[]) AND "status" = 'SUCCEEDED'
+         WHERE "project_id" = ANY(${ids}::uuid[]) AND "status" IN ('SUCCEEDED', 'PARTIAL')
          ORDER BY "project_id", "completed_at" DESC`;
       const [audits, geo, keywords, reports] = await this.prisma.$transaction([
         this.prisma.auditRun.deleteMany({ where: { projectId: { in: ids }, startedAt: { lt: before }, id: { notIn: latest.map((l) => l.id) } } }),

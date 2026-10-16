@@ -301,9 +301,32 @@ export class BillingService implements OnModuleInit {
       case 'invoice.marked_uncollectible':
         await this.upsertInvoice(obj, event.type);
         return true;
+      case 'charge.refunded':
+      case 'charge.dispute.created':
+        await this.reconcileRefund(obj, event.type);
+        return true;
       default:
         return false;
     }
+  }
+
+  /**
+   * Refunds and disputes (V1 manual §6): the credit purchase is marked and
+   * staff are alerted for reconciliation. Credits are never reversed silently;
+   * one-time credit purchases are non-refundable by policy, so any balance
+   * change is a deliberate admin adjustment.
+   */
+  private async reconcileRefund(obj: StripeObject, type: string) {
+    const paymentIntent = (type === 'charge.dispute.created' ? obj.payment_intent : (obj.payment_intent ?? obj.id)) as string | undefined;
+    if (!paymentIntent) return;
+    const purchase = await this.prisma.creditPurchase.findUnique({ where: { providerPaymentId: String(paymentIntent) } });
+    if (!purchase) return;
+    if (type === 'charge.refunded' && purchase.status !== 'REFUNDED') {
+      await this.prisma.creditPurchase.update({ where: { id: purchase.id }, data: { status: 'REFUNDED' } });
+    }
+    await this.auditLog.record({ workspaceId: purchase.workspaceId, action: type === 'charge.refunded' ? 'credit.purchase.refunded' : 'credit.purchase.disputed', targetType: 'credit_purchase', targetId: purchase.id, afterState: { providerPaymentId: purchase.providerPaymentId, credits: purchase.credits } });
+    const ws = await this.prisma.workspace.findUnique({ where: { id: purchase.workspaceId }, select: { name: true } });
+    void this.platform.alertStaff('payment_failed', `${type === 'charge.refunded' ? 'Refund' : 'Dispute'}: ${ws?.name ?? purchase.workspaceId}`, `Stripe ${type} for credit purchase ${purchase.providerPaymentId} (${purchase.credits} credits). Credits were not changed automatically; reconcile in Super Admin → Credits if policy permits.`);
   }
 
   private async workspaceForCustomer(customerId: string | undefined) {

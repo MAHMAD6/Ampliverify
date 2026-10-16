@@ -142,12 +142,12 @@ export class InsightsService implements OnModuleInit {
   async summary(actorId: string, projectId: string) {
     const project = await this.projects.requireProject(actorId, projectId, 'project.read');
     const [lastAudit, auditCount, openFindings, tasks, verified, keywordLists, keywordsTracked, contentIdeas, briefs, editorDocs, reports, activity] = await Promise.all([
-      this.prisma.auditRun.findFirst({ where: { projectId, status: 'SUCCEEDED' }, orderBy: { completedAt: 'desc' } }),
+      this.prisma.auditRun.findFirst({ where: { projectId, status: { in: ['SUCCEEDED', 'PARTIAL'] } }, orderBy: { completedAt: 'desc' } }),
       this.prisma.auditRun.count({ where: { projectId } }),
       this.prisma.$queryRaw<{ severity: string; n: bigint }[]>`
         SELECT f."severity", COUNT(*) AS n FROM "audit_findings" f
           JOIN (SELECT DISTINCT ON (ap."page_id") ap."id" FROM "audit_pages" ap JOIN "audit_runs" ar ON ar."id" = ap."audit_run_id"
-                 WHERE ar."project_id" = ${projectId}::uuid AND ar."status" = 'SUCCEEDED' ORDER BY ap."page_id", ar."started_at" DESC) cur ON cur."id" = f."audit_page_id"
+                 WHERE ar."project_id" = ${projectId}::uuid AND ar."status" IN ('SUCCEEDED', 'PARTIAL') ORDER BY ap."page_id", ar."started_at" DESC) cur ON cur."id" = f."audit_page_id"
          WHERE f."status" IN ('OPEN', 'IN_PROGRESS', 'REGRESSED') GROUP BY f."severity"`,
       this.prisma.optimizationTask.groupBy({ by: ['status'], where: { projectId }, _count: true }),
       this.prisma.verificationRun.count({ where: { task: { projectId }, result: 'PASSED' } }),
@@ -185,7 +185,7 @@ export class InsightsService implements OnModuleInit {
     const where = { projectId: { in: ids } };
     const [pages, audits, tasksStarted, editorDocuments, reports] = await Promise.all([
       this.prisma.page.count({ where: { domain: { projectId: { in: ids } } } }),
-      this.prisma.auditRun.count({ where: { ...where, status: 'SUCCEEDED' } }),
+      this.prisma.auditRun.count({ where: { ...where, status: { in: ['SUCCEEDED', 'PARTIAL'] } } }),
       this.prisma.optimizationTask.count({ where: { ...where, status: { in: ['IN_PROGRESS', 'DONE'] } } }),
       this.prisma.editorDocument.count({ where }),
       this.prisma.report.count({ where: { ...where, status: 'SUCCEEDED' } }),
@@ -199,7 +199,7 @@ export class InsightsService implements OnModuleInit {
     const latest = ids.length
       ? await this.prisma.$queryRaw<{ project_id: string; summary_json: Prisma.JsonValue; completed_at: Date }[]>`
           SELECT DISTINCT ON ("project_id") "project_id", "summary_json", "completed_at" FROM "audit_runs"
-           WHERE "project_id" IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) AND "status" = 'SUCCEEDED'
+           WHERE "project_id" IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) AND "status" IN ('SUCCEEDED', 'PARTIAL')
            ORDER BY "project_id", "completed_at" DESC`
       : [];
     const openTasks = ids.length ? await this.prisma.optimizationTask.groupBy({ by: ['projectId'], where: { projectId: { in: ids }, status: { in: ['OPEN', 'IN_PROGRESS', 'BLOCKED'] } }, _count: true }) : [];

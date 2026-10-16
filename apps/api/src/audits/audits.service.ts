@@ -23,6 +23,8 @@ export type AuditRequest = {
   scope?: AuditScope;
   mode?: AuditMode;
   maxPages?: number;
+  /** Client-supplied key: repeating a request with the same key returns the first run (V1 manual §3). */
+  idempotencyKey?: string;
 };
 
 type RunRequestJson = {
@@ -109,6 +111,13 @@ export class AuditsService implements OnModuleInit {
       throw new ConflictException({ code: 'AUDIT_IN_PROGRESS', message: 'Several audits are already running for this project. Try again when they finish.' });
     }
 
+    const jobKey = req.idempotencyKey ? `audit-req:${project.workspaceId}:${req.idempotencyKey}` : null;
+    if (jobKey) {
+      const job = await this.prisma.backgroundJob.findUnique({ where: { jobKey } });
+      const previous = job?.payloadRef ? await this.prisma.auditRun.findUnique({ where: { id: String((JSON.parse(job.payloadRef) as { runId?: string }).runId) } }) : null;
+      if (previous) return this.runView(previous);
+    }
+
     const maxPages = scope === 'SITE' ? Math.min(Math.max(req.maxPages ?? 25, 1), 200) : 1;
     const requestJson: RunRequestJson = { url: url.toString(), scope, mode, maxPages, requestedBy: actorId };
 
@@ -116,20 +125,21 @@ export class AuditsService implements OnModuleInit {
       const created = await tx.auditRun.create({
         data: { projectId, domainId: domain!.id, trigger, status: 'QUEUED', summaryJson: { request: requestJson } as Prisma.InputJsonObject },
       });
-      await this.credits.charge(
+      // Reserve the page budget now; completion settles the pages actually checked and returns the rest.
+      await this.credits.reserve(
         {
           workspaceId: project.workspaceId,
-          projectId,
           featureKey: USAGE_FEATURE,
           units: scope === 'SITE' ? maxPages : 1,
           referenceType: 'audit_run',
           referenceId: created.id,
           idempotencyKey: `audit:${created.id}`,
           actorId,
+          ttlMinutes: 120,
         },
         tx,
       );
-      await this.jobs.enqueue(AUDIT_QUEUE, { runId: created.id }, { jobKey: `audit:${created.id}` }, tx);
+      await this.jobs.enqueue(AUDIT_QUEUE, { runId: created.id }, { jobKey: jobKey ?? `audit:${created.id}` }, tx);
       await this.auditLog.record(
         {
           actorUserId: actorId,
@@ -151,7 +161,7 @@ export class AuditsService implements OnModuleInit {
   /** Job handler. Safe to retry: a finished run is left untouched. */
   async process(runId: string) {
     const run = await this.prisma.auditRun.findUnique({ where: { id: runId }, include: { project: true } });
-    if (!run || run.status === 'SUCCEEDED' || run.status === 'CANCELED' || run.status === 'FAILED') return;
+    if (!run || run.status === 'SUCCEEDED' || run.status === 'PARTIAL' || run.status === 'CANCELED' || run.status === 'FAILED') return;
     const request = (run.summaryJson as { request: RunRequestJson }).request;
     await this.prisma.auditRun.update({ where: { id: runId }, data: { status: 'RUNNING', startedAt: new Date() } });
 
@@ -164,7 +174,7 @@ export class AuditsService implements OnModuleInit {
         where: { id: runId },
         data: { status: 'FAILED', completedAt: new Date(), summaryJson: { request, error: message } as Prisma.InputJsonObject },
       });
-      await this.credits.refund(run.project.workspaceId, `audit:${runId}`);
+      await this.releaseReservation(runId, 'audit failed');
       await this.failVerifications(runId, message);
       if (request.requestedBy) {
         await this.notifications.notify({
@@ -210,7 +220,7 @@ export class AuditsService implements OnModuleInit {
         });
 
         const previous = await tx.auditPage.findFirst({
-          where: { pageId: pageRow.id, auditRun: { status: 'SUCCEEDED' }, auditRunId: { not: runId } },
+          where: { pageId: pageRow.id, auditRun: { status: { in: ['SUCCEEDED', 'PARTIAL'] } }, auditRunId: { not: runId } },
           orderBy: { auditRun: { startedAt: 'desc' } },
           include: { findings: true },
         });
@@ -296,10 +306,13 @@ export class AuditsService implements OnModuleInit {
         responseTimeMs: first.metrics.responseTimeMs,
       },
     };
+    // Some pages could not be fetched: the audit is PARTIAL (V1 manual audit states).
     await this.prisma.auditRun.update({
       where: { id: runId },
-      data: { status: 'SUCCEEDED', completedAt: new Date(), summaryJson: summary as unknown as Prisma.InputJsonObject },
+      data: { status: result.errors.length > 0 && request.scope === 'SITE' ? 'PARTIAL' : 'SUCCEEDED', completedAt: new Date(), summaryJson: summary as unknown as Prisma.InputJsonObject },
     });
+    const reservation = await this.prisma.creditReservation.findUnique({ where: { idempotencyKey: `audit:${runId}` } });
+    if (reservation) await this.credits.settle(reservation.id, { projectId: run.projectId, units: n, actualAmount: await this.credits.costOf(USAGE_FEATURE, request.scope === 'SITE' ? n : 1) });
     await this.completeVerifications(runId);
 
     if (request.requestedBy) {
@@ -327,9 +340,14 @@ export class AuditsService implements OnModuleInit {
         tx,
       );
     });
-    await this.credits.refund(project.workspaceId, `audit:${runId}`);
+    await this.releaseReservation(runId, 'audit canceled');
     await this.failVerifications(runId, 'Audit canceled');
     return { id: runId, status: 'CANCELED' };
+  }
+
+  private async releaseReservation(runId: string, reason: string) {
+    const reservation = await this.prisma.creditReservation.findUnique({ where: { idempotencyKey: `audit:${runId}` } });
+    if (reservation) await this.credits.release(reservation.id, reason);
   }
 
   async list(actorId: string, projectId: string, limit = 50) {

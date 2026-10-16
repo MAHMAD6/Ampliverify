@@ -33,7 +33,7 @@ export class OptimizationService {
       SELECT DISTINCT ON (ap."page_id") ap."id"
         FROM "audit_pages" ap
         JOIN "audit_runs" ar ON ar."id" = ap."audit_run_id"
-       WHERE ar."project_id" = ${projectId}::uuid AND ar."status" = 'SUCCEEDED'
+       WHERE ar."project_id" = ${projectId}::uuid AND ar."status" IN ('SUCCEEDED', 'PARTIAL')
        ORDER BY ap."page_id", ar."started_at" DESC`;
     return rows.map((r) => r.id);
   }
@@ -42,7 +42,7 @@ export class OptimizationService {
     await this.projects.requireProject(actorId, projectId, 'seo.audit.read');
     const auditPageIds = await this.currentAuditPages(projectId);
     const lastRun = await this.prisma.auditRun.findFirst({
-      where: { projectId, status: 'SUCCEEDED' },
+      where: { projectId, status: { in: ['SUCCEEDED', 'PARTIAL'] } },
       orderBy: { completedAt: 'desc' },
       select: { id: true, completedAt: true },
     });

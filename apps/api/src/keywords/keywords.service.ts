@@ -57,11 +57,11 @@ export class KeywordsService {
       throw new BadRequestException({ code: 'QUERY_REQUIRED', message: 'Enter a keyword.' });
     }
 
-    // Charge first so a failed provider call can be refunded with the same key.
+    // Reserve first; a failed provider call releases the reservation (V1 manual §6).
     const record = await this.prisma.$transaction(async (tx) => {
       const q = await tx.keywordQuery.create({ data: { projectId, query, locale: language, countryCode: country, tool: input.tool, createdBy: actorId } });
-      await this.credits.charge({ workspaceId: project.workspaceId, projectId, featureKey: USAGE_FEATURE, referenceType: 'keyword_query', referenceId: q.id, idempotencyKey: `kw:${q.id}`, actorId }, tx);
-      return q;
+      const reservation = await this.credits.reserve({ workspaceId: project.workspaceId, featureKey: USAGE_FEATURE, referenceType: 'keyword_query', referenceId: q.id, idempotencyKey: `kw:${q.id}`, actorId, ttlMinutes: 15 }, tx);
+      return { ...q, reservationId: reservation.id };
     });
 
     let payload: { keywords?: KeywordRow[]; seed?: KeywordRow | null; serp?: SerpRow[] };
@@ -88,9 +88,8 @@ export class KeywordsService {
         }
       }
     } catch (err) {
-      await this.credits.refund(project.workspaceId, `kw:${record.id}`);
-      // A failed lookup does not count toward the plan limit.
-      await this.prisma.usageEvent.deleteMany({ where: { idempotencyKey: `usage:kw:${record.id}` } });
+      // A failed lookup is not charged and does not count toward the plan limit.
+      await this.credits.release(record.reservationId, 'keyword lookup failed');
       await this.prisma.keywordQuery.delete({ where: { id: record.id } });
       throw err;
     }
@@ -101,6 +100,7 @@ export class KeywordsService {
     await this.persistMetrics(rows, country, language);
     if (input.tool === 'SERP' && payload.serp) await this.persistSerp(query, country, language, payload.serp);
     await this.prisma.keywordQuery.update({ where: { id: record.id }, data: { resultRef: key, resultCount: payload.keywords?.length ?? payload.serp?.length ?? 0 } });
+    await this.credits.settle(record.reservationId, { projectId });
     return this.view(record.id, payload, { ...record, resultRef: key });
   }
 

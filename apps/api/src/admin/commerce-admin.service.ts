@@ -9,6 +9,9 @@ import { RequestMeta } from '../common/types/request-meta.type';
 
 export type PlanInput = { code?: string; name?: string; description?: string | null; status?: PlanStatus; isPublic?: boolean; isFeatured?: boolean; displayOrder?: number };
 export type PriceInput = { billingInterval: BillingInterval; currency: string; amountMinor: number };
+
+export const PROFESSIONAL_PLAN = 'professional';
+export const PROFESSIONAL_MONTHLY_USD_MINOR = 19_900;
 export type EntitlementInput = { featureKey: string; enabled: boolean; limit?: number | null; config?: unknown };
 export type FeatureInput = { key: string; name: string; moduleKey?: string | null; description?: string | null; valueType: EntitlementValueType };
 export type OverrideInput = { featureKey: string; enabled: boolean; limit?: number | null; reason: string; endsAt?: string | null };
@@ -101,6 +104,10 @@ export class CommerceAdminService {
     const plan = await this.prisma.plan.findUnique({ where: { code } });
     if (!plan) throw new NotFoundException({ code: 'PLAN_NOT_FOUND', message: 'Plan not found.' });
     if (!Number.isInteger(input.amountMinor) || input.amountMinor < 0) throw new BadRequestException({ code: 'PRICE_INVALID', message: 'Amount must be a whole number of minor units (e.g. cents).' });
+    // Approved business rule (V1 API manual §6): Professional is $199 per month.
+    if (code === PROFESSIONAL_PLAN && input.billingInterval === 'MONTHLY' && input.currency.toUpperCase() === 'USD' && input.amountMinor !== PROFESSIONAL_MONTHLY_USD_MINOR) {
+      throw new BadRequestException({ code: 'PRICE_POLICY', message: 'The Professional plan is $199/month by approved business rule.' });
+    }
     const price = await this.prisma.$transaction(async (tx) => {
       await tx.planPrice.updateMany({ where: { planId: plan.id, billingInterval: input.billingInterval, active: true }, data: { active: false } });
       const created = await tx.planPrice.create({

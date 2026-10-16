@@ -25,7 +25,7 @@ export type Finding = {
 export type AuditRunView = {
   id: string;
   projectId: string;
-  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELED';
+  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'PARTIAL' | 'FAILED' | 'CANCELED';
   trigger: string;
   startedAt: string;
   completedAt: string | null;

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { FindingStatus } from '@prisma/client';
 import { Request } from 'express';
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
 import { requestMeta } from '../common/types/request-meta.type';
@@ -27,6 +27,11 @@ class RequestAuditDto {
   @Min(1)
   @Max(200)
   maxPages?: number;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[\w.:-]{8,100}$/)
+  idempotencyKey?: string;
 }
 
 class FindingStatusDto {
