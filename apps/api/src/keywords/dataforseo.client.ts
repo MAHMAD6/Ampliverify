@@ -129,4 +129,57 @@ export class DataForSeoClient {
       .filter((i) => i.url && typeof i.rank_absolute === 'number')
       .map((i) => ({ position: i.rank_absolute as number, url: String(i.url), domain: String(i.domain ?? ''), title: (i.title as string | undefined) ?? null, type: String(i.type ?? 'organic') }));
   }
+
+  // ── Standard (queued) task mode: task_post → task_get (V1 manual §4.1) ──
+
+  private async call(method: 'GET' | 'POST', path: string, body: unknown, operation: string) {
+    if (!this.configured) throw new ServiceUnavailableException({ code: 'DATAFORSEO_NOT_CONFIGURED', message: 'Search data is not available yet.' });
+    const auth = Buffer.from(`${this.config.get('DATAFORSEO_LOGIN')}:${this.config.get('DATAFORSEO_PASSWORD')}`).toString('base64');
+    const started = Date.now();
+    let status = 'ok';
+    try {
+      const res = await fetch(`https://api.dataforseo.com/v3${path}`, {
+        method,
+        headers: { authorization: `Basic ${auth}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (res.status === 429 || res.status >= 500) {
+        status = res.status === 429 ? 'rate_limited' : `http_${res.status}`;
+        throw new TransientProviderError(`DataForSEO HTTP ${res.status}`);
+      }
+      const json = (await res.json().catch(() => ({}))) as { cost?: number; status_message?: string; tasks?: { id?: string; status_code?: number; status_message?: string; cost?: number; result?: Item[] | null }[] };
+      if (!res.ok) {
+        status = `http_${res.status}`;
+        throw new ServiceUnavailableException({ code: 'DATAFORSEO_ERROR', message: json.status_message ?? 'Search data provider error.' });
+      }
+      if (json.cost) await this.prisma.providerUsage.create({ data: { provider: 'dataforseo', operation, costMinor: BigInt(Math.round(json.cost * 100)), currency: 'USD' } });
+      return { task: json.tasks?.[0], cost: json.cost ?? 0 };
+    } catch (err) {
+      if (status === 'ok') status = 'network_error';
+      if (err instanceof TransientProviderError || err instanceof ServiceUnavailableException) throw err;
+      throw new TransientProviderError(err instanceof Error ? err.message : String(err));
+    } finally {
+      await this.prisma.providerEvent.create({ data: { provider: 'dataforseo', operation, status, latencyMs: Date.now() - started } }).catch(() => undefined);
+    }
+  }
+
+  /** Creates a queued task; returns the provider task id. */
+  async postTask(path: string, task: Record<string, unknown>, operation: string) {
+    const { task: t, cost } = await this.call('POST', path, [task], operation);
+    if (!t?.id || (t.status_code ?? 0) >= 40000) throw new ServiceUnavailableException({ code: 'DATAFORSEO_TASK_REJECTED', message: t?.status_message ?? 'The search task was rejected.' });
+    return { id: t.id, cost };
+  }
+
+  /** Reads a queued task; `ready` is false while DataForSEO is still processing it (40601/40602). */
+  async getTask(path: string, operation: string) {
+    const { task: t } = await this.call('GET', path, null, operation);
+    const code = t?.status_code ?? 0;
+    if (code === 40601 || code === 40602) return { ready: false as const, result: null, cost: 0 };
+    if (code >= 40000) throw new ServiceUnavailableException({ code: 'DATAFORSEO_TASK_FAILED', message: t?.status_message ?? 'The search task failed.' });
+    return { ready: true as const, result: t?.result?.[0] ?? null, cost: t?.cost ?? 0 };
+  }
 }
+
+/** Throttling, 5xx and network failures: safe to retry with backoff. */
+export class TransientProviderError extends Error {}

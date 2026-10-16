@@ -61,6 +61,8 @@ enum RunStatus {
   QUEUED
   RUNNING
   SUCCEEDED
+  /// Some providers/surfaces succeeded and others failed (V1 manual audit states).
+  PARTIAL
   FAILED
   CANCELED
 

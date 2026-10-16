@@ -153,20 +153,27 @@ export function PromptDetail({
   const answers = (
     <section className={s.panel}>
       <header className={s.head}>
-        <h2>AI Answers</h2>
+        <h2>Observed AI Answers</h2>
         {lastChecked && <small className={s.muted}>Checked {formatDateTime(lastChecked)}</small>}
       </header>
       {prompt.results.length === 0 ? (
-        <Empty icon={<MessageSquareText size={26} />} title="No answers yet" text="Run a check to capture each platform's answer to this prompt." action={runButton} />
+        <Empty icon={<MessageSquareText size={26} />} title="No answers yet" text="Run a check to observe Google AI Mode and AI Overview results for this query." action={runButton} />
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {prompt.results.map((r) => (
             <details key={r.id} className={s.answer} open={prompt.results.length === 1}>
               <summary>
-                <b>{r.platform.name}</b> · {r.status !== 'SUCCEEDED' ? humanize(r.status) : r.mentioned ? `Mentioned${r.position ? ` (#${r.position})` : ''}` : 'Not mentioned'}
+                <b>{r.platform.name}</b> ·{' '}
+                {r.status !== 'SUCCEEDED' ? humanize(r.status) : r.evidence && !r.evidence.aiPresent ? 'No AI answer shown' : r.mentioned ? `Mentioned${r.position ? ` (#${r.position})` : ''}` : 'Not mentioned'}
                 {r.cited ? ' · Cited' : ''}
-                {r.model ? <span className={s.muted}> · {r.model}</span> : null}
               </summary>
+              {r.evidence && (
+                <p className={s.evidence}>
+                  {r.evidence.aiPresent ? 'Observed' : 'Checked'} in {r.evidence.surfaceLabel} on {formatDateTime(r.evidence.observedAt)} for “{r.evidence.query}” · {r.evidence.location} · {r.evidence.language.toUpperCase()} · {r.evidence.device} · source: DataForSEO task {r.evidence.providerTaskId.slice(0, 18)}
+                </p>
+              )}
+              {r.evidence && !r.evidence.aiPresent && <p className={s.muted}>Google did not show an AI answer for this query and locale at that time. This is not evidence that your brand is absent from AI search in general.</p>}
+              {r.evidence?.aiPresent && !r.cited && <p className={s.muted}>Your domain was not cited in this snapshot. AI answers vary by query, location and time, so absence here is not universal absence.</p>}
               {r.error && <p className={s.muted}>{r.error}</p>}
               {r.excerpt && <blockquote>{r.excerpt}</blockquote>}
               {r.answer && <p className={s.answerText}>{r.answer}</p>}
@@ -195,7 +202,7 @@ export function PromptDetail({
         <h2>Top Citations</h2>
       </header>
       {allCitations.length === 0 ? (
-        <Empty icon={<FileText size={26} />} title="No citations yet" text="Run a check to see the sources AI platforms cite for this prompt." />
+        <Empty icon={<FileText size={26} />} title="No citations yet" text="Run a check to see the sources Google AI Mode and AI Overviews reference for this query." />
       ) : (
         <div className={s.tableWrap}>
           <table className={s.table}>

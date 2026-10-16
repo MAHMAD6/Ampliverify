@@ -22,10 +22,8 @@ type Connection = {
 type ProviderRow = { key: string; name: string; authType: string; available: boolean; connections: Connection[] };
 
 const GEO_TEXT: Record<string, { text: string; mark: string; color: string }> = {
-  chatgpt: { text: 'Monitor brand mentions and citations in ChatGPT search answers.', mark: 'C', color: '#10a37f' },
-  claude: { text: 'Track how Claude answers questions about your market.', mark: 'A', color: '#d97757' },
-  gemini: { text: 'Track visibility in Gemini answers grounded in Google Search.', mark: 'G', color: '#4285f4' },
-  perplexity: { text: 'Track visibility and source citations in Perplexity.', mark: 'P', color: '#1f7a8c' },
+  'google-ai-mode': { text: 'Observe brand mentions and cited sources in Google AI Mode answers (DataForSEO).', mark: 'AI', color: '#4285f4' },
+  'google-ai-overview': { text: 'Observe AI Overviews and organic results on Google Search (DataForSEO).', mark: 'G', color: '#0f9d58' },
 };
 const ANALYTICS: Record<string, { text: string; mark: string; color: string }> = {
   google_search_console: { text: 'Import clicks, impressions and positions for your queries and pages.', mark: 'SC', color: '#4285f4' },

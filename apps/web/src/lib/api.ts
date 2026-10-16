@@ -110,7 +110,8 @@ export async function apiPublicPost<T>(path: string, body: unknown): Promise<Mut
 export async function apiRaw(path: string) {
   const token = await getAccessToken();
   if (!token) return null;
-  return fetch(`${API_URL}/api/v1${path}`, { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
+  // Manual redirects: signed object-storage URLs are passed to the browser, never fetched with the bearer token.
+  return fetch(`${API_URL}/api/v1${path}`, { headers: { authorization: `Bearer ${token}` }, cache: 'no-store', redirect: 'manual' });
 }
 
 async function toMutation<T>(res: Response): Promise<MutationResult<T>> {

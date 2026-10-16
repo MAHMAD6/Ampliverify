@@ -54,7 +54,7 @@ Better Auth runs inside the web app at `/api/auth` (`apps/web/src/lib/auth.ts`):
 - **API tokens:** the jwt plugin mints 15-minute EdDSA bearer tokens for API calls (`lib/session.ts`) and serves `/api/auth/jwks`, which the API verifies. The web `BETTER_AUTH_ISSUER`/`BETTER_AUTH_AUDIENCE` must equal the API's, and the API's `BETTER_AUTH_JWKS_URL` must point at the web origin.
 - **Provisioning:** every Better Auth user create/update is synced into the API (`POST /internal/auth/users/sync`, `AUTH_SYNC_SECRET`). `/auth/continue` repeats the sync after each sign-in and, on first sign-in, creates the user's organization and default workspace.
 - **Route gate:** `/app` and `/admin` redirect to `/login` without a session cookie (`src/proxy.ts`). Permissions are always enforced by the API.
-- **Email:** email/password requires verification. Emails go through Resend (`RESEND_API_KEY`, `EMAIL_FROM` in both apps). For local testing set `AUTH_EMAIL_LOG_LINKS=true` (web) and `EMAIL_LOG_ONLY=true` (API) to print messages to the server log instead; the web flag only works when `BETTER_AUTH_URL` is localhost.
+- **Email:** email/password requires verification. Emails go through Amazon SES v2 (`SES_REGION`, a verified `EMAIL_FROM`, and `SES_ACCESS_KEY_ID`/`SES_SECRET_ACCESS_KEY` or the AWS credential chain, in both apps). For local testing set `AUTH_EMAIL_LOG_LINKS=true` (web) and `EMAIL_LOG_ONLY=true` (API) to print messages to the server log instead; the web flag only works when `BETTER_AUTH_URL` is localhost.
 - **Social:** Google and Microsoft buttons are enabled when their client id and secret are set.
 
 First Super Admin: sign up and verify the account, then take its Better Auth user id (`select id from "user" where email = '…'` in the auth database) and run this once:
@@ -70,13 +70,14 @@ Every external provider is optional; the dependent feature is disabled with an e
 | Feature | Variables |
 |---|---|
 | Payments, credit packs | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (webhook: `POST /api/v1/webhooks/stripe`) |
-| Email | `RESEND_API_KEY`, `EMAIL_FROM` |
-| AI ideas, briefs, editor suggestions, Claude GEO checks | `ANTHROPIC_API_KEY` |
-| GEO checks on ChatGPT / Gemini / Perplexity | `OPENAI_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY` |
+| Email (transactional, scheduled reports, staff alerts) | Amazon SES v2: `SES_REGION`, `EMAIL_FROM` (verified identity), optional `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` / `SES_CONFIGURATION_SET` |
+| AI ideas, briefs, editor suggestions | OpenAI Responses API with Structured Outputs: `OPENAI_API_KEY`, optional `OPENAI_MODEL` |
+| GEO / AI Search observations | DataForSEO Google AI Mode and Google organic (AI Overview), Standard queued mode: `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`. Results are saved provider evidence; no LLM answer is presented as an AI platform's ranking |
 | Keyword research, Website Value Calculator | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` (valuations also use Google PageSpeed Insights: optional `PAGESPEED_API_KEY`, and public RDAP) |
+| Job queue, shared throttling | `REDIS_URL` (BullMQ dispatch with a PostgreSQL outbox and a dead-letter queue; without it the API polls PostgreSQL) |
 | CMS (WordPress, Webflow, Shopify, custom webhook) and Google credentials encryption | `INTEGRATION_ENCRYPTION_KEY` (32+ characters) |
 | Google Search Console / GA4 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
-| File storage | `STORAGE_DRIVER=s3` + `S3_*` (default: local `STORAGE_DIR`) |
+| File storage | Private S3-compatible bucket: `STORAGE_DRIVER=s3` + `S3_*`; report downloads use short-lived signed URLs (`S3_SIGNED_URL_SECONDS`). Local `STORAGE_DIR` for development only |
 | Applicant file malware scanning | `CLAMAV_HOST`, `CLAMAV_PORT` (files stay undownloadable until scanned clean) |
 
 Credit costs, credit packs, the default plan, sign-up credits, maintenance mode, the sign-up gate, admin MFA and staff alert recipients are set in **Super Admin → Settings**.

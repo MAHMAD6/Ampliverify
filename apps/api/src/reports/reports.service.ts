@@ -251,9 +251,17 @@ export class ReportsService implements OnModuleInit {
     const report = await this.get(actorId, id);
     const f = report.files.find((x) => x.format === format);
     if (!f) throw new NotFoundException({ code: 'REPORT_FILE_NOT_FOUND', message: 'This report file is not available.' });
+    const filename = `${report.title.replace(/[^\w\- ]+/g, '').slice(0, 80) || 'report'}.${format}`;
+    const contentType = ({ html: 'text/html; charset=utf-8', pdf: 'application/pdf', csv: 'text/csv; charset=utf-8' } as Record<string, string>)[format] ?? 'application/octet-stream';
+    // PDF and CSV go straight from private object storage through a short-lived signed URL.
+    // HTML keeps streaming through the API so its restrictive CSP header always applies.
+    if (format !== 'html') {
+      const signed = await this.storage.signedUrl(f.storageKey, { filename, contentType });
+      if (signed) return { signedUrl: signed.url, expiresAt: signed.expiresAt, filename, contentType };
+    }
     const body = await this.storage.readBuffer(f.storageKey);
     if (!body) throw new NotFoundException({ code: 'REPORT_FILE_NOT_FOUND', message: 'This report file is not available.' });
-    return { body, filename: `${report.title.replace(/[^\w\- ]+/g, '').slice(0, 80) || 'report'}.${format}`, contentType: ({ html: 'text/html; charset=utf-8', pdf: 'application/pdf', csv: 'text/csv; charset=utf-8' } as Record<string, string>)[format] ?? 'application/octet-stream' };
+    return { body, filename, contentType };
   }
 
   async remove(actorId: string, id: string, meta?: RequestMeta) {

@@ -10,13 +10,13 @@ routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 | Schema (`apps/api/prisma`) | Models from the database guide plus the INPUTS gaps (workspace timezone/language, featured plan, contact/support tickets, videos/events/case studies, credit packs, privacy), migrations, integrity constraints | — |
 | API (`apps/api/src`) | All modules below, unit + DB integration tests | Load testing |
 | Web (`apps/web`) | Every public, user-app and admin screen wired to the API | Visual QA against each design at all breakpoints |
-| Infra | Postgres (docker), Postgres-backed job queue with worker in the API process, local/S3 storage, Resend email, Stripe, ClamAV, GitHub Actions CI, API and web Dockerfiles | Production hosting, backups, monitoring/alerting |
+| Infra | Postgres (docker), Postgres-backed job queue with worker in the API process, PostgreSQL outbox + Redis (BullMQ) job queue, S3 storage with signed URLs, Amazon SES email, Stripe, ClamAV, GitHub Actions CI, API and web Dockerfiles | Production hosting, backups, monitoring/alerting |
 
 ## Batches
 
 | Batch | Status | Notes |
 |---|---|---|
-| A — Platform infrastructure | Done | Job queue on `background_jobs` (`FOR UPDATE SKIP LOCKED`, retries, periodic jobs; `JOBS_WORKER=off` to disable) instead of Redis/BullMQ; S3-compatible storage (`STORAGE_DRIVER=s3`) with local fallback; Resend email |
+| A — Platform infrastructure | Done | Jobs: `background_jobs` outbox (idempotent keys, retries, periodic jobs) dispatched through Redis/BullMQ with a dead-letter queue when `REDIS_URL` is set (PostgreSQL polling otherwise); Redis-backed throttling; S3-compatible storage (`STORAGE_DRIVER=s3`) with short-lived signed URLs; Amazon SES email |
 | B — Credits, entitlements, billing | Done | Append-only credit ledger, charges/refunds, entitlement resolver (plan + overrides + default plan), Stripe checkout/portal/cancel/webhooks, credit packs, two-person credit adjustments |
 | C — Workspace, account, settings | Done | Members/invitations/roles, MFA (TOTP), passkeys, sessions, notification preferences + feed, project defaults, data export and retention, AI & GEO preferences |
 | D — SEO audit engine | Done | Crawler (SSRF-safe, robots.txt), rule catalogue from the SEO Audit Guide, scoring, scheduled audits |
@@ -34,7 +34,7 @@ routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 
 ## Decisions taken
 
-1. Payments: Stripe. 2. Email: Resend. 3. Keyword/SERP data: DataForSEO. 4. GEO platforms: ChatGPT (OpenAI Responses + web search), Claude (web search), Gemini (Google Search grounding), Perplexity (Sonar); editor/content AI: Claude. 5. Credit costs, packs, default plan and sign-up credits are set by admins in Settings → Credits & Billing (no hard-coded prices).
+1. Payments: Stripe. 2. Email: Amazon SES v2. 3. Keyword/SERP data: DataForSEO. 4. GEO: DataForSEO Google AI Mode and Google organic (AI Overview) observations stored as evidence (V1 API manual §4.1, §5); editor/content AI: OpenAI Responses API with Structured Outputs (§4.2). 5. Credit costs, packs, default plan and sign-up credits are set by admins in Settings → Credits & Billing (no hard-coded prices).
 
 ## Decisions still needed
 

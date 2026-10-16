@@ -17,6 +17,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
   if (!ALLOWED.some((re) => re.test(path))) return new NextResponse('Not found', { status: 404 });
   const res = await apiRaw(`/${path}`);
   if (!res) return NextResponse.redirect(new URL('/login', process.env.BETTER_AUTH_URL ?? 'http://localhost:3000'));
+  // Short-lived signed URL to private object storage (S3): send the browser there directly.
+  const location = res.headers.get('location');
+  if ((res.status === 302 || res.status === 303 || res.status === 307) && location && /^https:\/\//.test(location)) {
+    return new NextResponse(null, { status: 302, headers: { location, 'cache-control': 'private, no-store' } });
+  }
   if (!res.ok) return new NextResponse(res.status === 403 ? 'You do not have access to this file.' : 'File not available.', { status: res.status });
   const headers = new Headers();
   for (const h of ['content-type', 'content-disposition', 'content-security-policy']) {

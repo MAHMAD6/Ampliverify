@@ -31,7 +31,7 @@ It uploads `git archive HEAD`, then on the server installs dependencies, applies
 
 ## Provider keys
 
-Fill the empty keys in the two env files (Resend, Stripe, Anthropic/OpenAI/Gemini/Perplexity, DataForSEO, PageSpeed, Google OAuth), then as the `ampliverify` user run `pm2 restart all --update-env`. Without `RESEND_API_KEY` no verification email is sent, so nobody can finish signing up.
+Fill the empty keys in the two env files (Amazon SES, Stripe, OpenAI, DataForSEO, PageSpeed, Google OAuth, `REDIS_URL`, S3 bucket), then as the `ampliverify` user run `pm2 restart all --update-env`. Without `SES_REGION` and a verified `EMAIL_FROM` no verification email is sent, so nobody can finish signing up. Redis: install it on the host (`apt install redis-server`, bound to 127.0.0.1) and set `REDIS_URL=redis://127.0.0.1:6379` in `api.env`.
 
 ## First Super Admin
 

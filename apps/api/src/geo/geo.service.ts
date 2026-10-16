@@ -11,17 +11,25 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ContentStorageService } from '../storage/content-storage.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { WorkspaceSettings } from '../workspaces/workspaces.service';
-import { analyzeAnswer, GeoProviders } from './geo-providers';
+import { analyzeAnswer, GeoProviders, ObservationIncompleteError, SURFACE_LABEL, type Observation, type Surface } from './geo-providers';
 
 export type Cadence = 'MANUAL' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
 const USAGE_FEATURE = 'geo.check';
 const QUEUE = 'geo.run';
 
-type StoredResult = {
-  text: string;
-  citations: { url: string; title: string | null }[];
-  model: string;
-  analysis: ReturnType<typeof analyzeAnswer>;
+/**
+ * Evidence snapshot saved to object storage for every observation (V1 manual §5):
+ * search conditions, provider task, timestamp, AI answer, citations, linked
+ * domains, cost and the raw provider result. `inferenceLabel` keeps any
+ * AmpliVerify inference separate from what was observed.
+ */
+type StoredResult = Omit<Observation, 'raw'> & {
+  raw?: unknown;
+  /** Legacy field kept for older snapshots. */
+  model?: string;
+  analysis?: ReturnType<typeof analyzeAnswer>;
+  inferenceLabel: 'observed';
+  resultStatus: 'complete' | 'incomplete' | 'failed';
   error?: string;
 };
 
@@ -42,10 +50,14 @@ const hostOf = (url: string) => {
 };
 
 /**
- * AI Search (GEO): tracked prompts are asked on each AI platform, answers are
- * analyzed for brand mentions, ranking, competitor mentions and citations,
- * then rolled up into visibility metrics, trends and actionable opportunities.
- * Trends are only reported once there are at least two checks.
+ * AI Search (GEO): tracked queries are observed on Google AI Mode and Google
+ * organic results (AI Overview) through DataForSEO. Each observation is saved
+ * as evidence (query, locale, device, surface, provider task, timestamp,
+ * citations, linked domains) and analyzed for brand mentions, competitor
+ * mentions and citations, then rolled up into visibility metrics, trends and
+ * opportunities. Reports say "Observed in Google AI Mode at [date, query,
+ * locale]" only when saved evidence supports it; an LLM-generated answer is
+ * never presented as an AI platform's ranking or citation.
  */
 @Injectable()
 export class GeoService implements OnModuleInit {
@@ -73,15 +85,18 @@ export class GeoService implements OnModuleInit {
   async platforms() {
     const rows = await this.prisma.geoPlatform.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } });
     return rows.map((p) => {
-      const provider = (p.capabilities as { provider?: string } | null)?.provider ?? '';
-      return { id: p.id, key: p.key, name: p.name, provider, configured: this.providers.isConfigured(provider) };
+      const caps = (p.capabilities as { provider?: string; surface?: Surface } | null) ?? {};
+      const provider = caps.provider ?? '';
+      return { id: p.id, key: p.key, name: p.name, provider, surface: caps.surface ?? null, configured: this.providers.isConfigured(provider) && !!caps.surface };
     });
   }
 
   private async resolvePlatforms(keys: string[] | null | undefined, workspaceDefaults: string[] | undefined) {
     const all = await this.platforms();
     const wanted = keys?.length ? keys : workspaceDefaults?.length ? workspaceDefaults : all.map((p) => p.key);
-    return all.filter((p) => wanted.includes(p.key));
+    const picked = all.filter((p) => wanted.includes(p.key));
+    // Saved selections may name retired platforms; fall back to every active surface.
+    return picked.length ? picked : all;
   }
 
   // ── Prompts ────────────────────────────────────────────────────────────
@@ -221,7 +236,7 @@ export class GeoService implements OnModuleInit {
         opportunities: true,
       },
     });
-    const latest = runs.find((r) => r.status === 'SUCCEEDED' || r.status === 'FAILED') ?? runs[0];
+    const latest = runs.find((r) => r.status === 'SUCCEEDED' || r.status === 'PARTIAL' || r.status === 'FAILED') ?? runs[0];
     const results = latest
       ? await Promise.all(
           latest.platformResults.map(async (r) => {
@@ -233,6 +248,24 @@ export class GeoService implements OnModuleInit {
               answer: stored?.text ?? null,
               model: stored?.model ?? null,
               error: stored?.error ?? null,
+              evidence: stored?.surface
+                ? {
+                    provider: stored.provider ?? 'dataforseo',
+                    surface: stored.surface,
+                    surfaceLabel: SURFACE_LABEL[stored.surface] ?? stored.surface,
+                    query: stored.query,
+                    location: stored.location,
+                    language: stored.language,
+                    device: stored.device,
+                    observedAt: stored.observedAt,
+                    providerTaskId: stored.providerTaskId,
+                    aiPresent: stored.aiPresent,
+                    resultStatus: stored.resultStatus,
+                    linkedDomains: stored.linkedDomains ?? [],
+                    organic: (stored.organic ?? []).slice(0, 10),
+                    inferenceLabel: stored.inferenceLabel ?? 'observed',
+                  }
+                : null,
               mentioned: r.mentions.some((m) => m.mentionType === 'BRAND'),
               position: r.mentions.find((m) => m.mentionType === 'BRAND')?.positionHint ?? null,
               cited: r.mentions.some((m) => m.mentionType === 'BRAND_CITATION'),
@@ -244,7 +277,7 @@ export class GeoService implements OnModuleInit {
         )
       : [];
     const history = runs
-      .filter((r) => r.status === 'SUCCEEDED')
+      .filter((r) => r.status === 'SUCCEEDED' || r.status === 'PARTIAL')
       .map((r) => {
         const ok = r.platformResults.filter((x) => x.status === 'SUCCEEDED');
         const mentioned = ok.filter((x) => x.mentions.some((m) => m.mentionType === 'BRAND')).length;
@@ -293,17 +326,18 @@ export class GeoService implements OnModuleInit {
 
     const run = await this.prisma.$transaction(async (tx) => {
       const created = await tx.geoRun.create({ data: { promptId, trigger, status: 'QUEUED' } });
-      const { cost } = await this.credits.charge(
-        { workspaceId: project.workspaceId, projectId: project.id, featureKey: USAGE_FEATURE, units: platforms.length, referenceType: 'geo_run', referenceId: created.id, idempotencyKey: `geo:${created.id}`, actorId },
+      const reservation = await this.credits.reserve(
+        { workspaceId: project.workspaceId, featureKey: USAGE_FEATURE, units: platforms.length, referenceType: 'geo_run', referenceId: created.id, idempotencyKey: `geo:${created.id}`, actorId, ttlMinutes: 60 },
         tx,
       );
-      await tx.geoRun.update({ where: { id: created.id }, data: { creditCost: cost } });
+      await tx.geoRun.update({ where: { id: created.id }, data: { creditCost: reservation.amount } });
       await tx.geoPlatformResult.createMany({ data: platforms.map((p) => ({ runId: created.id, platformId: p.id })) });
       await this.jobs.enqueue(QUEUE, { runId: created.id, requestedBy: actorId }, { jobKey: `geo:${created.id}` }, tx);
       await this.auditLog.record({ actorUserId: actorId, organizationId: project.organizationId, workspaceId: project.workspaceId, action: 'project.geo.check', targetType: 'geo_run', targetId: created.id, afterState: { platforms: platforms.map((p) => p.key), trigger }, requestMeta: meta }, tx);
       return created;
     });
-    return { id: run.id, status: run.status, platforms: platforms.map((p) => p.key) };
+    const reserved = await this.prisma.creditReservation.findUnique({ where: { idempotencyKey: `geo:${run.id}` } });
+    return { id: run.id, status: run.status, platforms: platforms.map((p) => p.key), reservationId: reserved?.id ?? null, reservedCredits: reserved ? Number(reserved.amount) : 0 };
   }
 
   async process(runId: string) {
@@ -311,7 +345,7 @@ export class GeoService implements OnModuleInit {
       where: { id: runId },
       include: { prompt: { include: { project: { include: { domains: true, workspace: true } } } }, platformResults: { include: { platform: true } } },
     });
-    if (!run || run.status === 'SUCCEEDED' || run.status === 'CANCELED') return;
+    if (!run || run.status === 'SUCCEEDED' || run.status === 'PARTIAL' || run.status === 'CANCELED') return;
     await this.prisma.geoRun.update({ where: { id: runId }, data: { status: 'RUNNING' } });
 
     const project = run.prompt.project;
@@ -319,17 +353,20 @@ export class GeoService implements OnModuleInit {
     const brandNames = [settings.aiGeo?.brandName, ...(settings.aiGeo?.brandAliases ?? []), project.name].filter((n): n is string => !!n && n.trim().length >= 2);
     const brand = { names: [...new Set(brandNames)], domains: project.domains.map((d) => d.host) };
     const competitors = await this.prisma.geoCompetitor.findMany({ where: { projectId: project.id, status: 'ACTIVE' } });
-    const usage = await this.prisma.usageEvent.findUnique({ where: { idempotencyKey: `usage:geo:${runId}` } });
+    const reservation = await this.prisma.creditReservation.findUnique({ where: { idempotencyKey: `geo:${runId}` } });
     const perUnit = await this.credits.costOf(USAGE_FEATURE, 1);
+    const language = project.workspace.language?.slice(0, 2) || 'en';
 
     let succeeded = 0;
+    let failed = 0;
     for (const result of run.platformResults.filter((r) => r.status === 'PENDING')) {
-      const provider = (result.platform.capabilities as { provider?: string } | null)?.provider ?? '';
+      const surface = (result.platform.capabilities as { surface?: Surface } | null)?.surface;
       const key = `geo/${project.id}/${runId}/${result.platform.key}.json`;
       try {
-        const answer = await this.providers.ask(provider, run.prompt.prompt, { country: run.prompt.country, usageEventId: usage?.id });
+        if (!surface) throw new Error(`Platform ${result.platform.key} has no search surface`);
+        const answer = await this.providers.observe(surface, run.prompt.prompt, { country: run.prompt.country, language });
         const analysis = analyzeAnswer(answer, brand, competitors);
-        const stored: StoredResult = { text: answer.text, citations: answer.citations, model: answer.model, analysis };
+        const stored: StoredResult = { ...answer, analysis, inferenceLabel: 'observed', resultStatus: 'complete' };
         const body = JSON.stringify(stored);
         await this.storage.writeBuffer(key, Buffer.from(body, 'utf8'), 'application/json');
 
@@ -366,35 +403,43 @@ export class GeoService implements OnModuleInit {
         });
         succeeded++;
       } catch (err) {
+        failed++;
         const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(`GEO check ${runId}/${result.platform.key} failed: ${message}`);
-        await this.storage.writeBuffer(key, Buffer.from(JSON.stringify({ error: message.slice(0, 500) }), 'utf8'), 'application/json').catch(() => undefined);
+        const status = err instanceof ObservationIncompleteError ? 'incomplete' : 'failed';
+        await this.storage.writeBuffer(key, Buffer.from(JSON.stringify({ resultStatus: status, surface: surface ?? null, query: run.prompt.prompt, observedAt: new Date().toISOString(), error: message.slice(0, 500) }), 'utf8'), 'application/json').catch(() => undefined);
         await this.prisma.geoPlatformResult.update({ where: { id: result.id }, data: { status: 'FAILED', responseRef: key } });
-        // Refund this platform's share of the charge.
-        if (perUnit.greaterThan(0)) {
-          await this.prisma.$transaction((tx) =>
-            this.credits.applyEntry(tx, {
-              workspaceId: project.workspaceId,
-              delta: perUnit,
-              reason: 'REVERSAL',
-              referenceType: 'geo_platform_result',
-              referenceId: result.id,
-              idempotencyKey: `geo-refund:${result.id}`,
-            }),
-          );
-        }
       }
     }
 
-    await this.prisma.geoRun.update({ where: { id: runId }, data: { status: succeeded ? 'SUCCEEDED' : 'FAILED', completedAt: new Date() } });
+    // Settle the reservation when anything was observed (failed surfaces were reversed above); otherwise release it.
+    if (reservation) {
+      if (succeeded) {
+        const settled = await this.credits.settle(reservation.id, { projectId: project.id, units: succeeded });
+        await this.reverseFailedShares(runId, project.workspaceId, perUnit);
+        if (settled && 'usageEventId' in settled) await this.prisma.providerUsage.updateMany({ where: { usageEventId: null, provider: 'dataforseo', operation: { startsWith: 'geo.' }, createdAt: { gte: run.startedAt } }, data: { usageEventId: settled.usageEventId } });
+      } else {
+        await this.credits.release(reservation.id, 'geo check failed');
+      }
+    }
+    await this.prisma.geoRun.update({ where: { id: runId }, data: { status: !succeeded ? 'FAILED' : failed ? 'PARTIAL' : 'SUCCEEDED', completedAt: new Date() } });
     if (succeeded) await this.generateOpportunities(runId);
     await this.notifications.notify({
       workspaceId: project.workspaceId,
       userId: run.prompt.createdBy,
       eventKey: 'geo.check_completed',
       title: succeeded ? 'AI search check completed' : 'AI search check failed',
-      body: `"${run.prompt.prompt.slice(0, 120)}" — ${succeeded}/${run.platformResults.length} platform${run.platformResults.length === 1 ? '' : 's'} checked.`,
+      body: `"${run.prompt.prompt.slice(0, 120)}" — ${succeeded}/${run.platformResults.length} search surface${run.platformResults.length === 1 ? '' : 's'} observed.`,
     });
+  }
+
+  /** After a partial run, returns the credits reserved for each surface that could not be observed. */
+  private async reverseFailedShares(runId: string, workspaceId: string, perUnit: Prisma.Decimal) {
+    if (!perUnit.greaterThan(0)) return;
+    const failed = await this.prisma.geoPlatformResult.findMany({ where: { runId, status: 'FAILED' }, select: { id: true } });
+    for (const r of failed) {
+      await this.prisma.$transaction((tx) => this.credits.applyEntry(tx, { workspaceId, delta: perUnit, reason: 'REVERSAL', referenceType: 'geo_platform_result', referenceId: r.id, idempotencyKey: `geo-refund:${r.id}` }));
+    }
   }
 
   /** Concrete next actions derived from the latest results (never generic advice). */
@@ -468,7 +513,7 @@ export class GeoService implements OnModuleInit {
   private async latestResults(projectId: string, days: number) {
     const since = new Date(Date.now() - days * 86_400_000);
     const runs = await this.prisma.geoRun.findMany({
-      where: { prompt: { projectId, status: { not: 'ARCHIVED' } }, status: 'SUCCEEDED', startedAt: { gte: since } },
+      where: { prompt: { projectId, status: { not: 'ARCHIVED' } }, status: { in: ['SUCCEEDED', 'PARTIAL'] }, startedAt: { gte: since } },
       orderBy: { startedAt: 'desc' },
       include: { platformResults: { where: { status: 'SUCCEEDED' }, include: { platform: true, mentions: true, citations: { include: { source: true } }, competitorMentions: { include: { competitor: true } } } } },
     });

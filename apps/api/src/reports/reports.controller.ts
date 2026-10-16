@@ -62,6 +62,8 @@ export class ReportsController {
   @Get('user/reports/:id/download/:format')
   async download(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Param('format') format: string, @Res() res: Response) {
     const f = await this.reports.file(a.userId, id, format);
+    res.setHeader('cache-control', 'private, no-store');
+    if ('signedUrl' in f && f.signedUrl) return res.redirect(302, f.signedUrl);
     res.setHeader('content-type', f.contentType);
     res.setHeader('content-disposition', `${format === 'html' ? 'inline' : 'attachment'}; filename="${f.filename}"`);
     if (format === 'html') res.setHeader('content-security-policy', "default-src 'none'; style-src 'unsafe-inline'");

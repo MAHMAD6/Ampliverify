@@ -142,6 +142,23 @@ export type GeoPromptDetail = Omit<GeoPromptRow, 'lastRun' | 'platforms' | 'visi
     answer: string | null;
     model: string | null;
     error: string | null;
+    /** Saved provider evidence for the observation (V1 manual §5). */
+    evidence: {
+      provider: string;
+      surface: string;
+      surfaceLabel: string;
+      query: string;
+      location: string;
+      language: string;
+      device: string;
+      observedAt: string;
+      providerTaskId: string;
+      aiPresent: boolean;
+      resultStatus: string;
+      linkedDomains: string[];
+      organic: { rank: number; url: string; domain: string; title: string | null }[];
+      inferenceLabel: string;
+    } | null;
     mentioned: boolean;
     position: number | null;
     cited: boolean;

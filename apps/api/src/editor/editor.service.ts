@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { AuditService } from '../audit/audit.service';
 import { AiGateService } from '../ai/ai-gate.service';
-import { ClaudeService } from '../ai/claude.service';
+import { OpenAiService } from '../ai/openai.service';
 import { ContentStorageService } from '../storage/content-storage.service';
 import { analyzePage, scoreFindings } from '../audits/analyzer';
 import { RULES_BY_KEY } from '../audits/rules';
@@ -31,13 +31,14 @@ const SUGGESTION_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['type', 'title', 'explanation', 'original', 'replacement'],
+        required: ['type', 'title', 'explanation', 'original', 'replacement', 'issueKeys'],
         properties: {
           type: { type: 'string', enum: ['CONTENT', 'STRUCTURE', 'KEYWORD', 'METADATA', 'LINK', 'READABILITY'] },
           title: { type: 'string' },
           explanation: { type: 'string' },
           original: { type: 'string', description: 'Exact text from the draft to replace, or empty when adding new text.' },
           replacement: { type: 'string', description: 'Proposed text (HTML allowed for content blocks).' },
+          issueKeys: { type: 'array', items: { type: 'string' }, description: 'Keys of the detected issues this suggestion addresses (evidence IDs); empty if none.' },
         },
       },
     },
@@ -59,7 +60,7 @@ const sanitizeHtml = (html: string) => {
 
 /**
  * On-Page SEO Editor: versioned documents (content in storage), live SEO/GEO
- * scoring with the audit rule engine, Claude suggestions that the user
+ * scoring with the audit rule engine, AI suggestions (OpenAI) that the user
  * accepts or rejects, and import of an existing page.
  */
 @Injectable()
@@ -69,7 +70,7 @@ export class EditorService {
     private readonly projects: ProjectsService,
     private readonly auditLog: AuditService,
     private readonly ai: AiGateService,
-    private readonly claude: ClaudeService,
+    private readonly openai: OpenAiService,
     private readonly storage: ContentStorageService,
     private readonly config: ConfigService,
   ) {}
@@ -222,21 +223,22 @@ export class EditorService {
     const ws = await this.prisma.workspace.findUniqueOrThrow({ where: { id: project.workspaceId } });
     const tone = (ws.settingsJson as { aiGeo?: { aiTone?: string } } | null)?.aiGeo?.aiTone;
 
-    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: project.id, actorId, referenceType: 'editor_document', referenceId: id }, (usageEventId) =>
-      this.claude.generateJson<{ suggestions: { type: SuggestionType; title: string; explanation: string; original: string; replacement: string }[] }>(
+    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: project.id, actorId, referenceType: 'editor_document', referenceId: id }, (usage) =>
+      this.openai.generateJson<{ suggestions: { type: SuggestionType; title: string; explanation: string; original: string; replacement: string; issueKeys: string[] }[] }>(
         {
           system: `You are an on-page SEO and GEO editor. Suggest specific, minimal edits that improve how this page ranks in search and how likely AI assistants are to quote it: direct answers, clear headings, the focus keyword used naturally, accurate metadata, scannable structure. Quote "original" exactly from the draft so the edit can be applied. Never invent facts, numbers, quotes or sources.${tone ? ` Match this tone: ${tone}.` : ''} Write in ${ws.language}.`,
-          prompt: `Focus keyword: ${content.focusKeyword || 'not set'}\nTitle tag: ${content.title}\nMeta description: ${content.metaDescription}\nDetected issues: ${analysis.issues.map((i) => i.title).join('; ') || 'none'}\n${input.focus ? `Concentrate on: ${input.focus}\n` : ''}${input.instruction ? `Writer's request: ${input.instruction}\n` : ''}\nDraft HTML:\n${content.html.slice(0, 60_000)}\n\nReturn up to 8 suggestions, most impactful first.`,
+          prompt: `Focus keyword: ${content.focusKeyword || 'not set'}\nTitle tag: ${content.title}\nMeta description: ${content.metaDescription}\nDetected issues (key: title): ${analysis.issues.map((i) => `${i.ruleKey}: ${i.title}`).join('; ') || 'none'}\n${input.focus ? `Concentrate on: ${input.focus}\n` : ''}${input.instruction ? `Writer's request: ${input.instruction}\n` : ''}\nDraft HTML:\n${content.html.slice(0, 60_000)}\n\nReturn up to 8 suggestions, most impactful first.`,
           schema: SUGGESTION_SCHEMA,
           effort: 'medium',
         },
-        { operation: 'editor.suggest', usageEventId },
+        { operation: 'editor.suggest', ...usage },
       ),
     );
+    const known = new Set(analysis.issues.map((i) => i.ruleKey));
     await this.prisma.$transaction(
       out.suggestions.slice(0, 8).map((s) =>
         this.prisma.editorSuggestion.create({
-          data: { versionId: version.id, type: s.type, suggestionJson: { title: s.title, explanation: s.explanation, original: s.original, replacement: sanitizeHtml(s.replacement) }, modelRef: this.claude.model },
+          data: { versionId: version.id, type: s.type, suggestionJson: { title: s.title, explanation: s.explanation, original: s.original, replacement: sanitizeHtml(s.replacement), evidenceIds: s.issueKeys.filter((k) => known.has(k)).slice(0, 10), label: 'recommendation' }, modelRef: this.openai.model },
         }),
       ),
     );

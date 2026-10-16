@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { AuditService } from '../audit/audit.service';
 import { AiGateService } from '../ai/ai-gate.service';
-import { ClaudeService } from '../ai/claude.service';
+import { OpenAiService } from '../ai/openai.service';
 
 const IDEA_SCHEMA = {
   type: 'object',
@@ -56,7 +56,7 @@ type IdeaOut = { ideas: { title: string; targetKeyword: string; intent: string; 
 /**
  * Content Strategy: topic ideas, clusters (from keyword research), content
  * briefs, content plans and optimized content. Ideas and briefs can be
- * drafted by Claude from the project's own data (domain, keywords, GEO gaps).
+ * drafted by the OpenAI Responses API from the project's own data (domain, keywords, GEO gaps).
  */
 @Injectable()
 export class ContentService {
@@ -65,7 +65,7 @@ export class ContentService {
     private readonly projects: ProjectsService,
     private readonly auditLog: AuditService,
     private readonly ai: AiGateService,
-    private readonly claude: ClaudeService,
+    private readonly openai: OpenAiService,
   ) {}
 
   // ── Context the AI works from (never invented data) ───────────────────
@@ -123,8 +123,8 @@ export class ContentService {
     const project = await this.projects.requireProject(actorId, projectId, 'content.write');
     const count = Math.min(Math.max(input.count ?? 8, 3), 20);
     const context = await this.projectContext(projectId);
-    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId, actorId, referenceType: 'content_ideas' }, (usageEventId) =>
-      this.claude.generateJson<IdeaOut>(
+    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId, actorId, referenceType: 'content_ideas' }, (usage) =>
+      this.openai.generateJson<IdeaOut>(
         {
           system:
             'You are a senior SEO and content strategist. Propose content that a real audience searches for and that AI assistants would cite. Ground every idea in the project context provided; do not invent statistics, rankings or search volumes. Write in the project language.',
@@ -132,13 +132,13 @@ export class ContentService {
           schema: IDEA_SCHEMA,
           effort: 'medium',
         },
-        { operation: 'content.ideas', usageEventId },
+        { operation: 'content.ideas', ...usage },
       ),
     );
     const created = await this.prisma.$transaction(
       out.ideas.slice(0, count).map((i) =>
         this.prisma.contentIdea.create({
-          data: { projectId, title: i.title.slice(0, 300), source: 'AI', metadata: { targetKeyword: i.targetKeyword, intent: i.intent, format: i.format, rationale: i.rationale, priority: i.priority, model: this.claude.model } },
+          data: { projectId, title: i.title.slice(0, 300), source: 'AI', metadata: { targetKeyword: i.targetKeyword, intent: i.intent, format: i.format, rationale: i.rationale, priority: i.priority, model: this.openai.model } },
         }),
       ),
     );
@@ -198,8 +198,8 @@ export class ContentService {
     const serp = brief.primaryKeywordId
       ? await this.prisma.serpSnapshot.findFirst({ where: { keywordId: brief.primaryKeywordId }, orderBy: { capturedAt: 'desc' }, include: { results: { orderBy: { position: 'asc' }, take: 10 } } })
       : null;
-    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: brief.projectId, actorId, referenceType: 'content_brief', referenceId: id }, (usageEventId) =>
-      this.claude.generateJson<Record<string, unknown>>(
+    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: brief.projectId, actorId, referenceType: 'content_brief', referenceId: id }, (usage) =>
+      this.openai.generateJson<Record<string, unknown>>(
         {
           system:
             'You are a senior SEO content strategist writing a brief for a writer. The brief must help the page rank in search and be cited by AI assistants: direct answers, clear structure, verifiable facts, and questions real people ask. Do not invent statistics or sources.',
@@ -209,12 +209,12 @@ export class ContentService {
           schema: BRIEF_SCHEMA,
           effort: 'medium',
         },
-        { operation: 'content.brief', usageEventId },
+        { operation: 'content.brief', ...usage },
       ),
     );
     return this.prisma.contentBrief.update({
       where: { id },
-      data: { briefJson: { ...((brief.briefJson as object) ?? {}), ...out, generatedBy: this.claude.model, generatedAt: new Date().toISOString() } as Prisma.InputJsonObject, status: brief.status === 'DRAFT' ? 'IN_PROGRESS' : brief.status },
+      data: { briefJson: { ...((brief.briefJson as object) ?? {}), ...out, generatedBy: this.openai.model, generatedAt: new Date().toISOString() } as Prisma.InputJsonObject, status: brief.status === 'DRAFT' ? 'IN_PROGRESS' : brief.status },
     });
   }
 

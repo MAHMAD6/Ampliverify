@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { promises as fs } from 'fs';
 import { isAbsolute, join, normalize, resolve, sep } from 'path';
 
@@ -11,7 +12,8 @@ import { isAbsolute, join, normalize, resolve, sep } from 'path';
  * Drivers: local filesystem (STORAGE_DIR, default) for development and tests,
  * or any S3-compatible bucket with STORAGE_DRIVER=s3 (S3_BUCKET, S3_REGION,
  * optional S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY). Objects are
- * private; the API streams them after its own authorization checks.
+ * private; after its own authorization checks the API streams them (local) or
+ * hands out a short-lived signed URL (S3, S3_SIGNED_URL_SECONDS, default 300).
  */
 @Injectable()
 export class ContentStorageService {
@@ -19,9 +21,11 @@ export class ContentStorageService {
   private readonly root: string;
   private readonly s3: S3Client | null = null;
   private readonly bucket: string | null = null;
+  private readonly signedSeconds: number;
 
   constructor(config: ConfigService) {
     this.root = resolve(config.get<string>('STORAGE_DIR') ?? 'storage');
+    this.signedSeconds = Number(config.get<string>('S3_SIGNED_URL_SECONDS') ?? 300);
     if (config.get<string>('STORAGE_DRIVER') === 's3') {
       this.bucket = config.get<string>('S3_BUCKET') ?? null;
       if (!this.bucket) throw new Error('S3_BUCKET is required when STORAGE_DRIVER=s3.');
@@ -81,6 +85,20 @@ export class ContentStorageService {
     const path = this.pathFor(key);
     await fs.mkdir(join(path, '..'), { recursive: true });
     await fs.writeFile(path, body);
+  }
+
+  /**
+   * Short-lived signed GET URL for a private object (V1 manual §11: least
+   * privilege + short-lived signed URLs). Null on the local driver, where the
+   * API streams the file itself.
+   */
+  async signedUrl(key: string, opts: { filename?: string; contentType?: string; inline?: boolean; expiresInSeconds?: number } = {}): Promise<{ url: string; expiresAt: Date } | null> {
+    this.validate(key);
+    if (!this.s3) return null;
+    const seconds = Math.min(Math.max(opts.expiresInSeconds ?? this.signedSeconds, 30), 3600);
+    const disposition = opts.filename ? `${opts.inline ? 'inline' : 'attachment'}; filename="${opts.filename.replace(/["\\\r\n]/g, '')}"` : undefined;
+    const url = await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.bucket!, Key: key, ...(disposition ? { ResponseContentDisposition: disposition } : {}), ...(opts.contentType ? { ResponseContentType: opts.contentType } : {}) }), { expiresIn: seconds });
+    return { url, expiresAt: new Date(Date.now() + seconds * 1000) };
   }
 
   async delete(key: string): Promise<void> {

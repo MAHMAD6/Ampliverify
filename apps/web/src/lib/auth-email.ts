@@ -1,4 +1,5 @@
 import 'server-only';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 
 type AuthEmail = { to: string; kind: 'verify-email' | 'reset-password'; url: string };
 
@@ -15,9 +16,12 @@ const COPY: Record<AuthEmail['kind'], { subject: string; text: (url: string) => 
   },
 };
 
+let client: SESv2Client | null = null;
+
 /**
- * Delivery for verification and password-reset links through Resend
- * (`RESEND_API_KEY`, `EMAIL_FROM`), the same provider the API uses.
+ * Delivery for verification and password-reset links through Amazon SES v2
+ * (`SES_REGION`, `EMAIL_FROM`, optional `SES_ACCESS_KEY_ID` /
+ * `SES_SECRET_ACCESS_KEY`), the same provider the API uses.
  *
  * For local development only, `AUTH_EMAIL_LOG_LINKS=true` writes the link to
  * the server log instead; it is ignored unless BETTER_AUTH_URL is a
@@ -29,17 +33,22 @@ export async function sendAuthEmail({ to, kind, url }: AuthEmail) {
     console.info(`[auth-email:local] ${kind} for ${to}: ${url}`);
     return;
   }
-  const key = process.env.RESEND_API_KEY;
-  if (!key) throw new Error('Email delivery is not configured (RESEND_API_KEY).');
+  const region = process.env.SES_REGION;
+  if (!region) throw new Error('Email delivery is not configured (SES_REGION).');
+  const accessKeyId = process.env.SES_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.SES_SECRET_ACCESS_KEY;
+  client ??= new SESv2Client({ region, ...(accessKeyId && secretAccessKey ? { credentials: { accessKeyId, secretAccessKey } } : {}) });
   const copy = COPY[kind];
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM ?? 'AmpliVerify <no-reply@ampliverify.com>', to: [to], subject: copy.subject, text: copy.text(url) }),
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { message?: string };
-    throw new Error(`Email provider error ${res.status}: ${body.message ?? 'unknown'}`);
+  try {
+    await client.send(
+      new SendEmailCommand({
+        FromEmailAddress: process.env.EMAIL_FROM ?? 'AmpliVerify <no-reply@ampliverify.com>',
+        Destination: { ToAddresses: [to] },
+        ...(process.env.SES_CONFIGURATION_SET ? { ConfigurationSetName: process.env.SES_CONFIGURATION_SET } : {}),
+        Content: { Simple: { Subject: { Data: copy.subject, Charset: 'UTF-8' }, Body: { Text: { Data: copy.text(url), Charset: 'UTF-8' } } } },
+      }),
+    );
+  } catch (err) {
+    throw new Error(`Email provider error (${(err as { name?: string }).name ?? 'Error'}): ${err instanceof Error ? err.message : 'unknown'}`);
   }
 }

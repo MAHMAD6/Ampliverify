@@ -177,10 +177,9 @@ export class CreditsService {
       const r = await tx.creditReservation.findUnique({ where: { id: reservationId } });
       if (!r || r.status !== 'RESERVED') return r;
       const usageKey = `usage:${r.idempotencyKey}`;
-      if (!(await tx.usageEvent.findUnique({ where: { idempotencyKey: usageKey } }))) {
-        await tx.usageEvent.create({ data: { workspaceId: r.workspaceId, projectId: opts.projectId ?? null, featureKey: r.featureKey, units: opts.units ?? 1, idempotencyKey: usageKey } });
-      }
-      return tx.creditReservation.update({ where: { id: r.id }, data: { status: 'SETTLED', settledAt: new Date() } });
+      const usage = (await tx.usageEvent.findUnique({ where: { idempotencyKey: usageKey } })) ?? (await tx.usageEvent.create({ data: { workspaceId: r.workspaceId, projectId: opts.projectId ?? null, featureKey: r.featureKey, units: opts.units ?? 1, idempotencyKey: usageKey } }));
+      const settled = await tx.creditReservation.update({ where: { id: r.id }, data: { status: 'SETTLED', settledAt: new Date() } });
+      return { ...settled, usageEventId: usage.id };
     });
   }
 

@@ -5,8 +5,8 @@ connected to. Update this file whenever a design arrives or a screen changes.
 Design files are listed in [INPUTS.md](./INPUTS.md); API routes in [API.md](./API.md).
 
 All screens below are **live**: they read from and write to the API. Where a
-third-party provider is not configured (Stripe, Resend, Anthropic, OpenAI,
-Gemini, Perplexity, DataForSEO, Google OAuth, ClamAV), the dependent action is
+third-party provider is not configured (Stripe, Amazon SES, OpenAI,
+DataForSEO, Google OAuth, Redis, ClamAV), the dependent action is
 disabled with an explanation, and nothing is simulated.
 
 Developer notes printed inside the mockups (e.g. "Production rule: …") are implemented as behavior, not shown to end users. Admin-facing guidance panels are kept, because administrators are the intended audience.

@@ -24,7 +24,7 @@ export default async function NotificationSettingsPage() {
     <SettingsShell
       tab="notifications"
       about={{ title: 'About Notifications', text: 'Staff alerts are emailed to the recipients below. Customers choose their own in-app and email notifications in their account settings.' }}
-      footer="Staff alerts are sent only when an email provider is configured (RESEND_API_KEY)."
+      footer="Staff alerts are sent only when Amazon SES is configured (SES_REGION and a verified EMAIL_FROM)."
     >
       {!settings ? (
         <Notice tone="neutral">Settings could not be loaded with your permissions.</Notice>

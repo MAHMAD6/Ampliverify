@@ -56,3 +56,4 @@
 
 @media (max-width: 1200px) { .row, .row2 { grid-template-columns: minmax(0, 1fr); } .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .metrics, .facts { grid-template-columns: minmax(0, 1fr); } .facts > div { border-left: 0; padding-left: 0; } }
+.evidence { font-size: 12.5px; color: var(--muted); background: var(--surface-alt); border-radius: 8px; padding: 8px 10px; margin: 8px 0; line-height: 1.5; overflow-wrap: anywhere; }
