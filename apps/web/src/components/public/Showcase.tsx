@@ -74,7 +74,7 @@ export function LaptopMock() {
 }
 
 /** "FREE TOOL — Website Value Calculator" band (Home and Features). */
-export function ValueTeaser({ available, reason }: { available: boolean; reason?: string }) {
+export function ValueTeaser({ available, reason, consentVersion }: { available: boolean; reason?: string; consentVersion?: string }) {
   return (
     <section className={s.section} style={{ paddingTop: 24 }}>
       <div className={s.container}>
@@ -86,7 +86,7 @@ export function ValueTeaser({ available, reason }: { available: boolean; reason?
               Get an instant estimate of your website’s value based on real SEO, traffic, and domain signals. It’s free for everyone — no account required.
             </p>
             <div style={{ marginTop: 18 }}>
-              <CalculatorForm icon="link" disabled={!available} disabledReason={reason} notes={['Free for everyone', 'Instant results', 'No signup required', 'Actionable insights']} />
+              <CalculatorForm icon="link" disabled={!available} disabledReason={reason} consentVersion={consentVersion} notes={['Free for everyone', 'Quality score in minutes', 'No signup required', 'Evidence you can check']} />
             </div>
           </div>
           <div className={s.teaserCard} aria-label="Example result">
@@ -112,7 +112,7 @@ export function ValueTeaser({ available, reason }: { available: boolean; reason?
               ))}
             </div>
             <p className={s.teaserNote}>
-              <CheckCircle2 size={14} /> Valuation is an estimate based on SEO and market data. Results may vary.
+              <CheckCircle2 size={14} /> Illustrative example. A dollar range is shown only with your earnings and current market comparables; otherwise you get the evidence-graded quality score.
             </p>
           </div>
         </div>

@@ -85,7 +85,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <ValueTeaser available={available} reason={available ? undefined : 'The calculator is not available yet. Please check back soon.'} />
+      <ValueTeaser available={available} reason={available ? undefined : 'The calculator is not available yet. Please check back soon.'} consentVersion={cfg.ok ? cfg.data.consentVersion : undefined} />
 
       <section className={s.section} style={{ paddingTop: 24 }}>
         <div className={s.container}>

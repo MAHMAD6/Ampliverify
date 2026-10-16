@@ -61,3 +61,13 @@
   .slider input[type='range'] { display: none; }
   .thresholds { grid-template-columns: minmax(0, 1fr); }
 }
+
+.saveBar { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; position: sticky; top: 0; z-index: 5; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.noteInput { height: 38px; min-width: 240px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; }
+.cell { width: 100%; min-width: 90px; height: 34px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 8px; font: inherit; font-size: 13px; background: var(--surface); }
+.iconBtn { background: none; border: 1px solid var(--line); border-radius: 8px; width: 34px; height: 34px; display: grid; place-items: center; color: var(--red); cursor: pointer; }
+.textarea { width: 100%; border: 1px solid var(--line-strong); border-radius: 8px; padding: 10px; font: inherit; font-size: 14px; resize: vertical; }
+@media (max-width: 640px) {
+  .noteInput { min-width: 0; width: 100%; }
+  .saveBar > div { width: 100%; }
+}

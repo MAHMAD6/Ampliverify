@@ -24,10 +24,10 @@ const STRIP = [
 const EXAMPLE_TREND = [3, 4, 3.6, 5, 5.4, 6.2, 7].map((v, i) => ({ month: `2026-0${i + 1}`, value: v }));
 
 const FAQS = [
-  ['How is my website value calculated?', 'We combine organic traffic and its keyword value, backlinks and authority, content depth, technical health, and domain signals. Each factor is weighted, and the result is shown as a range with a confidence score.'],
-  ['What data sources are used?', 'Public SEO data (traffic and keyword estimates, backlinks), Google PageSpeed Insights, and public domain registration records. You can connect Google Analytics 4 and Search Console for a verified valuation.'],
+  ['How is my website value calculated?', 'Every report gives a 0–100 quality score from five weighted categories: search visibility (25%), technical health (25%), performance (15%), content (20%) and risk / trust (15%). A dollar range is added only when you provide trailing-twelve-month earnings and current, dated comparable sale multiples exist for your business model. Otherwise the report says “Insufficient evidence for a monetary valuation”.'],
+  ['What data sources are used?', 'A public crawl of your home page, robots.txt and sitemap, Google PageSpeed Insights, RDAP domain records, and DataForSEO search estimates. Each signal is labelled observed, modeled, public record, self-reported or verified. Connect Google Analytics 4 and Search Console for verified traffic.'],
   ['Is this calculator free to use?', 'Yes. A limited number of free estimates are included each month without an account. Plans include more valuations, full reports and PDF downloads.'],
-  ['Can I get a more detailed report?', 'Yes. Connect your own data from the report page for a verified valuation with higher confidence, or run a full SEO audit for a step-by-step growth plan.'],
+  ['Can I get a more detailed report?', 'Yes. From the report page you can connect your own data and enter your earnings for an enhanced valuation. Confidence is graded by rules: LOW for public data only, MEDIUM with verified traffic, self-reported financials and current comparables.'],
 ];
 
 export default async function WebsiteValuePage() {
@@ -41,9 +41,9 @@ export default async function WebsiteValuePage() {
           <div>
             <div className={site.eyebrow}>Free Website Value Calculator</div>
             <h1 className={site.h1}>Find Out What Your Website Is Worth</h1>
-            <p className={site.lead}>Get an instant, data-driven estimate of your website’s value based on SEO performance, traffic signals, content, backlinks, and technical health.</p>
+            <p className={site.lead}>Get an evidence-graded quality score for your website from SEO visibility, technical health, performance, content and trust signals — with a value range when the evidence supports one.</p>
             <div style={{ marginTop: 26 }}>
-              <CalculatorForm disabled={!available} disabledReason={reason} />
+              <CalculatorForm disabled={!available} disabledReason={reason} consentVersion={cfg.ok ? cfg.data.consentVersion : undefined} />
             </div>
           </div>
           <div className={s.heroCard} aria-label="Example result">

@@ -595,7 +595,7 @@ export class ValuationService implements OnModuleInit {
     await this.rbac.assertGlobalPermission(userId, 'system.read');
     const v = await this.prisma.websiteValuation.findUnique({ where: { id } });
     if (!v) throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
-    return { ...this.shape(v), evidence: await this.evidenceRows(id) };
+    return { ...this.shape(v), shareToken: this.shareToken(v.id), evidence: await this.evidenceRows(id) };
   }
 
   async sources(userId: string) {

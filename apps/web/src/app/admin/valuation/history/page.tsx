@@ -17,19 +17,19 @@ export default async function ValuationHistoryPage({ searchParams }: { searchPar
   const rows = await adminGet<HistoryRow[]>(`/admin/valuation/history${q ? `?${q}` : ''}`);
   return (
     <>
-      <AdminHeader section="Website Value Calculator" title="Calculation History" description="Every estimate, verified valuation and test calculation, newest first." />
+      <AdminHeader section="Website Value Calculator" title="Calculation History" description="Every estimate, enhanced valuation and test calculation, newest first." />
       <Panel>
         <form style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
           <input name="domain" defaultValue={domain} placeholder="Filter by domain" aria-label="Domain" style={field} />
           <select name="kind" defaultValue={kind} aria-label="Type" style={field}>
             <option value="">All types</option>
             <option value="ESTIMATE">Estimates</option>
-            <option value="VERIFIED">Verified</option>
+            <option value="VERIFIED">Enhanced</option>
             <option value="TEST">Tests</option>
           </select>
           <select name="status" defaultValue={status} aria-label="Status" style={field}>
             <option value="">All statuses</option>
-            {['PENDING', 'RUNNING', 'COMPLETED', 'FAILED'].map((x) => (
+            {['QUEUED', 'COLLECTING', 'NORMALIZING', 'CALCULATING', 'COMPLETED', 'FAILED', 'CANCELLED', 'EXPIRED'].map((x) => (
               <option key={x} value={x}>
                 {x.charAt(0) + x.slice(1).toLowerCase()}
               </option>
@@ -51,8 +51,10 @@ export default async function ValuationHistoryPage({ searchParams }: { searchPar
                   <th>Date</th>
                   <th>Domain</th>
                   <th>Type</th>
+                  <th>Score</th>
                   <th>Value range</th>
                   <th>Confidence</th>
+                  <th>Version</th>
                   <th>Status</th>
                   <th>Requested by</th>
                 </tr>
@@ -66,11 +68,13 @@ export default async function ValuationHistoryPage({ searchParams }: { searchPar
                         {r.domain}
                       </Link>
                     </td>
-                    <td>{r.kind.charAt(0) + r.kind.slice(1).toLowerCase()}</td>
-                    <td>{r.valueMid === null ? '—' : `${money(r.valueLow, r.currency)} – ${money(r.valueHigh, r.currency)}`}</td>
-                    <td>{r.confidence === null ? '—' : `${r.confidence}%`}</td>
+                    <td>{r.kind === 'VERIFIED' ? 'Enhanced' : r.kind === 'ESTIMATE' ? 'Estimate' : 'Test'}</td>
+                    <td>{r.qualityScore ?? '—'}</td>
+                    <td>{r.valueLow === null ? 'Insufficient evidence' : `${money(r.valueLow, r.currency)} – ${money(r.valueHigh, r.currency)}`}</td>
+                    <td>{r.confidence ?? '—'}</td>
+                    <td>{r.methodologyVersion ?? '—'}</td>
                     <td>
-                      <span className={`${s.badge} ${r.status === 'FAILED' ? s.red : r.status === 'COMPLETED' ? '' : s.gray}`} title={r.error ?? undefined}>
+                      <span className={`${s.badge} ${r.status === 'FAILED' ? s.red : r.status === 'CANCELLED' || r.status === 'EXPIRED' ? s.amber : r.status === 'COMPLETED' ? '' : s.gray}`} title={r.error ?? undefined}>
                         {r.status.toLowerCase()}
                       </span>
                     </td>

@@ -41,32 +41,43 @@ export async function submitApplication(slug: string, form: FormData) {
   return send<{ received: boolean; receipt: string | null }>(`/public/careers/${encodeURIComponent(slug)}/apply`, { method: 'POST', body: form });
 }
 
-/** Starts a website valuation: as the signed-in user when there is a session, else anonymously. */
-export async function startValuation(domain: string) {
+const ID = /^[0-9a-f-]{36}$/i;
+const TOKEN = /^[\w-]{10,64}$/;
+const tq = (t?: string) => (t && TOKEN.test(t) ? `?t=${encodeURIComponent(t)}` : '');
+
+/** Starts a website valuation (POST /valuations): as the signed-in user when there is a session, else anonymously. */
+export async function startValuation(domain: string, consentVersion: string, idempotencyKey: string) {
   const token = await getAccessToken();
-  const body = JSON.stringify({ domain: domain.slice(0, 2048) });
-  if (token) {
-    return send<{ id: string; cached: boolean }>('/user/valuations', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body });
-  }
-  return send<{ id: string; cached: boolean }>('/public/valuations', { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+  const body = JSON.stringify({ domain: domain.slice(0, 2048), consentVersion, idempotencyKey });
+  const path = token ? '/user/valuations' : '/public/valuations';
+  return send<{ id: string; status: string; shareToken: string }>(path, { method: 'POST', headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body });
 }
 
-/** Projected range and confidence for the enhance page (nothing is saved). */
-export async function previewValuation(id: string, business: { monthlyRevenue?: number; annualRevenue?: number; profitMargin?: string; monthlyVisits?: number }, planned: string[]) {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false as const, message: 'Valuation not found.' };
-  return send<{ valueLow: number; valueHigh: number; valueMid: number; currency: string; confidence: number; confidenceLabel: string }>(`/public/valuations/${id}/preview`, {
+/** Projection for the enhance page; nothing is saved. */
+export async function previewValuation(id: string, shareToken: string, financial: { ttmRevenue?: number; ttmExpenses?: number; ttmProfit?: number; businessModel?: string }, planned: string[]) {
+  if (!ID.test(id)) return { ok: false as const, message: 'Valuation not found.' };
+  const token = await getAccessToken();
+  const path = token ? `/user/valuations/${id}/preview${tq(shareToken)}` : `/public/valuations/${id}/preview${tq(shareToken)}`;
+  return send<{ qualityScore: number | null; confidence: string; monetaryRange: { low: number; high: number; currency: string } | null; limitations: string[] }>(path, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ business, planned }),
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify({ financial, planned }),
   });
 }
 
-/** Verified valuation (signed-in): connected GA4 / Search Console and business details. */
-export async function verifyValuation(id: string, inputs: Record<string, unknown>) {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false as const, message: 'Valuation not found.' };
+/** Enhanced valuation (signed-in): GA4 / Search Console and self-reported financials. */
+export async function verifyValuation(id: string, shareToken: string, inputs: Record<string, unknown>) {
+  if (!ID.test(id)) return { ok: false as const, message: 'Valuation not found.' };
   const token = await getAccessToken();
   if (!token) return { ok: false as const, message: 'Please sign in to connect your data.' };
-  return send<{ id: string }>(`/user/valuations/${id}/verify`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(inputs) });
+  return send<{ id: string; status: string; shareToken: string }>(`/user/valuations/${id}/verify${tq(shareToken)}`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(inputs) });
+}
+
+/** Cancels a queued valuation. */
+export async function cancelValuation(id: string, shareToken: string) {
+  if (!ID.test(id)) return { ok: false as const, message: 'Valuation not found.' };
+  const token = await getAccessToken();
+  return send<{ id: string; status: string }>(token ? `/user/valuations/${id}/cancel${tq(shareToken)}` : `/public/valuations/${id}/cancel${tq(shareToken)}`, { method: 'POST', headers: token ? { authorization: `Bearer ${token}` } : {} });
 }
 
 const ARTICLE_KINDS = ['blog', 'guides'] as const;

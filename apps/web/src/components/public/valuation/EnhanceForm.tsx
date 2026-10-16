@@ -3,64 +3,85 @@
 import { useEffect, useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowDown, ArrowRight, BarChart3, Check, CircleDollarSign, FileText, Lock, Target } from 'lucide-react';
+import { ArrowDown, ArrowRight, BarChart3, Check, CircleDollarSign, Lock, Target } from 'lucide-react';
 import { apiAction } from '@/lib/actions';
 import { previewValuation, verifyValuation } from '@/lib/public-actions';
-import { AUDIENCES, BUSINESS_MODELS, INDUSTRIES, MARGINS, money, TRAFFIC_SOURCES } from '@/lib/valuation';
+import { BUSINESS_MODEL_LABEL, BUSINESS_MODELS, money, reportHref } from '@/lib/valuation';
 import { Gauge } from './Charts';
 import site from '../site.module.css';
 import s from './valuation.module.css';
 
 type Property = { id: string; name: string };
 export type GoogleState = {
-  /** null = Google integrations not configured on this server. */
+  /** false = Google integrations not configured on this server. */
   available: boolean;
   connectionId: string | null;
   account: string | null;
   properties: Property[];
 };
 
+type Range = { low: number; high: number; currency: string } | null;
+
 type Props = {
   valuationId: string;
+  shareToken: string;
   domain: string;
-  current: { low: number; high: number; mid: number; currency: string; confidence: number };
+  current: { qualityScore: number | null; confidence: string; range: Range };
+  consentVersion: string;
+  credits: number;
   signedIn: boolean;
   workspaceId: string | null;
   ga4: GoogleState;
   gsc: GoogleState;
 };
 
-const num = (v: string) => (v.trim() === '' ? undefined : Number(v.replace(/[, ]/g, '')));
+type Preview = { qualityScore: number | null; confidence: string; monetaryRange: Range; limitations: string[] };
 
-/** "Connect Your Data for a More Accurate Valuation" (docs/design/website-value/Enhanced_Valuation_Report). */
-export function EnhanceForm({ valuationId, domain, current, signedIn, workspaceId, ga4, gsc }: Props) {
+const num = (v: string) => (v.trim() === '' ? undefined : Number(v.replace(/[, ]/g, '')));
+const newKey = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `k${Date.now()}${Math.random().toString(36).slice(2)}`);
+const range = (r: Range | undefined) => (r ? `${money(r.low, r.currency)} – ${money(r.high, r.currency)}` : 'No dollar range');
+
+/** "Connect Your Data for a More Accurate Valuation" — enhanced valuation inputs (V1 manual §06). */
+export function EnhanceForm({ valuationId, shareToken, domain, current, consentVersion, credits, signedIn, workspaceId, ga4, gsc }: Props) {
   const router = useRouter();
-  const here = `/website-value/report/${valuationId}/enhance`;
+  const here = `/website-value/report/${valuationId}/enhance?t=${encodeURIComponent(shareToken)}`;
   const [ga4Prop, setGa4Prop] = useState(ga4.properties[0]?.id ?? '');
   const [gscProp, setGscProp] = useState(gsc.properties.find((p) => p.id.includes(domain))?.id ?? gsc.properties[0]?.id ?? '');
-  const [f, setF] = useState({ monthlyRevenue: '', annualRevenue: '', profitMargin: '', businessModel: '', industry: '', audience: '', monthlyVisits: '', trafficSource: '', notes: '' });
-  const [preview, setPreview] = useState<{ valueLow: number; valueHigh: number; confidence: number; currency: string } | null>(null);
+  const [f, setF] = useState({ ttmRevenue: '', ttmExpenses: '', ttmProfit: '', businessModel: '' });
+  const [agree, setAgree] = useState(false);
+  const [assume, setAssume] = useState(false);
+  // One idempotency key per page visit: a retried submit never starts (or charges for) a second job.
+  const [idemKey] = useState(newKey);
+  const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   const useGa4 = !!(ga4.connectionId && ga4Prop);
   const useGsc = !!(gsc.connectionId && gscProp);
-  const business = useMemo(
-    () => ({ monthlyRevenue: num(f.monthlyRevenue), annualRevenue: num(f.annualRevenue), profitMargin: f.profitMargin || undefined, monthlyVisits: num(f.monthlyVisits) }),
-    [f.monthlyRevenue, f.annualRevenue, f.profitMargin, f.monthlyVisits],
+  const financial = useMemo(
+    () =>
+      Object.fromEntries(Object.entries({ ttmRevenue: num(f.ttmRevenue), ttmExpenses: num(f.ttmExpenses), ttmProfit: num(f.ttmProfit), businessModel: f.businessModel || undefined }).filter(([, v]) => v !== undefined)) as {
+        ttmRevenue?: number;
+        ttmExpenses?: number;
+        ttmProfit?: number;
+        businessModel?: string;
+      },
+    [f.ttmRevenue, f.ttmExpenses, f.ttmProfit, f.businessModel],
   );
-  const invalid = Object.values(business).some((v) => typeof v === 'number' && (!Number.isFinite(v) || v < 0));
+  const invalid = [financial.ttmRevenue, financial.ttmExpenses].some((v) => v !== undefined && (!Number.isFinite(v) || v < 0)) || (financial.ttmProfit !== undefined && !Number.isFinite(financial.ttmProfit));
+  const financialGiven = financial.ttmRevenue !== undefined || financial.ttmProfit !== undefined;
+  const ready = useGa4 || useGsc || financialGiven;
 
   useEffect(() => {
     if (invalid) return;
     const planned = [useGa4 && 'ga4', useGsc && 'gsc'].filter(Boolean) as string[];
     const t = setTimeout(async () => {
-      const r = await previewValuation(valuationId, Object.fromEntries(Object.entries(business).filter(([, v]) => v !== undefined)), planned);
+      const r = await previewValuation(valuationId, shareToken, financial, planned);
       if (r.ok) setPreview(r.data);
     }, 400);
     return () => clearTimeout(t);
-  }, [business, useGa4, useGsc, valuationId, invalid]);
+  }, [financial, useGa4, useGsc, valuationId, shareToken, invalid]);
 
   const connect = (provider: 'google_analytics' | 'google_search_console') =>
     start(async () => {
@@ -70,15 +91,12 @@ export function EnhanceForm({ valuationId, domain, current, signedIn, workspaceI
       window.location.assign(r.data.url);
     });
 
-  const statusRow = (icon: React.ReactNode, label: string, state: string, ok: boolean, action: React.ReactNode) => (
+  const statusRow = (icon: React.ReactNode, label: string, state: string, ok: boolean) => (
     <div className={s.srcRow} key={label}>
       <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         {icon} {label}
       </span>
-      <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-        <small style={{ color: ok ? '#15803d' : 'var(--mute)' }}>● {state}</small>
-        {action}
-      </span>
+      <small style={{ color: ok ? '#15803d' : 'var(--mute)' }}>● {state}</small>
     </div>
   );
 
@@ -121,18 +139,19 @@ export function EnhanceForm({ valuationId, domain, current, signedIn, workspaceI
     start(async () => {
       setError(null);
       if (!signedIn) return router.push(`/login?next=${encodeURIComponent(here)}`);
-      if (invalid) return setError('Revenue and visits must be positive numbers.');
-      const inputs: Record<string, unknown> = Object.fromEntries(Object.entries({ ...business, businessModel: f.businessModel, industry: f.industry, audience: f.audience, trafficSource: f.trafficSource, notes: f.notes.trim() }).filter(([, v]) => v !== undefined && v !== ''));
+      if (invalid) return setError('Revenue and expenses must be positive numbers.');
+      if (financialGiven && !financial.businessModel) return setError('Select a business model so comparable multiples can be applied.');
+      if (!agree) return setError('Please confirm the data-access consent.');
+      if (financialGiven && !assume) return setError('Please confirm the self-reported figures.');
+      const inputs: Record<string, unknown> = { consentVersion, idempotencyKey: idemKey };
+      if (Object.keys(financial).length) inputs.financial = financial;
+      if (financialGiven) inputs.acceptAssumptions = true;
       if (useGa4) inputs.ga4 = { integrationId: ga4.connectionId, propertyId: ga4Prop };
       if (useGsc) inputs.gsc = { integrationId: gsc.connectionId, siteUrl: gscProp };
-      const r = await verifyValuation(valuationId, inputs);
+      const r = await verifyValuation(valuationId, shareToken, inputs);
       if (!r.ok) return setError(r.message);
-      router.push(`/website-value/report/${r.data.id}`);
+      router.push(reportHref(r.data.id, r.data.shareToken));
     });
-
-  const revenueGiven = !!(business.monthlyRevenue || business.annualRevenue);
-  const detailsGiven = !!(f.businessModel || f.industry || f.audience);
-  const visitsGiven = !!business.monthlyVisits;
 
   return (
     <div className={s.wrap}>
@@ -142,19 +161,19 @@ export function EnhanceForm({ valuationId, domain, current, signedIn, workspaceI
             <span className={s.stepNum}>1</span>
             <div>
               <h2 style={{ fontSize: 22, margin: 0 }}>Connect Your Data Sources</h2>
-              <p style={{ color: 'var(--mute)', fontSize: 14 }}>Link your accounts to use real traffic, search, and performance data.</p>
+              <p style={{ color: 'var(--mute)', fontSize: 14 }}>Link your accounts to use verified traffic and search data.</p>
             </div>
           </div>
           {(
             [
-              ['ga4', 'Google Analytics 4 (GA4)', 'Connect your GA4 property to get verified traffic, user engagement, conversions, and social/referral data.', ['Verified traffic and user data', 'Social and referral traffic', 'Engagement and conversions', 'Traffic trends and audience insights'], ga4, ga4Prop, setGa4Prop],
-              ['gsc', 'Google Search Console', 'Connect your Search Console to get verified indexing, keyword performance, and search visibility data.', ['Keyword rankings and impressions', 'Pages with search impressions', 'Click-through rates (CTR)', 'Average search position'], gsc, gscProp, setGscProp],
+              ['ga4', 'Google Analytics 4 (GA4)', 'Connect your GA4 property for verified sessions, users and traffic trends.', ['Verified sessions and users', 'Traffic trends over 12 months', 'Engagement', 'Referral and social traffic'], ga4, ga4Prop, setGa4Prop],
+              ['gsc', 'Google Search Console', 'Connect Search Console for verified clicks, impressions and positions.', ['Clicks and impressions (28 days)', 'Pages with search impressions', 'Click-through rate (CTR)', 'Average search position'], gsc, gscProp, setGscProp],
             ] as const
           ).map(([key, title, text, gets, g, value, onChange]) => (
             <section key={key} className={s.panel}>
               <div className={s.connector}>
                 <div style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
-                  <h3 style={{ display: 'flex', gap: 10, alignItems: 'center', margin: 0 }}>
+                  <h3 style={{ display: 'flex', gap: 10, alignItems: 'center', margin: 0, flexWrap: 'wrap' }}>
                     {title} <span className={s.pill}>Recommended</span>
                   </h3>
                   <p style={{ fontSize: 14, color: 'var(--ink2)' }}>{text}</p>
@@ -178,133 +197,106 @@ export function EnhanceForm({ valuationId, domain, current, signedIn, workspaceI
             <span className={s.stepNum}>2</span>
             <div>
               <h2 style={{ fontSize: 22, margin: 0 }}>Add Business Information (Optional)</h2>
-              <p style={{ color: 'var(--mute)', fontSize: 14 }}>Include additional details to further improve valuation accuracy.</p>
+              <p style={{ color: 'var(--mute)', fontSize: 14 }}>A dollar range needs your trailing-twelve-month (TTM) earnings and business model.</p>
             </div>
           </div>
           <div className={s.grid2}>
-            <section className={s.panel} style={{ display: 'grid', gap: 12 }}>
+            <section className={s.panel} style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
               <h3 style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <CircleDollarSign size={20} color="#15803d" /> Revenue Information
+                <CircleDollarSign size={20} color="#15803d" /> Earnings (Last 12 Months)
               </h3>
-              <p style={{ fontSize: 13, color: 'var(--mute)' }}>Helps us estimate earning potential and apply appropriate valuation models.</p>
+              <p style={{ fontSize: 13, color: 'var(--mute)' }}>Enter revenue and expenses, or your net profit. These are recorded as self-reported.</p>
               <div className={s.grid2} style={{ gap: 10 }}>
                 <label className={s.field}>
-                  Monthly Revenue (USD)
-                  <input inputMode="numeric" placeholder="e.g. 5,000" value={f.monthlyRevenue} onChange={set('monthlyRevenue')} />
+                  TTM Revenue (USD)
+                  <input inputMode="numeric" placeholder="e.g. 120,000" value={f.ttmRevenue} onChange={set('ttmRevenue')} />
                 </label>
                 <label className={s.field}>
-                  Annual Revenue (USD)
-                  <input inputMode="numeric" placeholder="e.g. 60,000" value={f.annualRevenue} onChange={set('annualRevenue')} />
+                  TTM Expenses (USD)
+                  <input inputMode="numeric" placeholder="e.g. 45,000" value={f.ttmExpenses} onChange={set('ttmExpenses')} />
                 </label>
               </div>
               <label className={s.field}>
-                Profit Margin (Optional)
-                <select value={f.profitMargin} onChange={set('profitMargin')}>
-                  <option value="">Select range</option>
-                  {MARGINS.map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
+                or TTM Net Profit (USD)
+                <input inputMode="numeric" placeholder="e.g. 75,000" value={f.ttmProfit} onChange={set('ttmProfit')} />
+              </label>
+            </section>
+            <section className={s.panel} style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
+              <h3 style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Target size={20} color="#15803d" /> Business Model
+              </h3>
+              <p style={{ fontSize: 13, color: 'var(--mute)' }}>Used to pick comparable sale multiples for similar websites.</p>
+              <label className={s.field}>
+                Business Model
+                <select value={f.businessModel} onChange={set('businessModel')}>
+                  <option value="">Select model</option>
+                  {BUSINESS_MODELS.map((o) => (
+                    <option key={o} value={o}>
+                      {BUSINESS_MODEL_LABEL[o]}
                     </option>
                   ))}
                 </select>
               </label>
             </section>
-            <section className={s.panel} style={{ display: 'grid', gap: 12 }}>
-              <h3 style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Target size={20} color="#15803d" /> Business Details
-              </h3>
-              <p style={{ fontSize: 13, color: 'var(--mute)' }}>Tell us more about your website and business model.</p>
-              {(
-                [
-                  ['businessModel', 'Business Model', 'Select model', BUSINESS_MODELS],
-                  ['industry', 'Industry', 'Select industry', INDUSTRIES],
-                  ['audience', 'Target Audience', 'Select audience', AUDIENCES],
-                ] as const
-              ).map(([k, l, ph, opts]) => (
-                <label key={k} className={s.field}>
-                  {l}
-                  <select value={f[k]} onChange={set(k)}>
-                    <option value="">{ph}</option>
-                    {opts.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-            </section>
-            <section className={s.panel} style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
-              <h3 style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <BarChart3 size={20} color="#15803d" /> Traffic Confirmation
-              </h3>
-              <p style={{ fontSize: 13, color: 'var(--mute)' }}>Adjust estimated traffic if you have more accurate numbers.</p>
-              <div className={s.grid2} style={{ gap: 10 }}>
-                <label className={s.field}>
-                  Monthly Visits (Optional)
-                  <input inputMode="numeric" placeholder="e.g. 25,000" value={f.monthlyVisits} onChange={set('monthlyVisits')} />
-                </label>
-                <label className={s.field}>
-                  Source
-                  <select value={f.trafficSource} onChange={set('trafficSource')}>
-                    <option value="">Select source</option>
-                    {TRAFFIC_SOURCES.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </section>
-            <section className={s.panel} style={{ display: 'grid', gap: 12, alignContent: 'start' }}>
-              <h3 style={{ margin: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
-                <FileText size={20} color="#15803d" /> Additional Information
-              </h3>
-              <p style={{ fontSize: 13, color: 'var(--mute)' }}>Any other details that may impact value.</p>
-              <label className={s.field}>
-                Additional notes (Optional)
-                <textarea maxLength={500} placeholder="e.g. monetization methods, partnerships, unique assets, etc." value={f.notes} onChange={set('notes')} />
-                <small style={{ textAlign: 'right', color: 'var(--mute)', fontWeight: 400 }}>{f.notes.length}/500</small>
-              </label>
-            </section>
           </div>
+
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 10 }}>
+            <span className={s.stepNum}>3</span>
+            <div>
+              <h2 style={{ fontSize: 22, margin: 0 }}>Review &amp; Confirm</h2>
+              <p style={{ color: 'var(--mute)', fontSize: 14 }}>The enhanced valuation is recalculated from your data and stored as a new, immutable result.</p>
+            </div>
+          </div>
+          <section className={s.panel} style={{ display: 'grid', gap: 12 }}>
+            <label className={s.checkLine}>
+              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+              <span>I agree to AmpliVerify reading the selected Google Analytics / Search Console data for this valuation (consent version {consentVersion}).</span>
+            </label>
+            {financialGiven && (
+              <label className={s.checkLine}>
+                <input type="checkbox" checked={assume} onChange={(e) => setAssume(e.target.checked)} />
+                <span>I confirm these figures are accurate to the best of my knowledge and understand they are labelled self-reported and are not independently verified.</span>
+              </label>
+            )}
+            <p style={{ fontSize: 13, color: 'var(--mute)' }}>{credits > 0 ? `This uses ${credits} credit${credits === 1 ? '' : 's'}. Credits are reserved when you submit and returned if the calculation fails or is cancelled.` : 'Enhanced valuations are included in your plan.'}</p>
+          </section>
         </div>
 
         <aside className={s.side}>
           <section className={s.panel} style={{ display: 'grid', gap: 14 }}>
             <div>
               <h3 style={{ margin: 0 }}>Valuation Preview</h3>
-              <p style={{ fontSize: 13, color: 'var(--mute)' }}>See how connecting your data can improve accuracy.</p>
+              <p style={{ fontSize: 13, color: 'var(--mute)' }}>See how your data changes the result.</p>
             </div>
             <div className={`${s.previewBox} ${s.muted}`}>
               <div>
-                <small>Current Estimate (Public Data)</small>
-                <div style={{ fontSize: 22, fontWeight: 800 }}>
-                  {money(current.low, current.currency)} – {money(current.high, current.currency)}
-                </div>
+                <small>Current (Public Data) · {current.confidence} confidence</small>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{range(current.range)}</div>
               </div>
-              <Gauge value={current.confidence} size={64} label="Current confidence" />
+              {current.qualityScore !== null && <Gauge value={current.qualityScore} size={64} label="Current quality score" />}
             </div>
             <ArrowDown size={18} style={{ margin: '0 auto', color: 'var(--mute)' }} />
             <div className={s.previewBox}>
               <div>
-                <small style={{ fontWeight: 700 }}>With Your Connected Data</small>
-                <small style={{ display: 'block', color: 'var(--mute)' }}>Estimated range based on your data sources</small>
-                <div style={{ fontSize: 24, fontWeight: 800, color: '#15803d' }}>{preview ? `${money(preview.valueLow, preview.currency)} – ${money(preview.valueHigh, preview.currency)}` : '—'}</div>
-                <small style={{ color: 'var(--mute)' }}>Final figures are calculated from your actual data.</small>
+                <small style={{ fontWeight: 700 }}>With Your Data · {preview?.confidence ?? '—'} confidence</small>
+                <small style={{ display: 'block', color: 'var(--mute)' }}>Projection — assumes the selected connections succeed</small>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#15803d' }}>{preview ? range(preview.monetaryRange) : '—'}</div>
+                {preview && !preview.monetaryRange && <small style={{ color: 'var(--mute)' }}>{preview.limitations[1] ?? preview.limitations[0]}</small>}
               </div>
-              {preview && <Gauge value={preview.confidence} size={76} label="Projected confidence" />}
+              {preview?.qualityScore != null && <Gauge value={preview.qualityScore} size={76} label="Projected quality score" />}
             </div>
             <div>
               <b style={{ fontSize: 15 }}>Data Source Status</b>
-              {statusRow(<BarChart3 size={18} color="#f59e0b" />, 'Google Analytics 4', useGa4 ? 'Selected' : ga4.connectionId ? 'Connected' : 'Not connected', useGa4, null)}
-              {statusRow(<Target size={18} color="#4285f4" />, 'Google Search Console', useGsc ? 'Selected' : gsc.connectionId ? 'Connected' : 'Not connected', useGsc, null)}
-              {statusRow(<CircleDollarSign size={18} color="#15803d" />, 'Revenue Information', revenueGiven ? 'Provided' : 'Not provided', revenueGiven, null)}
-              {statusRow(<Target size={18} color="#15803d" />, 'Business Details', detailsGiven ? 'Provided' : 'Not provided', detailsGiven, null)}
-              {statusRow(<BarChart3 size={18} color="#15803d" />, 'Traffic Confirmation', visitsGiven ? 'Provided' : 'Not provided', visitsGiven, null)}
+              {statusRow(<BarChart3 size={18} color="#f59e0b" />, 'Google Analytics 4', useGa4 ? 'Selected' : ga4.connectionId ? 'Connected' : 'Not connected', useGa4)}
+              {statusRow(<Target size={18} color="#4285f4" />, 'Google Search Console', useGsc ? 'Selected' : gsc.connectionId ? 'Connected' : 'Not connected', useGsc)}
+              {statusRow(<CircleDollarSign size={18} color="#15803d" />, 'TTM Earnings', financialGiven ? 'Self-reported' : 'Not provided', financialGiven)}
+              {statusRow(<Target size={18} color="#15803d" />, 'Business Model', f.businessModel ? BUSINESS_MODEL_LABEL[f.businessModel] : 'Not provided', !!f.businessModel)}
             </div>
             <div className={s.whatWeGet} style={{ display: 'flex', gap: 12 }}>
               <Lock size={22} color="#15803d" style={{ flex: 'none' }} />
               <div>
                 <b>Your Data Stays Private</b>
-                <p style={{ fontSize: 12, color: 'var(--ink2)' }}>We only access the data needed for analysis. We never see your Google password; access tokens are encrypted and you can disconnect anytime.</p>
+                <p style={{ fontSize: 12, color: 'var(--ink2)' }}>We only read the data needed for this valuation. We never see your Google password; access tokens are encrypted and you can disconnect anytime.</p>
                 <Link href="/legal#privacy" style={{ color: '#15803d', fontSize: 12, fontWeight: 700 }}>
                   Learn more about our data policy →
                 </Link>
@@ -315,11 +307,11 @@ export function EnhanceForm({ valuationId, domain, current, signedIn, workspaceI
                 {error}
               </p>
             )}
-            <button type="button" className={site.btn} onClick={submit} disabled={pending || (!useGa4 && !useGsc && !revenueGiven && !visitsGiven)}>
-              {pending ? 'Working…' : signedIn ? 'Generate Verified Valuation' : 'Sign In to Generate'} <ArrowRight size={18} />
+            <button type="button" className={site.btn} onClick={submit} disabled={pending || !ready}>
+              {pending ? 'Working…' : signedIn ? 'Generate Enhanced Valuation' : 'Sign In to Generate'} <ArrowRight size={18} />
             </button>
-            {!useGa4 && !useGsc && !revenueGiven && !visitsGiven && <small style={{ color: 'var(--mute)', textAlign: 'center' }}>Connect a data source or add revenue or traffic details first.</small>}
-            <Link href={`/website-value/report/${valuationId}`} className={site.btnOutline}>
+            {!ready && <small style={{ color: 'var(--mute)', textAlign: 'center' }}>Connect a data source or add your earnings first.</small>}
+            <Link href={reportHref(valuationId, shareToken)} className={site.btnOutline}>
               Continue with Current Estimate
             </Link>
           </section>

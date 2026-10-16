@@ -5,7 +5,7 @@ import { EnhanceForm, type GoogleState } from '@/components/public/valuation/Enh
 import { apiGet } from '@/lib/api';
 import { getAccessToken } from '@/lib/session';
 import { getAppContext } from '@/lib/project';
-import type { ValuationReport } from '@/lib/valuation';
+import { reportHref, type ValuationReport } from '@/lib/valuation';
 import site from '@/components/public/site.module.css';
 import s from '@/components/public/valuation/valuation.module.css';
 
@@ -21,14 +21,16 @@ async function googleState(rows: ProviderRow[] | null, key: string): Promise<Goo
   return { available: !!row?.available, connectionId: c?.id ?? null, account: c?.account ?? null, properties: props?.ok ? props.data : [] };
 }
 
-export default async function EnhanceValuationPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EnhanceValuationPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ t?: string }> }) {
   const { id } = await params;
+  const { t } = await searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const res = await apiGet<ValuationReport>(`/public/valuations/${id}`, { revalidate: 0 });
-  if (!res.ok || res.data.kind !== 'ESTIMATE' || res.data.status !== 'COMPLETED' || !res.data.result) notFound();
-  const v = res.data;
-  const r = v.result!;
+  const q = t && /^[\w-]{10,64}$/.test(t) ? `?t=${encodeURIComponent(t)}` : '';
   const signedIn = !!(await getAccessToken());
+  let res = await apiGet<ValuationReport>(`${signedIn ? '/user' : '/public'}/valuations/${id}${q}`, { auth: signedIn, revalidate: 0 });
+  if (signedIn && !res.ok && res.reason === 'not_found' && q) res = await apiGet<ValuationReport>(`/public/valuations/${id}${q}`, { revalidate: 0 });
+  if (!res.ok || res.data.mode !== 'public' || res.data.status !== 'completed') notFound();
+  const v = res.data;
   let workspaceId: string | null = null;
   let rows: ProviderRow[] | null = null;
   if (signedIn) {
@@ -44,11 +46,11 @@ export default async function EnhanceValuationPage({ params }: { params: Promise
         <div className={`${site.container} ${site.heroGrid}`}>
           <div>
             <nav className={site.crumbs} aria-label="Breadcrumb" style={{ color: 'var(--mute)', marginBottom: 14 }}>
-              <Link href="/">Home</Link> › <Link href="/blog">Resources</Link> › <Link href="/website-value">Website Value Calculator</Link> › <Link href={`/website-value/report/${id}`}>Report</Link> › <span>Enhance Valuation</span>
+              <Link href="/">Home</Link> › <Link href="/blog">Resources</Link> › <Link href="/website-value">Website Value Calculator</Link> › <Link href={reportHref(id, v.shareToken)}>Report</Link> › <span>Enhance Valuation</span>
             </nav>
-            <div className={site.eyebrow}>Enhanced / Verified Valuation</div>
+            <div className={site.eyebrow}>Enhanced Valuation</div>
             <h1 className={site.h1}>Connect Your Data for a More Accurate Valuation</h1>
-            <p className={site.lead}>Add your own data sources to get a verified website valuation for {v.domain} with higher confidence and deeper insights.</p>
+            <p className={site.lead}>Add your own data sources to get an enhanced valuation for {v.domain} with verified traffic, higher confidence and — with your earnings — a dollar range.</p>
             <div className={site.checks} style={{ gap: 26 }}>
               {[
                 [<BarChart3 key="a" size={18} />, 'Higher Accuracy', 'Uses your real data'],
@@ -70,9 +72,9 @@ export default async function EnhanceValuationPage({ params }: { params: Promise
           </div>
           <div className={s.heroCard}>
             <small>From Estimate</small>
-            <h3 style={{ marginTop: 2 }}>to Verified Value</h3>
+            <h3 style={{ marginTop: 2 }}>to Enhanced Value</h3>
             <ul className={s.list} style={{ marginTop: 12 }}>
-              {['Connect GA4', 'Connect Search Console', 'Add Business Inputs', 'Get a Verified Valuation'].map((t) => (
+              {['Connect GA4', 'Connect Search Console', 'Add TTM Earnings', 'Get an Enhanced Valuation'].map((t) => (
                 <li key={t}>
                   <Check size={18} className={s.okIcon} /> {t}
                 </li>
@@ -83,7 +85,7 @@ export default async function EnhanceValuationPage({ params }: { params: Promise
       </section>
 
       <div className={site.container} style={{ padding: '36px 0 24px' }}>
-        <EnhanceForm valuationId={id} domain={v.domain} current={{ low: r.valueLow, high: r.valueHigh, mid: r.valueMid, currency: r.currency, confidence: r.confidence }} signedIn={signedIn} workspaceId={workspaceId} ga4={ga4} gsc={gsc} />
+        <EnhanceForm valuationId={id} shareToken={v.shareToken} domain={v.domain} current={{ qualityScore: v.qualityScore, confidence: v.confidence ?? 'LOW', range: v.monetaryRange }} consentVersion={v.consentVersion} credits={v.enhancedCredits} signedIn={signedIn} workspaceId={workspaceId} ga4={ga4} gsc={gsc} />
       </div>
 
       <div className={site.container} style={{ paddingBottom: 64 }}>

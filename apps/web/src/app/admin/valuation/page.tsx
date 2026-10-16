@@ -7,8 +7,8 @@ export default function ValuationEngineSettingsPage() {
   return (
     <ValuationPage
       title="Valuation Engine Settings"
-      description="Configure how website values are calculated, manage data sources, set confidence rules, and control feature access."
-      sections={['model', 'preview', 'sources', 'confidence', 'access', 'history']}
+      description="Publish the quality-score weights, comparable sale multiples, evidence sources and access rules. Every change creates a new methodology version."
+      sections={['model', 'preview', 'comparables', 'sources', 'access', 'history']}
     />
   );
 }

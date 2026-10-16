@@ -147,7 +147,7 @@ export default async function FeaturesPage() {
         </div>
       </section>
 
-      <ValueTeaser available={available} reason={available ? undefined : 'The calculator is not available yet. Please check back soon.'} />
+      <ValueTeaser available={available} reason={available ? undefined : 'The calculator is not available yet. Please check back soon.'} consentVersion={cfg.ok ? cfg.data.consentVersion : undefined} />
 
       <CtaBand eyebrow="See the Difference" title="Ready to Engineer SEO Growth?" text="Join AmpliVerify and get the tools and insights you need to improve your search visibility and drive sustainable growth." />
     </>
