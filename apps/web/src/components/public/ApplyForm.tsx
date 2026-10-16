@@ -99,7 +99,7 @@ export function ApplyForm({ slug, closed, requireResume, requireCoverLetter }: {
           <textarea className={s.input} name="message" maxLength={5000} placeholder="Add a short note relevant to your application." />
         </label>
         <p className={`${s.full} ${s.cardText}`} style={{ fontSize: 13 }}>
-          By submitting this application, you acknowledge that the information you provide will be processed for recruitment purposes in accordance with the AmpliVerify <Link href="/legal#privacy">privacy notice</Link>.
+          By submitting this application, you acknowledge that the information you provide will be processed for recruitment purposes in accordance with the AmpliVerify <Link href="/legal">privacy notice</Link>.
         </p>
         <label className={s.full} style={{ display: 'flex', gap: 10, fontWeight: 400 }}>
           <input type="checkbox" name="consent" required /> I confirm that the information provided is accurate and I agree to the application privacy terms.

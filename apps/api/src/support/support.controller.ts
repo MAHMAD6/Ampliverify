@@ -19,7 +19,7 @@ class ContactDto {
   @IsString() @MinLength(2) @MaxLength(120) name: string;
   @IsEmail() @MaxLength(254) email: string;
   @IsOptional() @IsString() @MaxLength(160) company?: string;
-  @IsIn(['SALES', 'SUPPORT', 'PARTNERSHIP', 'PRESS', 'BILLING', 'OTHER']) topic: string;
+  @IsIn(['SALES', 'SUPPORT', 'PARTNERSHIP', 'PRESS', 'BILLING', 'PRIVACY', 'CAREERS', 'OTHER']) topic: string;
   @IsString() @MinLength(10) @MaxLength(5000) message: string;
   /** Honeypot: real visitors leave it empty. */
   @IsOptional() @IsString() @MaxLength(200) website?: string;

@@ -6,7 +6,7 @@
 
 /* Header */
 .brand { display: flex; align-items: center; gap: 12px; color: var(--navy); }
-.brand b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; line-height: 1; }
+.brand b { display: block; font-size: 25px; font-weight: 800; letter-spacing: 0.01em; line-height: 1; }
 .brandAccent { color: var(--g500); }
 .brandDark b { color: #fff; }
 .brandDark .brandAccent { color: #5cc23a; }
@@ -299,10 +299,13 @@ textarea.input { height: auto; min-height: 140px; padding: 14px 16px; resize: ve
 .footer h4 { color: #fff; font-size: 16px; margin-bottom: 14px; }
 .footer nav a { display: block; color: #c3cdd6; margin: 10px 0; font-size: 15px; }
 .footer nav a:hover { color: #fff; }
+.footer nav a.footerActive { color: #5cc23a; font-weight: 600; }
+.motto { color: #c3cdd6; letter-spacing: 0.02em; }
+.motto::before { content: none; }
 .social { display: flex; gap: 10px; margin-top: 18px; }
 .social a { width: 38px; height: 38px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 8px; display: grid; place-items: center; color: #fff; }
 .social a:hover { background: rgba(255, 255, 255, 0.1); }
-.copy { text-align: right; font-size: 14px; margin-top: 36px; color: #9fb0bf; }
+.copy { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; margin-top: 36px; padding-top: 22px; border-top: 1px solid rgba(255, 255, 255, 0.1); color: #9fb0bf; }
 .footerCta { background: var(--g500); }
 
 @media (max-width: 1100px) {
@@ -385,7 +388,7 @@ textarea.input { height: auto; min-height: 140px; padding: 14px 16px; resize: ve
   .footerGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
   .footerGrid > div:first-child, .footerGrid > div:last-child { grid-column: 1 / -1; }
   .footerGrid > div:last-child .btn { width: 100%; }
-  .copy { text-align: center; }
+  .copy { justify-content: center; text-align: center; }
   .form { gap: 14px; }
   .faq summary { font-size: 16px; }
 }

@@ -229,7 +229,7 @@ export function SignupPlans({ plans, website, defaultPlan, defaultInterval, prov
           {pending ? 'Creating account…' : 'Create Account & Run Audit'} <ArrowRight size={20} />
         </button>
         <p className={a.terms}>
-          By creating an account, you agree to our <Link href="/legal#terms">Terms of Service</Link> and <Link href="/legal#privacy">Privacy Policy</Link>.
+          By creating an account, you agree to our <Link href="/legal?doc=terms">Terms of Service</Link> and <Link href="/legal">Privacy Policy</Link>.
         </p>
       </form>
     </div>

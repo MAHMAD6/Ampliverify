@@ -36,7 +36,7 @@ export default async function ContactMessagesPage({ searchParams }: { searchPara
       basePath="/admin/support/contact"
       search="Search by name, email or message..."
       liveFilters={{ q }}
-      selects={[{ label: 'Topic', name: 'topic', value: topic, options: ['All Topics', ...['SALES', 'SUPPORT', 'BILLING', 'PARTNERSHIP', 'PRESS', 'OTHER'].map((t) => [t, ticketLabel(t)] as [string, string])] }]}
+      selects={[{ label: 'Topic', name: 'topic', value: topic, options: ['All Topics', ...['SALES', 'SUPPORT', 'BILLING', 'PARTNERSHIP', 'PRIVACY', 'CAREERS', 'PRESS', 'OTHER'].map((t) => [t, ticketLabel(t)] as [string, string])] }]}
       columns={['From', 'Topic', 'Message', 'Received', 'Status']}
       rows={rows.map((c) => [
         <span key="f">

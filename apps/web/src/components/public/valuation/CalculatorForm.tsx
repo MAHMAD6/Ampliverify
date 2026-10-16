@@ -60,7 +60,7 @@ export function CalculatorForm({
         <label className={s.consent}>
           <input type="checkbox" name="consent" value="1" disabled={disabled || pending} required />
           <span>
-            I confirm I’m allowed to analyze this site and agree to the collection of its public data (PageSpeed, domain records, search data) under the <Link href="/legal#privacy">Privacy Policy</Link>.
+            I confirm I’m allowed to analyze this site and agree to the collection of its public data (PageSpeed, domain records, search data) under the <Link href="/legal">Privacy Policy</Link>.
           </span>
         </label>
       </form>

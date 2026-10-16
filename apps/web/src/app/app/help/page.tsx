@@ -82,7 +82,7 @@ export default async function HelpSupportPage({ searchParams }: { searchParams: 
         <Panel title="Useful Links" flushHead>
           <KeyValue label="Documentation" value={<Link href="/help" style={{ color: 'var(--blue)' }}>Open Help Center</Link>} />
           <KeyValue label="Account & Billing" value={<Link href="/app/billing" style={{ color: 'var(--blue)' }}>Open Billing & Plan</Link>} />
-          <KeyValue label="Privacy" value={<Link href="/legal#privacy" style={{ color: 'var(--blue)' }}>Open privacy information</Link>} />
+          <KeyValue label="Privacy" value={<Link href="/legal" style={{ color: 'var(--blue)' }}>Open privacy information</Link>} />
         </Panel>
         <Panel title="Your Requests" description="Requests you submitted and their status." flushHead>
           {tickets.length ? (

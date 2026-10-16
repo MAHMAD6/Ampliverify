@@ -1,14 +1,16 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { getPlatformInfo } from '@/lib/platform';
 import { Brand } from './Brand';
+import { FooterNav } from './FooterNav';
 import s from './site.module.css';
 
 const COLUMNS = [
   { title: 'Product', links: [['Features', '/features'], ['Pricing', '/pricing'], ['How It Works', '/how-it-works']] },
   { title: 'Resources', links: [['Blog', '/blog'], ['Guides', '/guides'], ['Help Center', '/help'], ['Website Value Calculator', '/website-value']] },
   { title: 'Company', links: [['About Us', '/about'], ['Careers', '/careers'], ['Contact', '/contact']] },
-  { title: 'Legal', links: [['Privacy Policy', '/legal#privacy'], ['Terms of Service', '/legal#terms'], ['Cookie Policy', '/legal#cookies']] },
+  { title: 'Legal', links: [['Privacy Policy', '/legal'], ['Terms of Service', '/legal?doc=terms'], ['Cookie Policy', '/legal?doc=cookies'], ['DPA', '/legal?doc=dpa']] },
 ] as const;
 
 /** Brand glyphs drawn inline (lucide has no brand icons). */
@@ -47,14 +49,21 @@ export async function SiteFooter() {
           )}
         </div>
         {COLUMNS.map((c) => (
-          <nav key={c.title} aria-label={c.title}>
-            <h4>{c.title}</h4>
-            {c.links.map(([l, h]) => (
-              <Link key={h} href={h}>
-                {l}
-              </Link>
-            ))}
-          </nav>
+          <Suspense
+            key={c.title}
+            fallback={
+              <nav aria-label={c.title}>
+                <h4>{c.title}</h4>
+                {c.links.map(([l, h]) => (
+                  <Link key={h} href={h}>
+                    {l}
+                  </Link>
+                ))}
+              </nav>
+            }
+          >
+            <FooterNav title={c.title} links={c.links} />
+          </Suspense>
         ))}
         <div>
           <Link href="/signup" className={`${s.btn} ${s.footerCta}`}>
@@ -62,7 +71,10 @@ export async function SiteFooter() {
           </Link>
         </div>
       </div>
-      <p className={`${s.container} ${s.copy}`}>© {new Date().getFullYear()} AmpliVerify. All rights reserved.</p>
+      <div className={`${s.container} ${s.copy}`}>
+        <span>© {new Date().getFullYear()} AmpliVerify. All rights reserved.</span>
+        <span className={s.motto}>Audit · Optimize · Verify</span>
+      </div>
     </footer>
   );
 }

@@ -297,7 +297,7 @@ export function EnhanceForm({ valuationId, shareToken, domain, current, consentV
               <div>
                 <b>Your Data Stays Private</b>
                 <p style={{ fontSize: 12, color: 'var(--ink2)' }}>We only read the data needed for this valuation. We never see your Google password; access tokens are encrypted and you can disconnect anytime.</p>
-                <Link href="/legal#privacy" style={{ color: '#15803d', fontSize: 12, fontWeight: 700 }}>
+                <Link href="/legal" style={{ color: '#15803d', fontSize: 12, fontWeight: 700 }}>
                   Learn more about our data policy →
                 </Link>
               </div>
