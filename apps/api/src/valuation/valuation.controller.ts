@@ -1,30 +1,26 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put, Query, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Request, Response } from 'express';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
 import { requestMeta } from '../common/types/request-meta.type';
-import { SOURCES, SourceKey, ValuationSettings } from './valuation-engine';
 import { ValuationService } from './valuation.service';
 
-class DomainDto {
+class CreateDto {
   @IsString() @MaxLength(2048) domain: string;
-  @IsOptional() @IsUUID() workspaceId?: string;
+  @IsOptional() @IsIn(['public']) mode?: 'public';
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) consentVersion: string;
+  @IsOptional() @IsString() @Matches(/^[\w.:-]{8,100}$/) idempotencyKey?: string;
 }
 
-class BusinessDto {
-  @IsOptional() @IsNumber() @Min(0) @Max(1e11) monthlyRevenue?: number;
-  @IsOptional() @IsNumber() @Min(0) @Max(1e12) annualRevenue?: number;
-  @IsOptional() @Matches(/^\d{1,2}-\d{1,3}$/) profitMargin?: string;
-  @IsOptional() @IsNumber() @Min(0) @Max(1e10) monthlyVisits?: number;
-}
-
-class PreviewDto {
-  @IsOptional() @ValidateNested() @Type(() => BusinessDto) business?: BusinessDto;
-  @IsOptional() @IsArray() @ArrayMaxSize(6) @IsIn([...SOURCES], { each: true }) planned?: SourceKey[];
+class FinancialDto {
+  @IsOptional() @IsNumber() @Min(0) @Max(1e12) ttmRevenue?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(1e12) ttmExpenses?: number;
+  @IsOptional() @IsNumber() @Min(-1e12) @Max(1e12) ttmProfit?: number;
+  @IsOptional() @IsString() @MaxLength(80) businessModel?: string;
 }
 
 class Ga4Ref {
@@ -36,20 +32,37 @@ class GscRef {
   @IsString() @MaxLength(2048) siteUrl: string;
 }
 
-class VerifyDto extends BusinessDto {
+class VerifyDto {
   @IsOptional() @ValidateNested() @Type(() => Ga4Ref) ga4?: Ga4Ref;
   @IsOptional() @ValidateNested() @Type(() => GscRef) gsc?: GscRef;
-  @IsOptional() @IsString() @MaxLength(80) businessModel?: string;
-  @IsOptional() @IsString() @MaxLength(80) industry?: string;
-  @IsOptional() @IsString() @MaxLength(80) audience?: string;
-  @IsOptional() @IsString() @MaxLength(80) trafficSource?: string;
-  @IsOptional() @IsString() @MaxLength(500) notes?: string;
+  @IsOptional() @ValidateNested() @Type(() => FinancialDto) financial?: FinancialDto;
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) consentVersion: string;
+  @IsOptional() @IsBoolean() acceptAssumptions?: boolean;
+  @IsOptional() @IsString() @Matches(/^[\w.:-]{8,100}$/) idempotencyKey?: string;
 }
 
-class SettingsDto {
-  @IsObject() settings: Record<string, unknown>;
+class PreviewDto {
+  @IsOptional() @ValidateNested() @Type(() => FinancialDto) financial?: FinancialDto;
+  @IsOptional() @IsArray() @ArrayMaxSize(2) @IsIn(['gsc', 'ga4'], { each: true }) planned?: ('gsc' | 'ga4')[];
 }
 
+class ConfigDto {
+  @IsObject() config: Record<string, unknown>;
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
+}
+
+class TestDto {
+  @IsString() @MaxLength(2048) domain: string;
+}
+
+const sendPdf = (res: Response, f: { filename: string; body: Buffer }) => {
+  res.setHeader('content-type', 'application/pdf');
+  res.setHeader('content-disposition', `attachment; filename="${f.filename.replace(/[^a-z0-9.-]/gi, '-')}"`);
+  res.setHeader('cache-control', 'private, no-store');
+  res.send(f.body);
+};
+
+/** Website Value Calculator routes (V1 manual §06). Non-owners need the share token (`?t=`). */
 @Controller()
 export class ValuationController {
   constructor(private readonly valuation: ValuationService) {}
@@ -64,73 +77,97 @@ export class ValuationController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('public/valuations')
-  create(@Body() dto: DomainDto, @Req() req: Request) {
-    return this.valuation.createEstimate({ domain: dto.domain }, requestMeta(req));
+  create(@Body() dto: CreateDto, @Req() req: Request) {
+    return this.valuation.createEstimate({ domain: dto.domain, consentVersion: dto.consentVersion, idempotencyKey: dto.idempotencyKey }, requestMeta(req));
   }
 
   @Public()
   @Get('public/valuations/:id')
-  report(@Param('id', ParseUUIDPipe) id: string) {
-    return this.valuation.report(id);
+  get(@Param('id', ParseUUIDPipe) id: string, @Query('t') t?: string) {
+    return this.valuation.get(id, { token: t });
+  }
+
+  @Public()
+  @Get('public/valuations/:id/evidence')
+  evidence(@Param('id', ParseUUIDPipe) id: string, @Query('t') t?: string) {
+    return this.valuation.evidence(id, { token: t });
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Get('public/valuations/:id/report')
+  async report(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response, @Query('t') t?: string) {
+    sendPdf(res, await this.valuation.pdf(id, { token: t }));
   }
 
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('public/valuations/:id/preview')
-  preview(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PreviewDto) {
-    return this.valuation.preview(id, dto.business ?? {}, dto.planned ?? []);
+  preview(@Param('id', ParseUUIDPipe) id: string, @Body() dto: PreviewDto, @Query('t') t?: string) {
+    return this.valuation.preview(id, { token: t }, dto.financial ?? {}, dto.planned ?? []);
   }
 
   @Public()
-  @Get('public/valuations/:id/pdf')
-  async pdf(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
-    const f = await this.valuation.pdf(id);
-    res.setHeader('content-type', 'application/pdf');
-    res.setHeader('content-disposition', `attachment; filename="${f.filename.replace(/[^a-z0-9.-]/gi, '-')}"`);
-    res.send(f.body);
+  @Post('public/valuations/:id/cancel')
+  cancel(@Param('id', ParseUUIDPipe) id: string, @Query('t') t?: string) {
+    return this.valuation.cancel(id, { token: t });
   }
 
-  @Public()
-  @Get('public/valuations/:id/json')
-  json(@Param('id', ParseUUIDPipe) id: string) {
-    return this.valuation.json(id);
-  }
-
-  // ── Signed-in users ───────────────────────────────────────────────────────
+  // ── Signed-in users (owner access without a token) ────────────────────────
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('user/valuations')
-  createMine(@CurrentActor() a: AuthenticatedActor, @Body() dto: DomainDto, @Req() req: Request) {
-    return this.valuation.createEstimate({ domain: dto.domain, userId: a.userId, workspaceId: dto.workspaceId }, requestMeta(req));
+  createMine(@CurrentActor() a: AuthenticatedActor, @Body() dto: CreateDto, @Req() req: Request) {
+    return this.valuation.createEstimate({ domain: dto.domain, consentVersion: dto.consentVersion, idempotencyKey: dto.idempotencyKey, userId: a.userId }, requestMeta(req));
   }
 
   @Get('user/valuations')
   mine(@CurrentActor() a: AuthenticatedActor) {
-    return this.valuation.myValuations(a.userId);
+    return this.valuation.mine(a.userId);
+  }
+
+  @Get('user/valuations/:id')
+  getMine(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Query('t') t?: string) {
+    return this.valuation.get(id, { userId: a.userId, token: t });
+  }
+
+  @Get('user/valuations/:id/evidence')
+  evidenceMine(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Query('t') t?: string) {
+    return this.valuation.evidence(id, { userId: a.userId, token: t });
+  }
+
+  @Get('user/valuations/:id/report')
+  async reportMine(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Res() res: Response, @Query('t') t?: string) {
+    sendPdf(res, await this.valuation.pdf(id, { userId: a.userId, token: t }));
+  }
+
+  @Post('user/valuations/:id/preview')
+  previewMine(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: PreviewDto, @Query('t') t?: string) {
+    return this.valuation.preview(id, { userId: a.userId, token: t }, dto.financial ?? {}, dto.planned ?? []);
   }
 
   @Post('user/valuations/:id/verify')
-  verify(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VerifyDto, @Req() req: Request) {
-    return this.valuation.createVerified(a.userId, id, dto, requestMeta(req));
+  verify(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: VerifyDto, @Req() req: Request, @Query('t') t?: string) {
+    return this.valuation.createVerified(a.userId, id, t, dto, requestMeta(req));
+  }
+
+  @Post('user/valuations/:id/cancel')
+  cancelMine(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Query('t') t?: string) {
+    return this.valuation.cancel(id, { userId: a.userId, token: t });
   }
 
   // ── Super Admin ───────────────────────────────────────────────────────────
-  @Get('admin/valuation/settings')
-  settings(@CurrentActor() a: AuthenticatedActor) {
-    return this.valuation.adminSettings(a.userId);
+  @Get('admin/valuation/config')
+  adminConfig(@CurrentActor() a: AuthenticatedActor) {
+    return this.valuation.adminConfig(a.userId);
   }
 
-  @Put('admin/valuation/settings')
-  save(@CurrentActor() a: AuthenticatedActor, @Body() dto: SettingsDto, @Req() req: Request) {
-    return this.valuation.updateSettings(a.userId, dto.settings as unknown as ValuationSettings, requestMeta(req));
-  }
-
-  @Post('admin/valuation/settings/reset')
-  async reset(@CurrentActor() a: AuthenticatedActor, @Req() req: Request) {
-    const { defaults } = await this.valuation.adminSettings(a.userId);
-    return this.valuation.updateSettings(a.userId, defaults, requestMeta(req), true);
+  @Patch('admin/valuation/config')
+  updateConfig(@CurrentActor() a: AuthenticatedActor, @Body() dto: ConfigDto, @Req() req: Request) {
+    return this.valuation.updateConfig(a.userId, dto.config, dto.note, requestMeta(req));
   }
 
   @Post('admin/valuation/test')
-  test(@CurrentActor() a: AuthenticatedActor, @Body() dto: DomainDto) {
+  test(@CurrentActor() a: AuthenticatedActor, @Body() dto: TestDto) {
     return this.valuation.createTest(a.userId, dto.domain);
   }
 
@@ -140,18 +177,13 @@ export class ValuationController {
   }
 
   @Get('admin/valuation/valuations/:id')
-  adminReport(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.valuation.adminReport(a.userId, id);
+  detail(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.valuation.adminDetail(a.userId, id);
   }
 
   @Get('admin/valuation/sources')
   sources(@CurrentActor() a: AuthenticatedActor) {
     return this.valuation.sources(a.userId);
-  }
-
-  @Get('admin/valuation/changes')
-  changes(@CurrentActor() a: AuthenticatedActor, @Query('take') take?: string) {
-    return this.valuation.changes(a.userId, take ? Number(take) || 25 : 25);
   }
 
   @Get('admin/valuation/usage')

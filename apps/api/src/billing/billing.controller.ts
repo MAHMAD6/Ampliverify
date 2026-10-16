@@ -41,6 +41,11 @@ export class BillingController {
     return this.billing.invoices(actor.userId, workspaceId);
   }
 
+  @Get('user/workspaces/:workspaceId/credits/balance')
+  creditBalance(@CurrentActor() actor: AuthenticatedActor, @Param('workspaceId', ParseUUIDPipe) workspaceId: string) {
+    return this.billing.creditBalance(actor.userId, workspaceId);
+  }
+
   @Get('user/workspaces/:workspaceId/credits/ledger')
   ledger(@CurrentActor() actor: AuthenticatedActor, @Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Query('limit') limit?: string) {
     return this.billing.ledger(actor.userId, workspaceId, limit ? Number(limit) : undefined);

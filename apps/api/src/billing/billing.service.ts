@@ -77,8 +77,8 @@ export class BillingService implements OnModuleInit {
   async overview(userId: string, workspaceId: string) {
     await this.rbac.requireWorkspace(userId, workspaceId, 'usage.read');
     const plan = await this.entitlements.resolve(workspaceId);
-    const [balance, usage, subscription, packs, costs] = await Promise.all([
-      this.credits.balance(workspaceId),
+    const [{ available: balance, reserved }, usage, subscription, packs, costs] = await Promise.all([
+      this.credits.balanceDetail(workspaceId),
       this.credits.usageSince(workspaceId, plan.periodStart),
       plan.subscriptionId
         ? this.prisma.subscription.findUnique({ where: { id: plan.subscriptionId }, include: { plan: true, items: { include: { planPrice: true } } } })
@@ -101,7 +101,7 @@ export class BillingService implements OnModuleInit {
       },
       periodStart: plan.periodStart,
       periodEnd: plan.periodEnd,
-      credits: { balance, lowThreshold, low: lowThreshold > 0 && Number(balance) <= lowThreshold },
+      credits: { balance, reserved, lowThreshold, low: lowThreshold > 0 && Number(balance) <= lowThreshold },
       usage: usage.map((u) => ({ featureKey: u.featureKey, units: Number(u._sum.units ?? 0) })),
       limits: plan.features
         ? [...plan.features.entries()].filter(([, f]) => f.limit !== null).map(([key, f]) => ({ featureKey: key, limit: f.limit }))
@@ -121,6 +121,12 @@ export class BillingService implements OnModuleInit {
       include: { lines: true },
       take: 200,
     });
+  }
+
+  /** Available and reserved credit totals (manual §07 /credits/balance). */
+  async creditBalance(userId: string, workspaceId: string) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'usage.read');
+    return this.credits.balanceDetail(workspaceId);
   }
 
   async ledger(userId: string, workspaceId: string, limit?: number) {

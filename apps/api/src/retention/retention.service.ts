@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { CreditsService } from '../commerce/credits.service';
 import { AuditService } from '../audit/audit.service';
 import { JobsService } from '../jobs/jobs.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,10 +29,13 @@ export class RetentionService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly jobs: JobsService,
     private readonly config: ConfigService,
+    private readonly credits: CreditsService,
   ) {}
 
   onModuleInit() {
     this.jobs.registerPeriodic('retention.purge', DAY, async () => void (await this.run()));
+    // Orphan credit reservations (jobs that never finished) are released.
+    this.jobs.registerPeriodic('credits.release_expired', 15 * 60_000, async () => void (await this.credits.releaseExpiredReservations()));
   }
 
   async run(now = new Date()) {

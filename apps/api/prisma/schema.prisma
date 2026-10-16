@@ -2736,41 +2736,58 @@ enum ValuationKind {
   TEST
 }
 
+/// Manual §09: queued → collecting → normalizing → calculating → completed;
+/// terminal failed / cancelled / expired.
 enum ValuationStatus {
-  PENDING
-  RUNNING
+  QUEUED
+  COLLECTING
+  NORMALIZING
+  CALCULATING
   COMPLETED
   FAILED
+  CANCELLED
+  EXPIRED
 }
 
 /// One website valuation. Anonymous estimates carry only a salted hash of the
 /// requester's IP (for usage limits); results are snapshots of the engine
 /// settings and provider data at calculation time.
 model WebsiteValuation {
-  id            String          @id @default(uuid()) @db.Uuid
-  domain        String          @db.Citext
-  kind          ValuationKind   @default(ESTIMATE)
-  status        ValuationStatus @default(PENDING)
-  userId        String?         @map("user_id") @db.Uuid
-  workspaceId   String?         @map("workspace_id") @db.Uuid
+  id                  String          @id @default(uuid()) @db.Uuid
+  domain              String          @db.Citext
+  kind                ValuationKind   @default(ESTIMATE)
+  status              ValuationStatus @default(QUEUED)
+  userId              String?         @map("user_id") @db.Uuid
+  workspaceId         String?         @map("workspace_id") @db.Uuid
   /// The estimate a verified valuation improves on.
-  parentId      String?         @map("parent_id") @db.Uuid
-  requesterHash String?         @map("requester_hash")
-  inputsJson    Json?           @map("inputs_json")
-  resultJson    Json?           @map("result_json")
-  valueLow      Int?            @map("value_low")
-  valueHigh     Int?            @map("value_high")
-  valueMid      Int?            @map("value_mid")
-  currency      String          @default("USD") @db.Char(3)
-  confidence    Int?
-  error         String?
-  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  completedAt   DateTime?       @map("completed_at") @db.Timestamptz(6)
+  parentId            String?         @map("parent_id") @db.Uuid
+  requesterHash       String?         @map("requester_hash")
+  /// Client-supplied key: the same key never creates a second job or charge.
+  idempotencyKey      String?         @unique @map("idempotency_key")
+    consentVersion      String?         @map("consent_version")
+  methodologyVersion  String?         @map("methodology_version")
+  inputsJson          Json?           @map("inputs_json")
+  resultJson          Json?           @map("result_json")
+  qualityScore        Int?            @map("quality_score")
+  /// LOW / MEDIUM / HIGH (rules-based).
+  confidenceGrade     String?         @map("confidence_grade")
+  evidenceCoveragePct Int?            @map("evidence_coverage_pct")
+  /// Monetary range only when an earnings basis and comparables exist.
+  valueLow            Int?            @map("value_low")
+  valueHigh           Int?            @map("value_high")
+  currency            String          @default("USD") @db.Char(3)
+  limitationsJson     Json?           @map("limitations_json")
+  reservationId       String?         @map("reservation_id") @db.Uuid
+  error               String?
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt         DateTime?       @map("completed_at") @db.Timestamptz(6)
+  expiresAt           DateTime?       @map("expires_at") @db.Timestamptz(6)
 
-  user      User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
-  workspace Workspace?         @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
-  parent    WebsiteValuation?  @relation("ValuationParent", fields: [parentId], references: [id], onDelete: SetNull)
-  children  WebsiteValuation[] @relation("ValuationParent")
+  user      User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  workspace Workspace?          @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  parent    WebsiteValuation?   @relation("ValuationParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children  WebsiteValuation[]  @relation("ValuationParent")
+  evidence  ValuationEvidence[]
 
   @@index([domain, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
@@ -2844,4 +2861,81 @@ model NewsletterSubscriber {
 
   @@index([status, createdAt(sort: Desc)])
   @@map("newsletter_subscribers")
+}
+
+/// Versioned valuation methodology. Every admin change is a new immutable row;
+/// results record the version they were calculated with.
+model ValuationMethodology {
+  id          String   @id @default(uuid()) @db.Uuid
+  version     String   @unique
+  configJson  Json     @map("config_json")
+  checksum    String
+  approverId  String?  @map("approver_id") @db.Uuid
+  note        String?
+  effectiveAt DateTime @default(now()) @map("effective_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([effectiveAt(sort: Desc)])
+  @@map("valuation_methodologies")
+}
+
+/// One signal used by a valuation, with its provenance (manual §07).
+model ValuationEvidence {
+  id             String    @id @default(uuid()) @db.Uuid
+  valuationId    String    @map("valuation_id") @db.Uuid
+  source         String
+  metric         String
+  label          String
+  valueJson      Json?     @map("value_json")
+  unit           String?
+  classification String
+  status         String
+  observedAt     DateTime  @map("observed_at") @db.Timestamptz(6)
+  periodStart    DateTime? @map("period_start") @db.Timestamptz(6)
+  periodEnd      DateTime? @map("period_end") @db.Timestamptz(6)
+  missingReason  String?   @map("missing_reason")
+  rawHash        String?   @map("raw_hash")
+
+  valuation WebsiteValuation @relation(fields: [valuationId], references: [id], onDelete: Cascade)
+
+  @@index([valuationId])
+  @@map("valuation_evidence")
+}
+
+/// Provider response cache with per-source lifetimes (PageSpeed 24 h, rankings 7 d, RDAP 30 d).
+model ProviderCache {
+  key       String   @id
+  provider  String
+  valueJson Json     @map("value_json")
+  fetchedAt DateTime @default(now()) @map("fetched_at") @db.Timestamptz(6)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("provider_cache")
+}
+
+enum CreditReservationStatus {
+  RESERVED
+  SETTLED
+  RELEASED
+}
+
+/// Credits held for a queued job: settled exactly once on success, released on
+/// failure or cancellation; stale reservations are released by a reconciliation job.
+model CreditReservation {
+  id             String                  @id @default(uuid()) @db.Uuid
+  workspaceId    String                  @map("workspace_id") @db.Uuid
+  featureKey     String                  @map("feature_key")
+  amount         Decimal                 @db.Decimal(18, 4)
+  status         CreditReservationStatus @default(RESERVED)
+  referenceType  String                  @map("reference_type")
+  referenceId    String                  @map("reference_id") @db.Uuid
+  idempotencyKey String                  @unique @map("idempotency_key")
+  expiresAt      DateTime                @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  settledAt      DateTime?               @map("settled_at") @db.Timestamptz(6)
+
+  @@index([workspaceId, status])
+  @@index([status, expiresAt])
+  @@map("credit_reservations")
 }

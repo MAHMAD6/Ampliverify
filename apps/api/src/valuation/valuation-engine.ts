@@ -1,323 +1,351 @@
+import { createHash } from 'crypto';
+
 /**
- * Website valuation engine: pure functions, no I/O.
+ * Website Value Calculator engine (V1 manual §05): pure functions, no I/O.
  *
- * Model (documented for admins in Valuation Engine Settings → Formula Details):
- *  1. Each factor gets a 0–1 score from the collected signals (null = no data).
- *  2. Composite score S = Σ wᵢ·sᵢ / Σ wᵢ over factors with data.
- *  3. Annual traffic value A = monthly organic traffic value × 12 (keyword
- *     traffic cost from the SEO data provider, else visits × value per visit).
- *  4. Traffic-based value = A × (minMultiplier + (maxMultiplier − minMultiplier) × S).
- *  5. With revenue information: profit-based value = annual profit × (1.5 + 2.5·S),
- *     blended 60/40 with the traffic-based value.
- *  6. Range = midpoint × (1 ± industryAdjustment × (2 − confidence)), rounded.
- *  7. Confidence = weighted coverage, source reliability, freshness and
- *     cross-source consistency.
+ *  Step A — deterministic quality score 0–100: Σ(weightᵢ × normalizedᵢ) over
+ *  categories with evidence; missing categories are excluded and the rest
+ *  renormalized only when the evidence threshold is met. Otherwise no score.
+ *
+ *  Step B — an indicative monetary range ONLY with a calibrated basis:
+ *  normalized annual owner earnings (user-supplied trailing 12 months, marked
+ *  self-reported) × the range of administrator-maintained, dated comparable
+ *  multiples for the business model, adjusted for documented risk. With no
+ *  defensible basis the result is "Insufficient evidence for a monetary
+ *  valuation" — an SEO score is never turned into a price.
+ *
+ *  Confidence (rules-based): HIGH needs attributable multi-period earnings
+ *  evidence and comparables (independent earnings verification is not part of
+ *  V1, so V1 never issues HIGH); MEDIUM = verified traffic (GA4/GSC) +
+ *  self-reported business data + comparables; LOW otherwise.
  */
 
-export const FACTORS = ['traffic', 'backlinks', 'content', 'technical', 'social', 'brand'] as const;
-export type Factor = (typeof FACTORS)[number];
+export const CATEGORIES = ['visibility', 'technical', 'performance', 'content', 'risk'] as const;
+export type Category = (typeof CATEGORIES)[number];
 
-export const FACTOR_LABELS: Record<Factor, string> = {
-  traffic: 'SEO & Organic Traffic',
-  backlinks: 'Backlinks & Authority',
-  content: 'Content Value',
-  technical: 'Technical Health',
-  social: 'Social & Referral Traffic',
-  brand: 'Brand & Market Factors',
+export const CATEGORY_LABELS: Record<Category, string> = {
+  visibility: 'Organic visibility',
+  technical: 'Technical readiness',
+  performance: 'Performance',
+  content: 'Content & structure',
+  risk: 'Risk / stability',
 };
 
-export const SOURCES = ['ga4', 'gsc', 'dataforseo', 'pagespeed', 'rdap', 'social'] as const;
+export const SOURCES = ['crawler', 'pagespeed', 'rdap', 'dataforseo', 'gsc', 'ga4'] as const;
 export type SourceKey = (typeof SOURCES)[number];
 
 export const SOURCE_LABELS: Record<SourceKey, string> = {
-  ga4: 'Google Analytics 4 (GA4)',
+  crawler: 'AmpliVerify crawler',
+  pagespeed: 'Google PageSpeed Insights',
+  rdap: 'RDAP registration data',
+  dataforseo: 'DataForSEO Labs',
   gsc: 'Google Search Console',
-  dataforseo: 'DataForSEO',
-  pagespeed: 'PageSpeed Insights',
-  rdap: 'WHOIS / RDAP',
-  social: 'Social Media Signals',
+  ga4: 'Google Analytics 4',
 };
 
-export type PlanAccessLevel = 'off' | 'limited' | 'full' | 'full_api';
+/** Provenance classes from the manual (§03, §07). */
+export type Classification = 'observed' | 'modeled' | 'verified' | 'self_reported' | 'public_record';
 
-export type ValuationSettings = {
-  weights: Record<Factor, number>;
-  multipliers: { min: number; max: number };
-  /** ± percentage applied around the midpoint (scaled by confidence). */
-  industryAdjustmentPct: number;
-  currency: { code: string; rateFromUsd: number };
-  showRange: boolean;
-  /** USD per organic visit when no keyword traffic value is available. */
-  valuePerVisitUsd: number;
+export const SOURCE_CLASS: Record<SourceKey, Classification> = {
+  crawler: 'observed',
+  pagespeed: 'observed',
+  rdap: 'public_record',
+  dataforseo: 'modeled',
+  gsc: 'verified',
+  ga4: 'verified',
+};
+
+/** One signal with its provenance. Missing data is recorded as unavailable, never as zero. */
+export type Evidence = {
+  source: SourceKey | 'user';
+  metric: string;
+  label: string;
+  value: number | string | boolean | null;
+  unit?: string | null;
+  classification: Classification;
+  status: 'available' | 'unavailable';
+  observedAt: string;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  missingReason?: string | null;
+};
+
+export type Comparable = {
+  id: string;
+  label: string;
+  /** Business model the multiples apply to, or "any". */
+  businessModel: string;
+  /** Annual owner-earnings multiples. */
+  multipleLow: number;
+  multipleHigh: number;
+  /** Date of the transaction data (YYYY-MM-DD). */
+  observedAt: string;
+  source: string;
+};
+
+export type PlanAccessLevel = 'off' | 'public' | 'enhanced';
+
+export type ValuationConfig = {
+  weights: Record<Category, number>;
+  /** Minimum share (0–100) of total weight that must have evidence before a score is shown. */
+  minEvidencePct: number;
+  comparables: Comparable[];
+  /** Comparables older than this are not used. */
+  comparableMaxAgeMonths: number;
+  /** Documented-risk adjustment: below this quality score the range is reduced by `pct`. */
+  riskAdjustment: { belowScore: number; pct: number };
+  currency: string;
+  /** Cache lifetime per source, in hours (manual §08). */
+  cacheHours: { pagespeed: number; rankings: number; rdap: number; crawler: number };
   sources: Record<SourceKey, boolean>;
-  confidence: { coverage: number; reliability: number; freshness: number; consistency: number };
-  thresholds: { low: number; high: number };
-  /** Keyed by plan code; `free` covers visitors without an account or plan. */
+  /** Keyed by plan code; `free` covers visitors and accounts without a plan. */
   access: Record<string, PlanAccessLevel>;
-  limits: { freePerMonth: number; paidPerMonth: number; pdfPerMonth: number; apiAccess: boolean };
-  exports: { pdf: boolean; json: boolean };
-  features: { verifiedValuation: boolean; opportunities: boolean; socialSection: boolean };
-  calculator: { enabled: boolean; cacheHours: number; country: string; language: string };
-  report: { sections: Record<ReportSection, boolean>; disclaimer: string };
+  limits: { anonymousPerDay: number; anonymousPerDomainPerDay: number; userPerMonth: number; pdfPerMonth: number };
+  /** Credits reserved for an enhanced (verified) valuation. */
+  enhancedCredits: number;
+  consentVersion: string;
+  /** Days a result stays current before it is marked expired. */
+  resultTtlDays: number;
+  calculator: { enabled: boolean; country: string; language: string };
+  disclaimer: string;
 };
 
-export const REPORT_SECTIONS = ['traffic', 'backlinks', 'content', 'social', 'technical', 'domain', 'breakdown', 'opportunities'] as const;
-export type ReportSection = (typeof REPORT_SECTIONS)[number];
-
-export const DEFAULT_SETTINGS: ValuationSettings = {
-  weights: { traffic: 35, backlinks: 25, content: 15, technical: 10, social: 8, brand: 7 },
-  multipliers: { min: 0.5, max: 5 },
-  industryAdjustmentPct: 30,
-  currency: { code: 'USD', rateFromUsd: 1 },
-  showRange: true,
-  valuePerVisitUsd: 0.35,
-  sources: { ga4: true, gsc: true, dataforseo: true, pagespeed: true, rdap: true, social: true },
-  confidence: { coverage: 40, reliability: 25, freshness: 20, consistency: 15 },
-  thresholds: { low: 40, high: 70 },
-  access: { free: 'limited' },
-  limits: { freePerMonth: 3, paidPerMonth: 50, pdfPerMonth: 10, apiAccess: true },
-  exports: { pdf: true, json: true },
-  features: { verifiedValuation: true, opportunities: true, socialSection: true },
-  calculator: { enabled: true, cacheHours: 24, country: 'us', language: 'en' },
-  report: {
-    sections: { traffic: true, backlinks: true, content: true, social: true, technical: true, domain: true, breakdown: true, opportunities: true },
-    disclaimer: 'This valuation is an estimate based on publicly available data and industry benchmarks. It is not financial advice or an appraisal.',
-  },
+export const DEFAULT_CONFIG: ValuationConfig = {
+  weights: { visibility: 25, technical: 25, performance: 15, content: 20, risk: 15 },
+  minEvidencePct: 60,
+  comparables: [],
+  comparableMaxAgeMonths: 24,
+  riskAdjustment: { belowScore: 50, pct: 15 },
+  currency: 'USD',
+  cacheHours: { pagespeed: 24, rankings: 168, rdap: 720, crawler: 24 },
+  sources: { crawler: true, pagespeed: true, rdap: true, dataforseo: true, gsc: true, ga4: true },
+  access: { free: 'public' },
+  limits: { anonymousPerDay: 3, anonymousPerDomainPerDay: 2, userPerMonth: 50, pdfPerMonth: 10 },
+  enhancedCredits: 0,
+  consentVersion: '2026-10-13',
+  resultTtlDays: 30,
+  calculator: { enabled: true, country: 'us', language: 'en' },
+  disclaimer:
+    'This is an indicative estimate based on available evidence, not an appraisal or financial advice. A business valuation requires substantiated earnings and risk assumptions.',
 };
 
-/** Deep-merges stored settings over the defaults (missing keys keep defaults). */
-export function withDefaults(stored: unknown): ValuationSettings {
+export function withDefaults(stored: unknown): ValuationConfig {
   const merge = (base: unknown, over: unknown): unknown => {
-    if (!over || typeof over !== 'object' || Array.isArray(over) || !base || typeof base !== 'object' || Array.isArray(base)) return over ?? base;
+    if (Array.isArray(over)) return over;
+    if (!over || typeof over !== 'object' || !base || typeof base !== 'object' || Array.isArray(base)) return over ?? base;
     const out: Record<string, unknown> = { ...(base as Record<string, unknown>) };
-    for (const [k, v] of Object.entries(over as Record<string, unknown>)) out[k] = v === undefined ? out[k] : merge(out[k], v);
+    for (const [k, v] of Object.entries(over as Record<string, unknown>)) if (v !== undefined) out[k] = merge(out[k], v);
     return out;
   };
-  return merge(DEFAULT_SETTINGS, stored) as ValuationSettings;
+  return merge(DEFAULT_CONFIG, stored) as ValuationConfig;
 }
 
-export function validateSettings(s: ValuationSettings): string[] {
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function validateConfig(c: ValuationConfig): string[] {
   const errors: string[] = [];
-  const total = FACTORS.reduce((t, f) => t + Number(s.weights[f] ?? 0), 0);
-  if (FACTORS.some((f) => !(s.weights[f] >= 0 && s.weights[f] <= 100))) errors.push('Factor weights must be between 0 and 100.');
-  if (Math.round(total) !== 100) errors.push(`Factor weights must total 100% (currently ${Math.round(total * 10) / 10}%).`);
-  const ctotal = Object.values(s.confidence).reduce((t, v) => t + Number(v), 0);
-  if (Math.round(ctotal) !== 100) errors.push(`Confidence weights must total 100% (currently ${Math.round(ctotal)}%).`);
-  if (!(s.multipliers.min > 0 && s.multipliers.max >= s.multipliers.min && s.multipliers.max <= 50)) errors.push('Multipliers must satisfy 0 < minimum ≤ maximum ≤ 50.');
-  if (!(s.industryAdjustmentPct >= 0 && s.industryAdjustmentPct <= 90)) errors.push('Industry adjustment must be between 0% and 90%.');
-  if (!(s.thresholds.low > 0 && s.thresholds.high > s.thresholds.low && s.thresholds.high <= 100)) errors.push('Confidence thresholds must satisfy 0 < low < high ≤ 100.');
-  if (!/^[A-Z]{3}$/.test(s.currency.code) || !(s.currency.rateFromUsd > 0)) errors.push('Currency needs a 3-letter code and a positive rate from USD.');
-  if (!(s.valuePerVisitUsd >= 0 && s.valuePerVisitUsd <= 100)) errors.push('Value per visit must be between 0 and 100 USD.');
-  for (const [k, v] of Object.entries(s.limits)) if (k !== 'apiAccess' && !(Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100000)) errors.push(`Limit "${k}" must be a whole number between 0 and 100000.`);
-  if (!(s.calculator.cacheHours >= 0 && s.calculator.cacheHours <= 720)) errors.push('Result caching must be between 0 and 720 hours.');
-  for (const v of Object.values(s.access)) if (!['off', 'limited', 'full', 'full_api'].includes(v)) errors.push('Plan access levels must be off, limited, full or full_api.');
+  const total = CATEGORIES.reduce((t, k) => t + Number(c.weights[k] ?? 0), 0);
+  if (CATEGORIES.some((k) => !(c.weights[k] >= 0 && c.weights[k] <= 100))) errors.push('Category weights must be between 0 and 100.');
+  if (Math.round(total) !== 100) errors.push(`Category weights must total 100% (currently ${Math.round(total * 10) / 10}%).`);
+  if (!(c.minEvidencePct >= 0 && c.minEvidencePct <= 100)) errors.push('The evidence threshold must be between 0% and 100%.');
+  if (!(Number.isInteger(c.comparableMaxAgeMonths) && c.comparableMaxAgeMonths >= 1 && c.comparableMaxAgeMonths <= 120)) errors.push('Comparable age must be 1–120 months.');
+  if (!(c.riskAdjustment.belowScore >= 0 && c.riskAdjustment.belowScore <= 100 && c.riskAdjustment.pct >= 0 && c.riskAdjustment.pct <= 90)) errors.push('Risk adjustment must use a score of 0–100 and 0–90%.');
+  if (!/^[A-Z]{3}$/.test(c.currency)) errors.push('Currency must be a 3-letter code.');
+  for (const [k, v] of Object.entries(c.cacheHours)) if (!(Number.isFinite(v) && v >= 0 && v <= 8760)) errors.push(`Cache time for ${k} must be 0–8760 hours.`);
+  for (const v of Object.values(c.access)) if (!['off', 'public', 'enhanced'].includes(v)) errors.push('Plan access must be off, public or enhanced.');
+  for (const [k, v] of Object.entries(c.limits)) if (!(Number.isInteger(v) && v >= 0 && v <= 100000)) errors.push(`Limit "${k}" must be a whole number 0–100000.`);
+  if (!(Number.isInteger(c.enhancedCredits) && c.enhancedCredits >= 0 && c.enhancedCredits <= 10000)) errors.push('Enhanced valuation credits must be a whole number 0–10000.');
+  if (!DATE.test(c.consentVersion)) errors.push('Consent version must be a date (YYYY-MM-DD).');
+  if (!(Number.isInteger(c.resultTtlDays) && c.resultTtlDays >= 1 && c.resultTtlDays <= 365)) errors.push('Result lifetime must be 1–365 days.');
+  const ids = new Set<string>();
+  for (const m of c.comparables) {
+    if (!m.id || ids.has(m.id)) errors.push('Each comparable needs a unique id.');
+    ids.add(m.id);
+    if (!m.label?.trim() || !m.source?.trim()) errors.push(`Comparable "${m.label || m.id}" needs a label and a source.`);
+    if (!DATE.test(m.observedAt ?? '')) errors.push(`Comparable "${m.label || m.id}" needs a transaction date (YYYY-MM-DD).`);
+    if (!(m.multipleLow > 0 && m.multipleHigh >= m.multipleLow && m.multipleHigh <= 50)) errors.push(`Comparable "${m.label || m.id}" multiples must satisfy 0 < low ≤ high ≤ 50.`);
+  }
   return errors;
 }
 
-/** Signals collected for one domain. Missing data is null, never zero. */
-export type Signals = {
-  organicVisits: number | null;
-  /** USD per month (keyword traffic cost). */
-  organicTrafficValue: number | null;
-  rankingKeywords: number | null;
-  avgPosition: number | null;
-  referringDomains: number | null;
-  backlinks: number | null;
-  /** 0–100. */
-  domainAuthority: number | null;
-  contentPages: number | null;
-  pagespeedMobile: number | null;
-  pagespeedDesktop: number | null;
-  coreWebVitals: 'good' | 'needs_improvement' | 'poor' | null;
-  https: boolean | null;
-  crawlable: boolean | null;
-  indexable: boolean | null;
-  domainAgeYears: number | null;
-  tld: string;
-  /** 0–1 share of keyword volume that contains the brand name. */
-  brandShare: number | null;
-  avgKeywordDifficulty: number | null;
-  socialVisits: number | null;
-  totalVisits: number | null;
-  trafficGrowthPct: number | null;
-  backlinkGrowthPct: number | null;
-  /** Verified (GA4/GSC) organic traffic when connected. */
-  verifiedOrganicVisits: number | null;
-};
+/** Stable checksum of a methodology config (version integrity). */
+export function checksum(c: ValuationConfig) {
+  const sort = (v: unknown): unknown => (Array.isArray(v) ? v.map(sort) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, sort((v as Record<string, unknown>)[k])])) : v);
+  return createHash('sha256').update(JSON.stringify(sort(c))).digest('hex');
+}
 
-export type BusinessInputs = {
-  monthlyRevenue?: number | null;
-  annualRevenue?: number | null;
-  /** e.g. "10-20" (percent range). */
-  profitMargin?: string | null;
-  monthlyVisits?: number | null;
+/** Self-reported trailing-12-month financials (manual §04). */
+export type FinancialInputs = {
+  ttmRevenue?: number | null;
+  ttmExpenses?: number | null;
+  /** Owner earnings, if the user reports it directly. */
+  ttmProfit?: number | null;
+  businessModel?: string | null;
 };
-
-export type SourceState = 'verified' | 'estimated' | 'unavailable' | 'disabled';
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
-const logScore = (n: number | null, decades: number) => (n === null ? null : clamp01(Math.log10(Math.max(0, n) + 1) / decades));
+const logScore = (n: number, decades: number) => clamp01(Math.log10(Math.max(0, n) + 1) / decades);
+
+/** Lookup of available evidence values. */
+export function evidenceMap(ev: Evidence[]) {
+  const m = new Map<string, Evidence>();
+  for (const e of ev) if (e.status === 'available') m.set(e.metric, e);
+  return {
+    num: (k: string) => {
+      const v = m.get(k)?.value;
+      return typeof v === 'number' && Number.isFinite(v) ? v : null;
+    },
+    bool: (k: string) => {
+      const v = m.get(k)?.value;
+      return typeof v === 'boolean' ? v : null;
+    },
+    str: (k: string) => {
+      const v = m.get(k)?.value;
+      return typeof v === 'string' ? v : null;
+    },
+    has: (k: string) => m.has(k),
+  };
+}
+
 const avg = (xs: (number | null)[]) => {
   const v = xs.filter((x): x is number => x !== null);
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 };
-
-export function factorScores(sig: Signals): Record<Factor, number | null> {
-  const visits = sig.verifiedOrganicVisits ?? sig.organicVisits;
-  const authority = sig.domainAuthority === null ? null : clamp01(sig.domainAuthority / 100);
-  const refd = logScore(sig.referringDomains, 4.5);
-  const pages = logScore(sig.contentPages, 4);
-  const kws = logScore(sig.rankingKeywords, 5);
-  const speed = avg([sig.pagespeedMobile, sig.pagespeedDesktop]);
-  const cwv = sig.coreWebVitals === null ? null : { good: 1, needs_improvement: 0.5, poor: 0 }[sig.coreWebVitals];
-  const tech = [speed === null ? null : (speed / 100) * 0.5, sig.https === null ? null : (sig.https ? 1 : 0) * 0.15, sig.crawlable === null ? null : (sig.crawlable ? 1 : 0) * 0.1, sig.indexable === null ? null : (sig.indexable ? 1 : 0) * 0.1, cwv === null ? null : cwv * 0.15];
-  const techWeights = [0.5, 0.15, 0.1, 0.1, 0.15];
-  const techAvail = tech.reduce<number>((t, v, i) => t + (v === null ? 0 : techWeights[i]), 0);
-  const social =
-    sig.socialVisits === null
-      ? null
-      : clamp01(0.5 * (logScore(sig.socialVisits, 5) ?? 0) + 0.5 * clamp01(sig.totalVisits ? (sig.socialVisits / sig.totalVisits) * 5 : 0));
-  const tldScore = ['com', 'org', 'net', 'io', 'co', 'ai'].includes(sig.tld) ? 1 : 0.6;
-  const brandParts = [sig.domainAgeYears === null ? null : clamp01(sig.domainAgeYears / 15) * 0.6, tldScore * 0.2, sig.brandShare === null ? null : clamp01(sig.brandShare * 5) * 0.2];
-  const brandAvail = (sig.domainAgeYears === null ? 0 : 0.6) + 0.2 + (sig.brandShare === null ? 0 : 0.2);
-  return {
-    traffic: logScore(visits, 6),
-    backlinks: refd === null && authority === null ? null : refd === null ? authority : authority === null ? refd : 0.6 * refd + 0.4 * authority,
-    content: pages === null && kws === null ? null : pages === null ? kws : kws === null ? pages : 0.5 * pages + 0.5 * kws,
-    technical: techAvail >= 0.3 ? tech.reduce<number>((t, v) => t + (v ?? 0), 0) / techAvail : null,
-    social,
-    brand: brandParts.reduce<number>((t, v) => t + (v ?? 0), 0) / brandAvail,
-  };
-}
-
-export function confidenceLabel(confidence: number, s: ValuationSettings) {
-  return confidence >= s.thresholds.high ? 'Good' : confidence >= s.thresholds.low ? 'Fair' : 'Low';
-}
-
-/** Projects a midpoint margin from a range like "10-20" (percent). */
-export function marginOf(range: string | null | undefined) {
-  const m = /^(\d{1,2})-(\d{1,3})$/.exec(range ?? '');
-  return m ? (Number(m[1]) + Number(m[2])) / 200 : null;
-}
-
-const roundTo = (n: number, step: number) => Math.max(0, Math.round(n / step) * step);
-const niceStep = (n: number) => (n < 5_000 ? 100 : n < 100_000 ? 500 : n < 1_000_000 ? 5_000 : 50_000);
-
-export type Valuation = {
-  scores: Record<Factor, number | null>;
-  composite: number;
-  breakdown: { factor: Factor; label: string; weight: number; score: number | null; contributionPct: number }[];
-  annualTrafficValueUsd: number;
-  valueMid: number;
-  valueLow: number;
-  valueHigh: number;
-  currency: string;
-  confidence: number;
-  confidenceLabel: string;
-  confidenceParts: { coverage: number; reliability: number; freshness: number; consistency: number };
-  method: 'traffic' | 'traffic+revenue';
+/** Weighted mean of the parts that have data; null when none do. */
+const parts = (xs: [number | null, number][]) => {
+  const have = xs.filter((x): x is [number, number] => x[0] !== null);
+  const w = have.reduce((t, [, wt]) => t + wt, 0);
+  return w ? have.reduce((t, [v, wt]) => t + v * wt, 0) / w : null;
 };
 
-export function valuate(sig: Signals, sources: Record<SourceKey, SourceState>, s: ValuationSettings, business: BusinessInputs = {}): Valuation {
-  const scores = factorScores(sig);
-  const enabledFactors = FACTORS.filter((f) => s.weights[f] > 0 && !(f === 'social' && !s.sources.social));
-  const withData = enabledFactors.filter((f) => scores[f] !== null);
-  const wSum = withData.reduce((t, f) => t + s.weights[f], 0);
-  const composite = wSum ? withData.reduce((t, f) => t + s.weights[f] * (scores[f] as number), 0) / wSum : 0;
-  const contribTotal = withData.reduce((t, f) => t + s.weights[f] * (scores[f] as number), 0);
-  const breakdown = FACTORS.map((f) => ({
-    factor: f,
-    label: FACTOR_LABELS[f],
-    weight: s.weights[f],
-    score: scores[f] === null ? null : Math.round((scores[f] as number) * 100) / 100,
-    contributionPct: contribTotal && scores[f] !== null && enabledFactors.includes(f) ? Math.round(((s.weights[f] * (scores[f] as number)) / contribTotal) * 100) : 0,
+/** Normalized 0–1 score per category from the evidence; null = no evidence. */
+export function categoryScores(ev: Evidence[]): Record<Category, number | null> {
+  const e = evidenceMap(ev);
+  const b = (k: string) => (e.bool(k) === null ? null : e.bool(k) ? 1 : 0);
+  const verifiedClicks = e.num('gsc.clicks_28d');
+  const visibility = parts([
+    [e.num('dataforseo.ranking_keywords') === null ? null : logScore(e.num('dataforseo.ranking_keywords')!, 5), 0.4],
+    [e.num('dataforseo.estimated_organic_visits') === null ? null : logScore(e.num('dataforseo.estimated_organic_visits')!, 6), 0.3],
+    [e.num('dataforseo.avg_position') === null ? null : clamp01(1 - (e.num('dataforseo.avg_position')! - 1) / 99), 0.1],
+    [verifiedClicks === null ? null : logScore(verifiedClicks, 6), 0.2],
+  ]);
+  const titleLen = e.num('crawler.title_length');
+  const descLen = e.num('crawler.meta_description_length');
+  const h1 = e.num('crawler.h1_count');
+  const technical = parts([
+    [b('crawler.indexable'), 0.25],
+    [b('crawler.crawlable'), 0.2],
+    [b('crawler.https'), 0.15],
+    [titleLen === null ? null : titleLen >= 10 && titleLen <= 65 ? 1 : titleLen > 0 ? 0.5 : 0, 0.1],
+    [descLen === null ? null : descLen >= 50 && descLen <= 165 ? 1 : descLen > 0 ? 0.5 : 0, 0.1],
+    [b('crawler.canonical_valid'), 0.1],
+    [h1 === null ? null : h1 === 1 ? 1 : h1 > 1 ? 0.6 : 0, 0.1],
+  ]);
+  const ps = avg([e.num('pagespeed.performance_mobile'), e.num('pagespeed.performance_desktop')]);
+  const cwv = e.str('pagespeed.core_web_vitals');
+  const performance = parts([
+    [ps === null ? null : ps / 100, 0.8],
+    [cwv === null ? null : ({ FAST: 1, AVERAGE: 0.5, SLOW: 0 } as Record<string, number>)[cwv] ?? null, 0.2],
+  ]);
+  const pages = e.num('crawler.sitemap_urls');
+  const words = e.num('crawler.word_count');
+  const h2 = e.num('crawler.h2_count');
+  const content = parts([
+    [pages === null ? null : logScore(pages, 4), 0.35],
+    [words === null ? null : clamp01(words / 1200), 0.25],
+    [h2 === null ? null : clamp01(h2 / 6), 0.2],
+    [b('crawler.structured_data'), 0.2],
+  ]);
+  const age = e.num('rdap.domain_age_years');
+  const risk = parts([
+    [age === null ? null : clamp01(age / 10), 0.4],
+    [e.str('rdap.status') === null ? null : /active|ok/i.test(e.str('rdap.status')!) ? 1 : 0.3, 0.2],
+    [b('crawler.http_ok'), 0.25],
+    [e.num('crawler.redirect_hops') === null ? null : e.num('crawler.redirect_hops')! <= 1 ? 1 : e.num('crawler.redirect_hops')! <= 3 ? 0.6 : 0.2, 0.15],
+  ]);
+  return { visibility, technical, performance, content, risk };
+}
+
+export type Result = {
+  qualityScore: number | null;
+  breakdown: { category: Category; label: string; weight: number; score: number | null; contributionPct: number }[];
+  evidenceCoveragePct: number;
+  monetary: { low: number; high: number; currency: string; earnings: number; multipleLow: number; multipleHigh: number; comparableIds: string[]; riskAdjusted: boolean } | null;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  limitations: string[];
+};
+
+const monthsBetween = (a: Date, b: Date) => (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth());
+const round = (n: number) => {
+  const step = n < 10_000 ? 100 : n < 100_000 ? 500 : n < 1_000_000 ? 5_000 : 50_000;
+  return Math.max(0, Math.round(n / step) * step);
+};
+
+export function calculate(ev: Evidence[], c: ValuationConfig, fin: FinancialInputs = {}, now = new Date()): Result {
+  const scores = categoryScores(ev);
+  const limitations: string[] = [];
+  const enabled = CATEGORIES.filter((k) => c.weights[k] > 0);
+  const totalW = enabled.reduce((t, k) => t + c.weights[k], 0) || 1;
+  const withData = enabled.filter((k) => scores[k] !== null);
+  const coveredW = withData.reduce((t, k) => t + c.weights[k], 0);
+  const coverage = Math.round((coveredW / totalW) * 100);
+  const qualityScore = coverage >= c.minEvidencePct && coveredW > 0 ? Math.round((withData.reduce((t, k) => t + c.weights[k] * (scores[k] as number), 0) / coveredW) * 100) : null;
+  if (qualityScore === null) limitations.push(`Not enough evidence for a quality score (${coverage}% of weighted categories have data; ${c.minEvidencePct}% required).`);
+  for (const k of enabled) if (scores[k] === null) limitations.push(`${CATEGORY_LABELS[k]}: no evidence was available.`);
+  const contribTotal = withData.reduce((t, k) => t + c.weights[k] * (scores[k] as number), 0);
+  const breakdown = CATEGORIES.map((k) => ({
+    category: k,
+    label: CATEGORY_LABELS[k],
+    weight: c.weights[k],
+    score: scores[k] === null ? null : Math.round((scores[k] as number) * 100),
+    contributionPct: contribTotal && scores[k] !== null ? Math.round(((c.weights[k] * (scores[k] as number)) / contribTotal) * 100) : 0,
   }));
 
-  const visits = business.monthlyVisits ?? sig.verifiedOrganicVisits ?? sig.organicVisits ?? 0;
-  const monthlyValue = sig.organicTrafficValue !== null && sig.verifiedOrganicVisits === null && !business.monthlyVisits ? sig.organicTrafficValue : visits * s.valuePerVisitUsd;
-  const annualTrafficValueUsd = Math.max(0, monthlyValue * 12);
-  const multiplier = s.multipliers.min + (s.multipliers.max - s.multipliers.min) * composite;
-  let midUsd = annualTrafficValueUsd * multiplier;
-  let method: Valuation['method'] = 'traffic';
-  const annualRevenue = business.annualRevenue ?? (business.monthlyRevenue ? business.monthlyRevenue * 12 : null);
-  if (annualRevenue && annualRevenue > 0) {
-    const profit = annualRevenue * (marginOf(business.profitMargin) ?? 0.2);
-    midUsd = 0.6 * profit * (1.5 + 2.5 * composite) + 0.4 * midUsd;
-    method = 'traffic+revenue';
+  // Step B — monetary range only with an earnings basis and dated comparables.
+  const earnings =
+    typeof fin.ttmProfit === 'number' && fin.ttmProfit !== null ? fin.ttmProfit : typeof fin.ttmRevenue === 'number' && typeof fin.ttmExpenses === 'number' ? fin.ttmRevenue - fin.ttmExpenses : null;
+  const model = (fin.businessModel ?? '').trim().toLowerCase();
+  const usable = c.comparables.filter((m) => {
+    const d = new Date(`${m.observedAt}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && monthsBetween(d, now) <= c.comparableMaxAgeMonths && (m.businessModel.toLowerCase() === 'any' || (model && m.businessModel.toLowerCase() === model));
+  });
+  let monetary: Result['monetary'] = null;
+  if (earnings === null) limitations.push('Financial evidence unavailable: no trailing-12-month earnings were provided.');
+  else if (earnings <= 0) limitations.push('Reported trailing-12-month earnings are not positive, so no earnings-based range applies.');
+  if (!usable.length) limitations.push(c.comparables.length ? `No current comparable transactions (within ${c.comparableMaxAgeMonths} months) match this business model.` : 'No comparable transaction multiples are configured.');
+  if (earnings !== null && earnings > 0 && usable.length) {
+    const lo = Math.min(...usable.map((m) => m.multipleLow));
+    const hi = Math.max(...usable.map((m) => m.multipleHigh));
+    const riskAdjusted = qualityScore !== null && qualityScore < c.riskAdjustment.belowScore && c.riskAdjustment.pct > 0;
+    const f = riskAdjusted ? 1 - c.riskAdjustment.pct / 100 : 1;
+    monetary = { low: round(earnings * lo * f), high: round(earnings * hi * f), currency: c.currency, earnings: Math.round(earnings), multipleLow: lo, multipleHigh: hi, comparableIds: usable.map((m) => m.id), riskAdjusted };
+    limitations.push('Earnings are self-reported and have not been independently verified.');
+    if (riskAdjusted) limitations.push(`Range reduced by ${c.riskAdjustment.pct}% for documented quality and stability risk.`);
   }
+  if (!monetary) limitations.unshift('Insufficient evidence for a monetary valuation.');
 
-  // Confidence.
-  const relevant = SOURCES.filter((k) => sources[k] !== 'disabled');
-  const coverage = enabledFactors.length ? withData.length / enabledFactors.length : 0;
-  const available = relevant.filter((k) => sources[k] === 'verified' || sources[k] === 'estimated');
-  const reliability = available.length ? available.reduce((t, k) => t + (sources[k] === 'verified' ? 1 : 0.65), 0) / Math.max(available.length, 3) : 0;
-  const freshness = 1;
-  const est = sig.organicVisits;
-  const ver = sig.verifiedOrganicVisits ?? business.monthlyVisits ?? null;
-  const consistency = est !== null && ver !== null && Math.max(est, ver) > 0 ? 1 - clamp01(Math.abs(est - ver) / Math.max(est, ver)) : 0.6;
-  const parts = { coverage, reliability: clamp01(reliability), freshness, consistency };
-  const cw = s.confidence;
-  const cwSum = cw.coverage + cw.reliability + cw.freshness + cw.consistency || 1;
-  const confidence = Math.round(((cw.coverage * parts.coverage + cw.reliability * parts.reliability + cw.freshness * parts.freshness + cw.consistency * parts.consistency) / cwSum) * 100);
-
-  const rate = s.currency.rateFromUsd;
-  const mid = midUsd * rate;
-  const spread = (s.industryAdjustmentPct / 100) * (2 - confidence / 100) * 0.7;
-  const step = niceStep(mid);
-  return {
-    scores,
-    composite: Math.round(composite * 1000) / 1000,
-    breakdown,
-    annualTrafficValueUsd: Math.round(annualTrafficValueUsd),
-    valueMid: roundTo(mid, step),
-    valueLow: roundTo(mid * (1 - Math.min(spread, 0.9)), step),
-    valueHigh: roundTo(mid * (1 + spread), step),
-    currency: s.currency.code,
-    confidence,
-    confidenceLabel: confidenceLabel(confidence, s),
-    confidenceParts: { coverage: Math.round(parts.coverage * 100), reliability: Math.round(parts.reliability * 100), freshness: Math.round(parts.freshness * 100), consistency: Math.round(parts.consistency * 100) },
-    method,
-  };
+  const verifiedTraffic = ev.some((x) => (x.source === 'gsc' || x.source === 'ga4') && x.status === 'available');
+  if (!verifiedTraffic) limitations.push('Traffic figures are third-party estimates, not measured visitors.');
+  const confidence: Result['confidence'] = monetary && verifiedTraffic ? 'MEDIUM' : 'LOW';
+  return { qualityScore, breakdown, evidenceCoveragePct: coverage, monetary, confidence, limitations: [...new Set(limitations)] };
 }
 
-/** Plain-language drivers, risks and improvement opportunities. */
-export function insights(sig: Signals, v: Valuation) {
-  const sc = v.scores;
-  const drivers: string[] = [];
-  const risks: string[] = [];
-  if ((sc.traffic ?? 0) >= 0.45) drivers.push(sig.trafficGrowthPct !== null && sig.trafficGrowthPct > 5 ? 'Strong organic traffic growth' : 'Strong organic traffic');
-  else if (sc.traffic !== null) risks.push('Limited organic traffic');
-  if ((sc.backlinks ?? 0) >= 0.45) drivers.push('High-quality backlink profile');
-  else if (sc.backlinks !== null) risks.push('Weak backlink profile');
-  if ((sc.content ?? 0) >= 0.5) drivers.push('Relevant, authoritative content');
-  else if (sc.content !== null) risks.push('Content depth could be improved');
-  if ((sc.technical ?? 0) >= 0.7) drivers.push('Good technical SEO health');
-  else if (sc.technical !== null) risks.push('Technical improvements needed');
-  if ((sig.domainAgeYears ?? 0) >= 5) drivers.push('Established domain history');
-  if ((sc.social ?? 0) >= 0.4) drivers.push('Growing social media presence');
-  else risks.push('Limited social diversification');
-  if (sig.brandShare !== null && sig.brandShare < 0.05) risks.push('Limited brand search volume');
-  if ((sig.avgKeywordDifficulty ?? 0) >= 50) risks.push('High competitor landscape');
-  if (sig.trafficGrowthPct !== null && sig.trafficGrowthPct < -10) risks.push('Declining organic traffic');
-
-  const ideas: Record<Factor, string> = {
-    traffic: 'Improve organic traffic and keyword rankings',
-    backlinks: 'Build high-quality backlinks from relevant sites',
-    content: 'Expand and optimize content depth',
-    technical: 'Improve technical performance (Core Web Vitals)',
-    social: 'Grow and diversify social media traffic',
-    brand: 'Strengthen brand presence and market position',
+/** Plain-language strengths and improvement areas from category scores. */
+export function insights(r: Result) {
+  const strong: string[] = [];
+  const weak: string[] = [];
+  for (const b of r.breakdown) {
+    if (b.score === null) continue;
+    if (b.score >= 70) strong.push(`${b.label} is strong (${b.score}/100).`);
+    else if (b.score < 50) weak.push(`${b.label} needs work (${b.score}/100).`);
+  }
+  const ideas: Record<Category, string> = {
+    visibility: 'Grow organic visibility: target more relevant keywords and improve rankings.',
+    technical: 'Fix technical issues: indexability, titles, descriptions, canonicals and headings.',
+    performance: 'Improve page speed and Core Web Vitals.',
+    content: 'Expand content depth, heading structure and structured data.',
+    risk: 'Reduce risk: keep registration current, avoid redirect chains and errors.',
   };
-  const opportunities = [...FACTORS]
-    .sort((a, b) => (sc[a] ?? 0) - (sc[b] ?? 0) || v.breakdown.find((x) => x.factor === b)!.weight - v.breakdown.find((x) => x.factor === a)!.weight)
-    .map((f) => ideas[f]);
-  return { drivers: drivers.slice(0, 6), risks: risks.slice(0, 5), opportunities };
-}
-
-/** Percent change of the last `n` points against the `n` before them. */
-export function periodChange(series: number[], n = 6) {
-  if (series.length < n * 2) return null;
-  const cur = series.slice(-n).reduce((a, b) => a + b, 0);
-  const prev = series.slice(-n * 2, -n).reduce((a, b) => a + b, 0);
-  return prev > 0 ? Math.round(((cur - prev) / prev) * 100) : null;
+  const opportunities = [...r.breakdown].filter((b) => b.score !== null).sort((a, b) => (a.score ?? 0) - (b.score ?? 0)).map((b) => ideas[b.category]);
+  return { strengths: strong, improvements: weak, opportunities };
 }

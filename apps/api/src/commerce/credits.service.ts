@@ -135,6 +135,90 @@ export class CreditsService {
     });
   }
 
+  /**
+   * Holds credits for a queued job (manual §06): the cost is debited now and
+   * recorded as RESERVED. `settle` marks it used exactly once; `release`
+   * returns it. Replays with the same key return the existing reservation.
+   */
+  async reserve(input: { workspaceId: string; featureKey: string; units?: number; amount?: number; referenceType: string; referenceId: string; idempotencyKey: string; actorId?: string | null; ttlMinutes?: number }, db?: Prisma.TransactionClient) {
+    const run = async (tx: Prisma.TransactionClient) => {
+      const existing = await tx.creditReservation.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
+      if (existing) return existing;
+      const amount = input.amount !== undefined ? new Prisma.Decimal(input.amount) : await this.costOf(input.featureKey, input.units ?? 1, tx);
+      if (amount.greaterThan(0)) {
+        await this.applyEntry(tx, {
+          workspaceId: input.workspaceId,
+          delta: amount.negated(),
+          reason: 'USAGE',
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+          idempotencyKey: `reserve:${input.idempotencyKey}`,
+          createdBy: input.actorId ?? null,
+        });
+      }
+      return tx.creditReservation.create({
+        data: {
+          workspaceId: input.workspaceId,
+          featureKey: input.featureKey,
+          amount,
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+          idempotencyKey: input.idempotencyKey,
+          expiresAt: new Date(Date.now() + (input.ttlMinutes ?? 120) * 60_000),
+        },
+      });
+    };
+    return db ? run(db) : this.prisma.$transaction(run);
+  }
+
+  /** Marks a reservation used and records the usage event. Idempotent. */
+  async settle(reservationId: string, opts: { projectId?: string | null; units?: number } = {}) {
+    return this.prisma.$transaction(async (tx) => {
+      const r = await tx.creditReservation.findUnique({ where: { id: reservationId } });
+      if (!r || r.status !== 'RESERVED') return r;
+      const usageKey = `usage:${r.idempotencyKey}`;
+      if (!(await tx.usageEvent.findUnique({ where: { idempotencyKey: usageKey } }))) {
+        await tx.usageEvent.create({ data: { workspaceId: r.workspaceId, projectId: opts.projectId ?? null, featureKey: r.featureKey, units: opts.units ?? 1, idempotencyKey: usageKey } });
+      }
+      return tx.creditReservation.update({ where: { id: r.id }, data: { status: 'SETTLED', settledAt: new Date() } });
+    });
+  }
+
+  /** Returns a reservation's credits (failure, cancellation or expiry). Idempotent. */
+  async release(reservationId: string, reason = 'operation failed') {
+    return this.prisma.$transaction(async (tx) => {
+      const r = await tx.creditReservation.findUnique({ where: { id: reservationId } });
+      if (!r || r.status !== 'RESERVED') return r;
+      if (new Prisma.Decimal(r.amount).greaterThan(0)) {
+        await this.applyEntry(tx, {
+          workspaceId: r.workspaceId,
+          delta: r.amount,
+          reason: 'REVERSAL',
+          referenceType: `${r.referenceType}:${reason}`.slice(0, 120),
+          referenceId: r.referenceId,
+          idempotencyKey: `release:${r.idempotencyKey}`,
+        });
+      }
+      return tx.creditReservation.update({ where: { id: r.id }, data: { status: 'RELEASED', settledAt: new Date() } });
+    });
+  }
+
+  /** Releases reservations whose job never finished (orphan reconciliation). */
+  async releaseExpiredReservations(now = new Date()) {
+    const stale = await this.prisma.creditReservation.findMany({ where: { status: 'RESERVED', expiresAt: { lt: now } }, select: { id: true }, take: 500 });
+    for (const r of stale) await this.release(r.id, 'expired');
+    return stale.length;
+  }
+
+  /** Available balance plus credits currently held by queued jobs. */
+  async balanceDetail(workspaceId: string) {
+    const [available, reserved] = await Promise.all([
+      this.balance(workspaceId),
+      this.prisma.creditReservation.aggregate({ where: { workspaceId, status: 'RESERVED' }, _sum: { amount: true } }),
+    ]);
+    return { available, reserved: reserved._sum.amount ?? new Prisma.Decimal(0) };
+  }
+
   ledger(workspaceId: string, limit = 100) {
     return this.prisma.creditLedger.findMany({
       where: { wallet: { workspaceId } },

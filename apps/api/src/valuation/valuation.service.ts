@@ -1,57 +1,61 @@
-import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, ValuationKind } from '@prisma/client';
-import { createHash, randomUUID } from 'crypto';
+import { Prisma, ValuationKind, ValuationStatus, WebsiteValuation } from '@prisma/client';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobsService } from '../jobs/jobs.service';
 import { RbacService } from '../rbac/rbac.service';
 import { AuditService } from '../audit/audit.service';
 import { EntitlementsService } from '../commerce/entitlements.service';
-import { SettingsService } from '../commerce/settings.service';
+import { CreditsService } from '../commerce/credits.service';
 import { DataForSeoClient } from '../keywords/dataforseo.client';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { normalizeHost } from '../common/utils/domain';
 import { renderPdf, SectionPayload } from '../reports/report-render';
 import {
-  BusinessInputs,
-  DEFAULT_SETTINGS,
-  FACTOR_LABELS,
+  calculate,
+  CATEGORY_LABELS,
+  checksum,
+  DEFAULT_CONFIG,
+  Evidence,
+  FinancialInputs,
   insights,
   PlanAccessLevel,
+  Result,
   SOURCE_LABELS,
   SOURCES,
   SourceKey,
-  valuate,
-  ValuationSettings,
-  validateSettings,
+  validateConfig,
+  ValuationConfig,
   withDefaults,
 } from './valuation-engine';
-import { collectDataForSeo, collectPageSpeed, collectRdap, collectSite, Collected, initialCollected } from './valuation-sources';
+import { collectCrawler, collectDataForSeo, collectPageSpeed, collectRdap, CRAWLER_METRICS, DATAFORSEO_METRICS, ev, missing, PAGESPEED_METRICS, RDAP_METRICS, TrendPoint } from './valuation-sources';
 
-export const VALUATION_SETTING = 'valuation.engine';
-
-export type VerifyInputs = BusinessInputs & {
+export type VerifyInputs = {
   ga4?: { integrationId: string; propertyId: string } | null;
   gsc?: { integrationId: string; siteUrl: string } | null;
-  businessModel?: string | null;
-  industry?: string | null;
-  audience?: string | null;
-  trafficSource?: string | null;
-  notes?: string | null;
+  financial?: FinancialInputs | null;
+  consentVersion: string;
+  /** Required when financial inputs are given: the user accepts the scenario assumptions. */
+  acceptAssumptions?: boolean;
+  idempotencyKey?: string;
 };
 
-type Viewer = { userId: string } | null;
+type Stored = { result: Result; insights: ReturnType<typeof insights>; trend: TrendPoint[]; screenshot: string | null; methodology: { version: string; weights: ValuationConfig['weights']; minEvidencePct: number } };
 
+const DAY = 86_400_000;
+const ACTIVE: ValuationStatus[] = ['QUEUED', 'COLLECTING', 'NORMALIZING', 'CALCULATING'];
 const monthStart = () => {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 };
+const hash = (v: string) => createHash('sha256').update(v).digest('hex');
 
 /**
- * Website Value Calculator: public estimates, verified valuations (GA4 / Search
- * Console / business inputs), admin engine settings and test runs.
- * Calculations run on the job queue; the report page polls until complete.
+ * Website Value Calculator (V1 manual). Public indicative estimates and
+ * authenticated enhanced/verified valuations share one versioned calculation;
+ * evidence tiers stay separate and every signal keeps its provenance.
  */
 @Injectable()
 export class ValuationService implements OnModuleInit {
@@ -64,7 +68,7 @@ export class ValuationService implements OnModuleInit {
     private readonly rbac: RbacService,
     private readonly audit: AuditService,
     private readonly entitlements: EntitlementsService,
-    private readonly settingsStore: SettingsService,
+    private readonly credits: CreditsService,
     private readonly dataforseo: DataForSeoClient,
     private readonly integrations: IntegrationsService,
   ) {}
@@ -73,156 +77,230 @@ export class ValuationService implements OnModuleInit {
     this.jobs.register('valuation.run', async (p) => this.run(String(p.valuationId)));
   }
 
-  async settings() {
-    return withDefaults(await this.settingsStore.get<unknown>(VALUATION_SETTING, null));
+  // ── Methodology (versioned, append-only) ──────────────────────────────────
+
+  async methodology(): Promise<{ version: string; config: ValuationConfig; effectiveAt: Date | null }> {
+    const row = await this.prisma.valuationMethodology.findFirst({ orderBy: { effectiveAt: 'desc' } });
+    if (row) return { version: row.version, config: withDefaults(row.configJson), effectiveAt: row.effectiveAt };
+    return { version: 'v1.0.0', config: DEFAULT_CONFIG, effectiveAt: null };
   }
+
+  /** Validated config change → new immutable methodology version (manual §06 PATCH /admin/valuation/config). */
+  async updateConfig(userId: string, next: unknown, note: string | undefined, meta?: RequestMeta) {
+    await this.rbac.assertGlobalPermission(userId, 'system.manage');
+    const config = withDefaults(next);
+    const errors = validateConfig(config);
+    if (errors.length) throw new BadRequestException({ code: 'INVALID_VALUATION_CONFIG', message: errors.join(' ') });
+    const current = await this.methodology();
+    if (current.effectiveAt && checksum(current.config) === checksum(config)) throw new BadRequestException({ code: 'NO_CHANGES', message: 'Nothing changed.' });
+    const count = await this.prisma.valuationMethodology.count();
+    const version = `v1.0.${count + 1}`;
+    const row = await this.prisma.$transaction(async (tx) => {
+      if (count === 0) {
+        // Record the defaults the first results were calculated with.
+        await tx.valuationMethodology.create({ data: { version: 'v1.0.0', configJson: DEFAULT_CONFIG as unknown as Prisma.InputJsonObject, checksum: checksum(DEFAULT_CONFIG), note: 'Initial defaults', effectiveAt: new Date(Date.now() - 1000) } });
+      }
+      const created = await tx.valuationMethodology.create({ data: { version, configJson: config as unknown as Prisma.InputJsonObject, checksum: checksum(config), approverId: userId, note: note?.slice(0, 500) ?? null } });
+      await this.audit.record({ actorUserId: userId, actorRole: 'admin', action: 'valuation.methodology.publish', targetType: 'valuation_methodology', targetId: created.id, reason: note?.slice(0, 500) ?? null, afterState: { version, checksum: created.checksum }, requestMeta: meta }, tx);
+      return created;
+    });
+    return { version: row.version, config, effectiveAt: row.effectiveAt };
+  }
+
+  // ── Access helpers ────────────────────────────────────────────────────────
 
   private get allowPrivate() {
     return this.config.get<string>('AUDIT_ALLOW_PRIVATE_HOSTS') === 'true';
   }
 
+  private secret() {
+    return this.config.get<string>('AUTH_SYNC_SECRET') ?? '';
+  }
+
   private requesterHash(ip: string | undefined) {
-    return ip ? createHash('sha256').update(`${this.config.get<string>('AUTH_SYNC_SECRET') ?? ''}:valuation:${ip}`).digest('hex').slice(0, 32) : null;
+    return ip ? hash(`${this.secret()}:valuation:${ip}`).slice(0, 32) : null;
   }
 
-  /** What the public calculator page needs to render (no secrets). */
-  async publicConfig() {
-    const s = await this.settings();
-    return {
-      enabled: s.calculator.enabled,
-      available: s.calculator.enabled && s.sources.dataforseo && this.dataforseo.configured,
-      verifiedValuation: s.features.verifiedValuation,
-      showRange: s.showRange,
-      currency: s.currency.code,
-      freePerMonth: s.limits.freePerMonth,
-      disclaimer: s.report.disclaimer,
-    };
+  /** Share token = HMAC of the job id; lets non-owners read a result (manual §06). */
+  shareToken(id: string) {
+    return createHmac('sha256', this.secret()).update(`valuation-share:${id}`).digest('base64url').slice(0, 32);
   }
 
-  // ── Plans, access and limits ───────────────────────────────────────────────
+  private tokenOk(id: string, token: string | undefined) {
+    if (!token) return false;
+    const a = Buffer.from(token);
+    const b = Buffer.from(this.shareToken(id));
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  /** Owner (signed-in creator) or share-token holder; everyone else gets 404. */
+  private async readable(id: string, viewer: { userId?: string | null; token?: string }) {
+    const v = await this.prisma.websiteValuation.findUnique({ where: { id } });
+    if (!v || v.kind === 'TEST') throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
+    const owner = !!viewer.userId && v.userId === viewer.userId;
+    if (!owner && !this.tokenOk(id, viewer.token)) throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
+    return { v, owner };
+  }
 
   private async defaultWorkspace(userId: string) {
     const m = await this.prisma.workspaceMembership.findFirst({ where: { userId, status: 'ACTIVE', workspace: { deletedAt: null } }, orderBy: { joinedAt: 'asc' } });
     return m?.workspaceId ?? null;
   }
 
-  private async planOf(workspaceId: string | null) {
-    if (!workspaceId) return { code: 'free', paid: false };
-    const plan = await this.entitlements.resolve(workspaceId);
-    return { code: plan.planCode ?? 'free', paid: !!plan.subscriptionId };
-  }
-
-  private accessFor(s: ValuationSettings, planCode: string): PlanAccessLevel {
-    return s.access[planCode] ?? s.access.free ?? 'limited';
-  }
-
-  private async assertWithinLimit(s: ValuationSettings, by: { userId?: string | null; requesterHash?: string | null }, paid: boolean) {
-    const limit = paid ? s.limits.paidPerMonth : s.limits.freePerMonth;
-    const where: Prisma.WebsiteValuationWhereInput = { createdAt: { gte: monthStart() }, kind: { in: ['ESTIMATE', 'VERIFIED'] } };
-    if (by.userId) where.userId = by.userId;
-    else if (by.requesterHash) where.requesterHash = by.requesterHash;
-    else return;
-    const used = await this.prisma.websiteValuation.count({ where });
-    if (used >= limit) {
-      throw new HttpException(
-        { code: 'VALUATION_LIMIT_REACHED', message: paid ? `You have used all ${limit} valuations included this month.` : `Free valuations are limited to ${limit} per month. Create an account or upgrade for more.` },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-  }
-
-  // ── Creating valuations ────────────────────────────────────────────────────
-
-  private async assertAvailable(s: ValuationSettings) {
-    if (!s.calculator.enabled) throw new ServiceUnavailableException({ code: 'VALUATION_DISABLED', message: 'The Website Value Calculator is turned off.' });
-    if (!s.sources.dataforseo || !this.dataforseo.configured) {
-      throw new ServiceUnavailableException({ code: 'VALUATION_UNAVAILABLE', message: 'Website valuation is not available yet: the SEO data provider is not configured.' });
-    }
+  private async accessFor(c: ValuationConfig, workspaceId: string | null): Promise<PlanAccessLevel> {
+    const code = workspaceId ? ((await this.entitlements.resolve(workspaceId)).planCode ?? 'free') : 'free';
+    return c.access[code] ?? c.access.free ?? 'public';
   }
 
   private domainOf(input: string) {
     const host = normalizeHost(input ?? '');
-    if (!host) throw new BadRequestException({ code: 'INVALID_DOMAIN', message: 'Enter a valid website domain, for example example.com.' });
+    if (!host) throw new HttpException({ code: 'UNSUPPORTED_DOMAIN', message: 'Enter a valid public website domain, for example example.com.' }, HttpStatus.UNPROCESSABLE_ENTITY);
     return host;
   }
 
-  /** Anonymous or signed-in estimate. Reuses a recent completed estimate of the same domain. */
-  async createEstimate(input: { domain: string; userId?: string | null; workspaceId?: string | null }, meta?: RequestMeta) {
-    const s = await this.settings();
-    await this.assertAvailable(s);
+  private assertConsent(c: ValuationConfig, consentVersion: string | undefined) {
+    if (consentVersion !== c.consentVersion) throw new BadRequestException({ code: 'CONSENT_REQUIRED', message: 'Please accept the current valuation terms to continue.', consentVersion: c.consentVersion });
+  }
+
+  async publicConfig() {
+    const { config: c, version } = await this.methodology();
+    return {
+      enabled: c.calculator.enabled,
+      available: c.calculator.enabled && c.sources.crawler,
+      consentVersion: c.consentVersion,
+      methodologyVersion: version,
+      weights: c.weights,
+      anonymousPerDay: c.limits.anonymousPerDay,
+      enhancedCredits: c.enhancedCredits,
+      currency: c.currency,
+      disclaimer: c.disclaimer,
+      sources: SOURCES.filter((k) => c.sources[k]).map((k) => ({ key: k, label: SOURCE_LABELS[k] })),
+    };
+  }
+
+  // ── Creating jobs ─────────────────────────────────────────────────────────
+
+  /** POST /valuations — public quick estimate (anonymous or signed in). */
+  async createEstimate(input: { domain: string; consentVersion: string; idempotencyKey?: string; userId?: string | null }, meta?: RequestMeta) {
+    const { config: c, version } = await this.methodology();
+    if (!c.calculator.enabled) throw new HttpException({ code: 'VALUATION_DISABLED', message: 'The Website Value Calculator is turned off.' }, HttpStatus.SERVICE_UNAVAILABLE);
+    this.assertConsent(c, input.consentVersion);
     const domain = this.domainOf(input.domain);
+    const key = input.idempotencyKey ? `est:${input.userId ?? 'anon'}:${input.idempotencyKey}` : null;
+    if (key) {
+      const prior = await this.prisma.websiteValuation.findUnique({ where: { idempotencyKey: key } });
+      if (prior) return this.created(prior);
+    }
     let workspaceId: string | null = null;
+    const requesterHash = this.requesterHash(meta?.ipAddress);
     if (input.userId) {
-      workspaceId = input.workspaceId ?? (await this.defaultWorkspace(input.userId));
-      if (workspaceId) await this.rbac.requireWorkspace(input.userId, workspaceId, 'workspace.read');
+      workspaceId = await this.defaultWorkspace(input.userId);
+      if ((await this.accessFor(c, workspaceId)) === 'off') throw new ForbiddenException({ code: 'VALUATION_NOT_IN_PLAN', message: 'Website valuation is not included in your plan.' });
+      const used = await this.prisma.websiteValuation.count({ where: { userId: input.userId, createdAt: { gte: monthStart() }, kind: { not: 'TEST' } } });
+      if (used >= c.limits.userPerMonth) throw new HttpException({ code: 'VALUATION_LIMIT_REACHED', message: `You have used all ${c.limits.userPerMonth} valuations included this month.` }, HttpStatus.TOO_MANY_REQUESTS);
+    } else {
+      const since = new Date(Date.now() - DAY);
+      const [mine, domainCount] = await Promise.all([
+        requesterHash ? this.prisma.websiteValuation.count({ where: { requesterHash, createdAt: { gte: since } } }) : 0,
+        this.prisma.websiteValuation.count({ where: { domain, userId: null, createdAt: { gte: since } } }),
+      ]);
+      if (mine >= c.limits.anonymousPerDay) throw new HttpException({ code: 'VALUATION_LIMIT_REACHED', message: `Free estimates are limited to ${c.limits.anonymousPerDay} per day. Create an account for more.` }, HttpStatus.TOO_MANY_REQUESTS);
+      if (domainCount >= c.limits.anonymousPerDomainPerDay) throw new HttpException({ code: 'VALUATION_LIMIT_REACHED', message: 'This domain was estimated recently. Please try again tomorrow or sign in.' }, HttpStatus.TOO_MANY_REQUESTS);
     }
-    const plan = await this.planOf(workspaceId);
-    if (this.accessFor(s, plan.code) === 'off') throw new ForbiddenException({ code: 'VALUATION_NOT_IN_PLAN', message: 'Website valuation is not included in your plan.' });
-    const requesterHash = input.userId ? null : this.requesterHash(meta?.ipAddress);
-
-    if (s.calculator.cacheHours > 0) {
-      const cached = await this.prisma.websiteValuation.findFirst({
-        where: { domain, kind: 'ESTIMATE', status: 'COMPLETED', completedAt: { gte: new Date(Date.now() - s.calculator.cacheHours * 3600_000) }, userId: input.userId ?? null, workspaceId },
-        orderBy: { completedAt: 'desc' },
-      });
-      if (cached) return { id: cached.id, cached: true };
-    }
-    await this.assertWithinLimit(s, { userId: input.userId, requesterHash }, plan.paid);
     const row = await this.prisma.$transaction(async (tx) => {
-      const v = await tx.websiteValuation.create({ data: { domain, kind: 'ESTIMATE', userId: input.userId ?? null, workspaceId, requesterHash, currency: s.currency.code } });
+      const v = await tx.websiteValuation.create({ data: { domain, kind: 'ESTIMATE', userId: input.userId ?? null, workspaceId, requesterHash: input.userId ? null : requesterHash, idempotencyKey: key, consentVersion: input.consentVersion, methodologyVersion: version, currency: c.currency } });
       await this.jobs.enqueue('valuation.run', { valuationId: v.id }, { jobKey: `valuation:${v.id}` }, tx);
       return v;
     });
-    return { id: row.id, cached: false };
+    return this.created(row);
   }
 
-  /** Verified valuation from connected GA4 / Search Console and business inputs (signed-in users). */
-  async createVerified(userId: string, parentId: string, inputs: VerifyInputs, meta?: RequestMeta) {
-    const s = await this.settings();
-    await this.assertAvailable(s);
-    if (!s.features.verifiedValuation) throw new ServiceUnavailableException({ code: 'VERIFIED_VALUATION_DISABLED', message: 'Verified valuations are turned off.' });
-    const parent = await this.prisma.websiteValuation.findUnique({ where: { id: parentId } });
-    if (!parent || parent.kind === 'TEST') throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
-    // Each connection is authorized (workspace read + property ownership) before use.
-    if (inputs.ga4) await this.integrations.ga4ValuationSummary(userId, inputs.ga4.integrationId, inputs.ga4.propertyId).catch((e) => this.rethrowSource(e, 'Google Analytics'));
-    if (inputs.gsc) await this.integrations.gscValuationSummary(userId, inputs.gsc.integrationId, inputs.gsc.siteUrl).catch((e) => this.rethrowSource(e, 'Search Console'));
-    const connectionWs = inputs.ga4 || inputs.gsc ? await this.prisma.workspaceIntegration.findUnique({ where: { id: (inputs.ga4 ?? inputs.gsc)!.integrationId } }) : null;
-    const workspaceId = connectionWs?.workspaceId ?? (await this.defaultWorkspace(userId));
-    if (workspaceId) await this.rbac.requireWorkspace(userId, workspaceId, 'workspace.read');
-    const plan = await this.planOf(workspaceId);
-    if (this.accessFor(s, plan.code) === 'off') throw new ForbiddenException({ code: 'VALUATION_NOT_IN_PLAN', message: 'Website valuation is not included in your plan.' });
-    await this.assertWithinLimit(s, { userId }, plan.paid);
+  private created(v: WebsiteValuation) {
+    return { id: v.id, jobId: v.id, status: v.status.toLowerCase(), shareToken: this.shareToken(v.id) };
+  }
+
+  /** POST /valuations/:id/verify — enhanced valuation with GSC/GA4 and/or self-reported financials. */
+  async createVerified(userId: string, parentId: string, token: string | undefined, inputs: VerifyInputs, meta?: RequestMeta) {
+    const { config: c, version } = await this.methodology();
+    this.assertConsent(c, inputs.consentVersion);
+    const { v: parent } = await this.readable(parentId, { userId, token });
+    if (!inputs.ga4 && !inputs.gsc && !inputs.financial) throw new BadRequestException({ code: 'NOTHING_TO_VERIFY', message: 'Connect Google Search Console or GA4, or add financial details.' });
+    if (inputs.financial && !inputs.acceptAssumptions) throw new BadRequestException({ code: 'ASSUMPTIONS_NOT_ACCEPTED', message: 'Please accept the valuation assumptions before adding financial details.' });
+    const key = inputs.idempotencyKey ? `ver:${userId}:${inputs.idempotencyKey}` : null;
+    if (key) {
+      const prior = await this.prisma.websiteValuation.findUnique({ where: { idempotencyKey: key } });
+      if (prior) return this.created(prior);
+    }
+    // Property access is verified before anything is queued (manual §10).
+    if (inputs.ga4) await this.integrations.ga4ValuationSummary(userId, inputs.ga4.integrationId, inputs.ga4.propertyId);
+    if (inputs.gsc) await this.integrations.gscValuationSummary(userId, inputs.gsc.integrationId, inputs.gsc.siteUrl);
+    const connection = inputs.ga4 || inputs.gsc ? await this.prisma.workspaceIntegration.findUnique({ where: { id: (inputs.ga4 ?? inputs.gsc)!.integrationId } }) : null;
+    const workspaceId = connection?.workspaceId ?? (await this.defaultWorkspace(userId));
+    if (!workspaceId) throw new ForbiddenException({ code: 'WORKSPACE_REQUIRED', message: 'Create a workspace before running an enhanced valuation.' });
+    await this.rbac.requireWorkspace(userId, workspaceId, 'workspace.read');
+    if ((await this.accessFor(c, workspaceId)) !== 'enhanced') throw new ForbiddenException({ code: 'VALUATION_NOT_IN_PLAN', message: 'Enhanced valuations are not included in your plan.' });
+    const id = randomUUID();
     const row = await this.prisma.$transaction(async (tx) => {
+      const reservation = c.enhancedCredits > 0 ? await this.credits.reserve({ workspaceId, featureKey: 'valuation.enhanced', amount: c.enhancedCredits, referenceType: 'website_valuation', referenceId: id, idempotencyKey: `valuation:${id}`, actorId: userId, ttlMinutes: 180 }, tx) : null;
       const v = await tx.websiteValuation.create({
-        data: { domain: parent.domain, kind: 'VERIFIED', parentId: parent.id, userId, workspaceId, inputsJson: inputs as unknown as Prisma.InputJsonValue, currency: s.currency.code },
+        data: {
+          id,
+          domain: parent.domain,
+          kind: 'VERIFIED',
+          parentId: parent.id,
+          userId,
+          workspaceId,
+          idempotencyKey: key,
+          consentVersion: inputs.consentVersion,
+          methodologyVersion: version,
+          currency: c.currency,
+          reservationId: reservation?.id ?? null,
+          inputsJson: { ga4: inputs.ga4 ?? null, gsc: inputs.gsc ?? null, financial: inputs.financial ?? null, acceptAssumptions: !!inputs.acceptAssumptions } as unknown as Prisma.InputJsonObject,
+        },
       });
       await this.jobs.enqueue('valuation.run', { valuationId: v.id }, { jobKey: `valuation:${v.id}` }, tx);
       return v;
     });
-    await this.audit.record({ actorUserId: userId, workspaceId, action: 'valuation.verify', targetType: 'website_valuation', targetId: row.id, afterState: { domain: parent.domain, ga4: !!inputs.ga4, gsc: !!inputs.gsc, revenue: !!(inputs.monthlyRevenue || inputs.annualRevenue) }, requestMeta: meta });
-    return { id: row.id };
+    await this.audit.record({ actorUserId: userId, workspaceId, action: 'valuation.verify', targetType: 'website_valuation', targetId: row.id, afterState: { domain: parent.domain, ga4: !!inputs.ga4, gsc: !!inputs.gsc, financial: !!inputs.financial, reservedCredits: c.enhancedCredits }, requestMeta: meta });
+    return this.created(row);
   }
 
-  private rethrowSource(e: unknown, label: string): never {
-    if (e instanceof HttpException) throw e;
-    throw new BadRequestException({ code: 'SOURCE_ERROR', message: `${label}: ${(e as Error).message}` });
-  }
-
-  /** Admin test calculation: bypasses limits and caching. */
+  /** Admin test run: no limits; same pipeline. */
   async createTest(userId: string, domainInput: string) {
     await this.rbac.assertGlobalPermission(userId, 'system.manage');
-    const s = await this.settings();
-    if (!s.sources.dataforseo || !this.dataforseo.configured) throw new ServiceUnavailableException({ code: 'VALUATION_UNAVAILABLE', message: 'The SEO data provider (DataForSEO) is not configured.' });
+    const { config: c, version } = await this.methodology();
     const domain = this.domainOf(domainInput);
     const row = await this.prisma.$transaction(async (tx) => {
-      const v = await tx.websiteValuation.create({ data: { domain, kind: 'TEST', userId, currency: s.currency.code } });
+      const v = await tx.websiteValuation.create({ data: { domain, kind: 'TEST', userId, methodologyVersion: version, currency: c.currency } });
       await this.jobs.enqueue('valuation.run', { valuationId: v.id }, { jobKey: `valuation:${v.id}` }, tx);
       return v;
     });
     return { id: row.id };
   }
 
-  // ── Calculation ────────────────────────────────────────────────────────────
+  async cancel(id: string, viewer: { userId?: string | null; token?: string }) {
+    const { v } = await this.readable(id, viewer);
+    if (v.status !== 'QUEUED') throw new HttpException({ code: 'NOT_CANCELLABLE', message: 'Only queued valuations can be cancelled.' }, HttpStatus.CONFLICT);
+    await this.prisma.websiteValuation.update({ where: { id }, data: { status: 'CANCELLED', completedAt: new Date() } });
+    if (v.reservationId) await this.credits.release(v.reservationId, 'cancelled');
+    return { id, status: 'cancelled' };
+  }
+
+  // ── Pipeline ──────────────────────────────────────────────────────────────
+
+  /** Cached provider read (manual §08 TTLs); `key` already includes domain and locale. */
+  private async cached<T>(key: string, provider: string, hours: number, fetcher: () => Promise<T>): Promise<T> {
+    if (hours > 0) {
+      const hit = await this.prisma.providerCache.findUnique({ where: { key } });
+      if (hit && hit.expiresAt > new Date()) return hit.valueJson as T;
+    }
+    const value = await fetcher();
+    if (hours > 0) {
+      const data = { provider, valueJson: value as unknown as Prisma.InputJsonValue, fetchedAt: new Date(), expiresAt: new Date(Date.now() + hours * 3600_000) };
+      await this.prisma.providerCache.upsert({ where: { key }, create: { key, ...data }, update: data }).catch(() => undefined);
+    }
+    return value;
+  }
 
   private async timed<T>(provider: string, operation: string, fn: () => Promise<T>) {
     const started = Date.now();
@@ -236,385 +314,321 @@ export class ValuationService implements OnModuleInit {
     }
   }
 
+  private async setStatus(id: string, status: ValuationStatus) {
+    await this.prisma.websiteValuation.update({ where: { id }, data: { status } });
+  }
+
   async run(id: string) {
     const v = await this.prisma.websiteValuation.findUnique({ where: { id } });
-    if (!v || v.status === 'COMPLETED') return;
-    await this.prisma.websiteValuation.update({ where: { id }, data: { status: 'RUNNING' } });
+    if (!v || !ACTIVE.includes(v.status)) return;
+    const { config: c, version } = await this.methodology();
     try {
-      const s = await this.settings();
-      const inputs = (v.inputsJson ?? {}) as VerifyInputs;
-      const c = await this.collect(v.domain, s, v.kind === 'VERIFIED' ? { userId: v.userId!, inputs } : null);
-      const business: BusinessInputs = { monthlyRevenue: inputs.monthlyRevenue ?? null, annualRevenue: inputs.annualRevenue ?? null, profitMargin: inputs.profitMargin ?? null, monthlyVisits: inputs.monthlyVisits ?? null };
-      if (c.signals.organicVisits === null && c.signals.verifiedOrganicVisits === null && !business.monthlyVisits) {
-        throw new Error('No traffic data could be collected for this domain.');
-      }
-      const result = valuate(c.signals, c.sources, s, business);
-      const notes = insights(c.signals, result);
+      await this.setStatus(id, 'COLLECTING');
+      const inputs = (v.inputsJson ?? {}) as Partial<VerifyInputs>;
+      const { evidence, trend, screenshot } = await this.collect(v, c, inputs);
+      await this.setStatus(id, 'NORMALIZING');
+      // Self-reported inputs alone are not a result: at least one provider must return evidence.
+      if (!evidence.some((e) => e.status === 'available' && e.source !== 'user')) throw Object.assign(new Error('No source returned evidence for this domain; the result would be empty.'), { code: 'SOURCE_UNAVAILABLE' });
+      await this.prisma.valuationEvidence.createMany({
+        data: evidence.map((e) => ({
+          valuationId: id,
+          source: e.source,
+          metric: e.metric,
+          label: e.label,
+          valueJson: e.value === null ? Prisma.DbNull : (e.value as Prisma.InputJsonValue),
+          unit: e.unit ?? null,
+          classification: e.classification,
+          status: e.status,
+          observedAt: new Date(e.observedAt),
+          periodStart: e.periodStart ? new Date(e.periodStart) : null,
+          periodEnd: e.periodEnd ? new Date(e.periodEnd) : null,
+          missingReason: e.missingReason ?? null,
+          rawHash: e.value === null ? null : hash(JSON.stringify(e.value)).slice(0, 16),
+        })),
+      });
+      await this.setStatus(id, 'CALCULATING');
+      const result = calculate(evidence, c, inputs.financial ?? {});
+      const stored: Stored = { result, insights: insights(result), trend, screenshot, methodology: { version, weights: c.weights, minEvidencePct: c.minEvidencePct } };
       await this.prisma.websiteValuation.update({
         where: { id },
         data: {
           status: 'COMPLETED',
           completedAt: new Date(),
-          valueLow: result.valueLow,
-          valueHigh: result.valueHigh,
-          valueMid: result.valueMid,
-          currency: result.currency,
-          confidence: result.confidence,
+          expiresAt: new Date(Date.now() + c.resultTtlDays * DAY),
+          methodologyVersion: version,
+          qualityScore: result.qualityScore,
+          confidenceGrade: result.confidence,
+          evidenceCoveragePct: result.evidenceCoveragePct,
+          valueLow: result.monetary?.low ?? null,
+          valueHigh: result.monetary?.high ?? null,
+          currency: c.currency,
+          limitationsJson: result.limitations,
+          resultJson: stored as unknown as Prisma.InputJsonObject,
           error: null,
-          resultJson: { valuation: result, insights: notes, collected: c, settingsSnapshot: { weights: s.weights, multipliers: s.multipliers, industryAdjustmentPct: s.industryAdjustmentPct, valuePerVisitUsd: s.valuePerVisitUsd } } as unknown as Prisma.InputJsonValue,
         },
       });
+      if (v.reservationId) await this.credits.settle(v.reservationId);
     } catch (e) {
-      this.logger.warn(`Valuation ${id} failed: ${(e as Error).message}`);
-      await this.prisma.websiteValuation.update({ where: { id }, data: { status: 'FAILED', error: (e as Error).message.slice(0, 500), completedAt: new Date() } });
+      const code = (e as { code?: string }).code ?? 'VALUATION_FAILED';
+      this.logger.warn(`Valuation ${id} failed (${code}): ${(e as Error).message}`);
+      await this.prisma.websiteValuation.update({ where: { id }, data: { status: 'FAILED', error: `${code}: ${(e as Error).message}`.slice(0, 500), completedAt: new Date() } });
+      // Unrecoverable failures are never charged (manual §08).
+      if (v.reservationId) await this.credits.release(v.reservationId, 'failed');
     }
   }
 
-  private async collect(domain: string, s: ValuationSettings, verified: { userId: string; inputs: VerifyInputs } | null): Promise<Collected> {
-    const c = initialCollected(domain, s.sources);
-    const notes: string[] = [];
-    const tasks: Promise<unknown>[] = [];
-    if (s.sources.dataforseo && this.dataforseo.configured) {
+  private async collect(v: WebsiteValuation, c: ValuationConfig, inputs: Partial<VerifyInputs>) {
+    const d = v.domain;
+    const loc = `${c.calculator.country}:${c.calculator.language}`;
+    const off = (k: SourceKey, metrics: [string, string][]) => missing(k, metrics, 'Disabled by the administrator.');
+    const tasks: Promise<Evidence[]>[] = [];
+    let trend: TrendPoint[] = [];
+    let screenshot: string | null = null;
+    tasks.push(c.sources.crawler ? this.cached(`crawler:${d}`, 'crawler', c.cacheHours.crawler, () => collectCrawler(d, this.allowPrivate)) : Promise.resolve(off('crawler', CRAWLER_METRICS)));
+    tasks.push(
+      c.sources.pagespeed
+        ? this.cached(`pagespeed:${d}`, 'pagespeed', c.cacheHours.pagespeed, () => this.timed('pagespeed', 'valuation.pagespeed', () => collectPageSpeed(d, this.config.get<string>('PAGESPEED_API_KEY') || undefined))).then(
+            (r) => ((screenshot = r.screenshot), r.evidence),
+            (e: Error) => missing('pagespeed', PAGESPEED_METRICS, e.message),
+          )
+        : Promise.resolve(off('pagespeed', PAGESPEED_METRICS)),
+    );
+    tasks.push(c.sources.rdap ? this.cached(`rdap:${d}`, 'rdap', c.cacheHours.rdap, () => this.timed('rdap', 'valuation.rdap', () => collectRdap(d))).catch((e: Error) => missing('rdap', RDAP_METRICS, e.message)) : Promise.resolve(off('rdap', RDAP_METRICS)));
+    if (!c.sources.dataforseo) tasks.push(Promise.resolve(off('dataforseo', DATAFORSEO_METRICS)));
+    else if (!this.dataforseo.configured) tasks.push(Promise.resolve(missing('dataforseo', DATAFORSEO_METRICS, 'The SEO data provider is not configured.')));
+    else
       tasks.push(
-        collectDataForSeo(this.dataforseo, domain, s.calculator.country, s.calculator.language, c, notes).then((ok) => {
-          c.sources.dataforseo = ok ? 'estimated' : 'unavailable';
-          if (notes.length) c.sourceNotes.dataforseo = notes.join(' ');
-        }),
-      );
-    } else if (s.sources.dataforseo) c.sourceNotes.dataforseo = 'Not configured.';
-    if (s.sources.pagespeed) {
-      tasks.push(
-        this.timed('pagespeed', 'valuation.pagespeed', () => collectPageSpeed(domain, this.config.get<string>('PAGESPEED_API_KEY') || undefined, c)).then(
-          () => (c.sources.pagespeed = 'estimated'),
-          (e: Error) => (c.sourceNotes.pagespeed = e.message),
+        this.cached(`dataforseo:${d}:${loc}`, 'dataforseo', c.cacheHours.rankings, () => collectDataForSeo(this.dataforseo, d, c.calculator.country, c.calculator.language)).then(
+          (r) => ((trend = r.trend), r.evidence),
+          (e: Error) => missing('dataforseo', DATAFORSEO_METRICS, e.message),
         ),
       );
+    if (v.kind === 'VERIFIED' && v.userId) {
+      if (inputs.gsc && c.sources.gsc) {
+        const { integrationId, siteUrl } = inputs.gsc;
+        tasks.push(
+          this.timed('google', 'valuation.gsc', () => this.integrations.gscValuationSummary(v.userId!, integrationId, siteUrl)).then(
+            (g) => {
+              const period = { periodStart: new Date(Date.now() - 30 * DAY).toISOString(), periodEnd: new Date(Date.now() - 2 * DAY).toISOString() };
+              return [
+                ev('gsc', 'clicks_28d', 'Search clicks (28 days)', Math.round(g.clicks), period),
+                ev('gsc', 'impressions_28d', 'Search impressions (28 days)', Math.round(g.impressions), period),
+                ev('gsc', 'pages_with_impressions', 'Pages with search impressions', g.pagesWithImpressions, period),
+                g.position === null ? ev('gsc', 'avg_position', 'Average position', null, { missingReason: 'No search data in the period.' }) : ev('gsc', 'avg_position', 'Average position', Math.round(g.position * 10) / 10, period),
+              ];
+            },
+            (e: Error) => missing('gsc', [['clicks_28d', 'Search clicks (28 days)']], e.message),
+          ),
+        );
+      }
+      if (inputs.ga4 && c.sources.ga4) {
+        const { integrationId, propertyId } = inputs.ga4;
+        tasks.push(
+          this.timed('google', 'valuation.ga4', () => this.integrations.ga4ValuationSummary(v.userId!, integrationId, propertyId)).then(
+            (g) => {
+              const period = { periodStart: new Date(Date.now() - 30 * DAY).toISOString(), periodEnd: new Date(Date.now() - DAY).toISOString() };
+              return [ev('ga4', 'sessions_30d', 'Sessions (30 days)', g.totalSessions, period), ev('ga4', 'organic_sessions_30d', 'Organic search sessions (30 days)', g.organicSessions, period)];
+            },
+            (e: Error) => missing('ga4', [['sessions_30d', 'Sessions (30 days)']], e.message),
+          ),
+        );
+      }
     }
-    if (s.sources.rdap) {
-      tasks.push(
-        this.timed('rdap', 'valuation.rdap', () => collectRdap(domain, c)).then(
-          () => (c.sources.rdap = 'estimated'),
-          (e: Error) => (c.sourceNotes.rdap = e.message),
-        ),
-      );
+    const evidence = (await Promise.all(tasks)).flat();
+    const f = inputs.financial;
+    if (f) {
+      const self = (metric: string, label: string, value: number | string | null | undefined) =>
+        ({ source: 'user' as const, metric: `user.${metric}`, label, value: value ?? null, classification: 'self_reported' as const, status: value === null || value === undefined ? ('unavailable' as const) : ('available' as const), observedAt: new Date().toISOString(), missingReason: value === null || value === undefined ? 'Not provided.' : null, periodStart: null, periodEnd: null, unit: typeof value === 'number' ? c.currency : null });
+      evidence.push(self('ttm_revenue', 'Revenue (trailing 12 months)', f.ttmRevenue), self('ttm_expenses', 'Expenses (trailing 12 months)', f.ttmExpenses), self('ttm_profit', 'Owner earnings (trailing 12 months)', f.ttmProfit), self('business_model', 'Business model', f.businessModel));
     }
-    tasks.push(collectSite(domain, this.allowPrivate, c).catch((e: Error) => (notes.push(`Site checks: ${e.message}`), undefined)));
-    if (verified?.inputs.ga4 && s.sources.ga4) {
-      const { integrationId, propertyId } = verified.inputs.ga4;
-      tasks.push(
-        this.timed('google', 'valuation.ga4', () => this.integrations.ga4ValuationSummary(verified.userId, integrationId, propertyId)).then(
-          (g) => {
-            c.sources.ga4 = 'verified';
-            c.signals.verifiedOrganicVisits = g.organicSessions;
-            c.signals.totalVisits = g.totalSessions;
-            if (s.sources.social) {
-              c.signals.socialVisits = g.socialSessions;
-              c.sources.social = 'verified';
-              c.socialSources = g.socialSources.map((x) => ({ source: x.source, visits: x.sessions, share: g.socialSessions ? Math.round((x.sessions / g.socialSessions) * 100) : 0 }));
-              c.trends.socialTraffic = g.socialTrend;
-            }
-            if (g.organicTrend.length >= 2) c.trends.organicTraffic = g.organicTrend;
-          },
-          (e: Error) => (c.sourceNotes.ga4 = e.message),
-        ),
-      );
-    }
-    if (verified?.inputs.gsc && s.sources.gsc) {
-      const { integrationId, siteUrl } = verified.inputs.gsc;
-      tasks.push(
-        this.timed('google', 'valuation.gsc', () => this.integrations.gscValuationSummary(verified.userId, integrationId, siteUrl)).then(
-          (g) => {
-            c.sources.gsc = 'verified';
-            if (c.signals.verifiedOrganicVisits === null) c.signals.verifiedOrganicVisits = Math.round(g.clicks);
-            if (g.pagesWithImpressions) c.signals.contentPages = Math.max(c.signals.contentPages ?? 0, g.pagesWithImpressions);
-            if (g.position) c.signals.avgPosition = Math.round(g.position * 10) / 10;
-          },
-          (e: Error) => (c.sourceNotes.gsc = e.message),
-        ),
-      );
-    }
-    await Promise.all(tasks);
-    if (c.trends.organicTraffic.length >= 12) {
-      const vals = c.trends.organicTraffic.map((p) => p.value);
-      const cur = vals.slice(-6).reduce((a, b) => a + b, 0);
-      const prev = vals.slice(-12, -6).reduce((a, b) => a + b, 0);
-      c.signals.trafficGrowthPct = prev > 0 ? Math.round(((cur - prev) / prev) * 100) : c.signals.trafficGrowthPct;
-    }
-    return c;
+    return { evidence, trend, screenshot };
   }
 
-  // ── Reading ────────────────────────────────────────────────────────────────
+  // ── Reading ───────────────────────────────────────────────────────────────
 
-  /** Report payload shaped by the owner's plan access level and the report section settings. */
-  async report(id: string) {
-    const v = await this.prisma.websiteValuation.findUnique({ where: { id }, include: { children: { where: { kind: 'VERIFIED' }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, status: true } } } });
-    if (!v || v.kind === 'TEST') throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
-    const s = await this.settings();
-    const plan = await this.planOf(v.workspaceId);
-    const level = this.accessFor(s, plan.code);
-    return this.shape(v, s, level);
+  /** Marks a completed result past its lifetime as expired (the only allowed change). */
+  private async freshen(v: WebsiteValuation) {
+    if (v.status === 'COMPLETED' && v.expiresAt && v.expiresAt < new Date()) {
+      await this.prisma.websiteValuation.update({ where: { id: v.id }, data: { status: 'EXPIRED' } });
+      return { ...v, status: 'EXPIRED' as ValuationStatus };
+    }
+    return v;
   }
 
-  private shape(v: Prisma.WebsiteValuationGetPayload<object> & { children?: { id: string; status: string }[] }, s: ValuationSettings, level: PlanAccessLevel) {
-    const base = {
+  async get(id: string, viewer: { userId?: string | null; token?: string }) {
+    const { v: raw, owner } = await this.readable(id, viewer);
+    const v = await this.freshen(raw);
+    const { config: c } = await this.methodology();
+    const children = await this.prisma.websiteValuation.findMany({ where: { parentId: v.id, kind: 'VERIFIED' }, orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, status: true } });
+    return { ...this.shape(v), owner, shareToken: this.shareToken(v.id), verifiedChild: children[0] ? { id: children[0].id, status: children[0].status.toLowerCase(), shareToken: this.shareToken(children[0].id) } : null, enhancedCredits: c.enhancedCredits, consentVersion: c.consentVersion, disclaimer: c.disclaimer };
+  }
+
+  private shape(v: WebsiteValuation) {
+    const stored = v.resultJson as unknown as Stored | null;
+    const r = stored?.result ?? null;
+    return {
       id: v.id,
       domain: v.domain,
-      kind: v.kind,
-      status: v.status,
+      mode: v.kind === 'VERIFIED' ? 'enhanced' : v.kind === 'TEST' ? 'test' : 'public',
+      status: v.status.toLowerCase(),
       error: v.status === 'FAILED' ? v.error : null,
-      createdAt: v.createdAt,
-      completedAt: v.completedAt,
       parentId: v.parentId,
-      verifiedChild: v.children?.[0] ?? null,
-      access: level,
-      showRange: s.showRange,
-      // Exports are counted per workspace, so visitor estimates (no workspace) never export.
-      exports: { pdf: !!v.workspaceId && s.exports.pdf && (level === 'full' || level === 'full_api'), json: !!v.workspaceId && s.exports.json && level === 'full_api' },
-      disclaimer: s.report.disclaimer,
-      verifiedValuation: s.features.verifiedValuation,
-    };
-    if (v.status !== 'COMPLETED' || !v.resultJson) return { ...base, result: null };
-    const r = v.resultJson as unknown as { valuation: ReturnType<typeof valuate>; insights: ReturnType<typeof insights>; collected: Collected };
-    const sec = s.report.sections;
-    const full = level === 'full' || level === 'full_api';
-    const c = r.collected;
-    const result = {
-      valueLow: v.valueLow,
-      valueHigh: v.valueHigh,
-      valueMid: v.valueMid,
+      createdAt: v.createdAt,
+      asOf: v.completedAt,
+      expiresAt: v.expiresAt,
+      methodologyVersion: v.methodologyVersion,
       currency: v.currency,
-      confidence: v.confidence,
-      confidenceLabel: r.valuation.confidenceLabel,
-      confidenceParts: r.valuation.confidenceParts,
-      method: r.valuation.method,
-      screenshot: c.screenshot,
-      metrics: {
-        organicTraffic: c.signals.verifiedOrganicVisits ?? c.signals.organicVisits,
-        organicTrafficVerified: c.signals.verifiedOrganicVisits !== null,
-        trafficGrowthPct: c.signals.trafficGrowthPct,
-        referringDomains: c.signals.referringDomains,
-        backlinkGrowthPct: c.signals.backlinkGrowthPct,
-        domainAuthority: c.signals.domainAuthority,
-        contentPages: c.signals.contentPages,
-        socialTraffic: c.signals.socialVisits,
-      },
-      breakdown: sec.breakdown ? r.valuation.breakdown.map((b) => ({ label: b.label, factor: b.factor, contributionPct: b.contributionPct, score: b.score })) : null,
-      drivers: r.insights.drivers,
-      risks: r.insights.risks,
-      sources: SOURCES.map((k) => ({ key: k, label: SOURCE_LABELS[k], state: c.sources[k] })),
-      // Detail tabs: full access only.
-      detail: full
-        ? {
-            traffic: sec.traffic ? { organicVisits: c.signals.verifiedOrganicVisits ?? c.signals.organicVisits, rankingKeywords: c.signals.rankingKeywords, avgPosition: c.signals.avgPosition, trend: c.trends.organicTraffic, keywordTrend: c.trends.rankingKeywords } : null,
-            backlinks: sec.backlinks ? { referringDomains: c.signals.referringDomains, totalBacklinks: c.totalBacklinks, domainAuthority: c.signals.domainAuthority, trend: c.trends.referringDomains } : null,
-            content: sec.content ? { pages: c.signals.contentPages, rankingKeywords: c.signals.rankingKeywords, relevance: r.valuation.scores.content === null ? null : Math.round(r.valuation.scores.content * 100) / 10 } : null,
-            social:
-              sec.social && s.features.socialSection
-                ? { visits: c.signals.socialVisits, share: c.signals.socialVisits !== null && c.signals.totalVisits ? Math.round((c.signals.socialVisits / c.signals.totalVisits) * 100) : null, sources: c.socialSources, trend: c.trends.socialTraffic, verified: c.sources.social === 'verified' }
-                : null,
-            technical: sec.technical ? { pagespeedMobile: c.signals.pagespeedMobile, pagespeedDesktop: c.signals.pagespeedDesktop, coreWebVitals: c.signals.coreWebVitals, ...c.technical } : null,
-            domain: sec.domain ? { ageYears: c.signals.domainAgeYears, registeredAt: c.domain.registeredAt, status: c.domain.status, authority: c.signals.domainAuthority, tld: c.domain.tld } : null,
-            opportunities: sec.opportunities && s.features.opportunities ? r.insights.opportunities : null,
-          }
-        : null,
+      qualityScore: v.qualityScore,
+      confidence: v.confidenceGrade,
+      evidenceCoveragePct: v.evidenceCoveragePct,
+      monetaryRange: r?.monetary ? { low: r.monetary.low, high: r.monetary.high, currency: r.monetary.currency, earnings: r.monetary.earnings, multipleLow: r.monetary.multipleLow, multipleHigh: r.monetary.multipleHigh, riskAdjusted: r.monetary.riskAdjusted } : null,
+      breakdown: r?.breakdown ?? null,
+      limitations: (v.limitationsJson as string[] | null) ?? [],
+      strengths: stored?.insights.strengths ?? [],
+      improvements: stored?.insights.improvements ?? [],
+      opportunities: stored?.insights.opportunities ?? [],
+      trend: stored?.trend ?? [],
+      screenshot: stored?.screenshot ?? null,
+      methodology: stored?.methodology ?? null,
     };
-    return { ...base, result };
   }
 
-  /** Projected range/confidence for the enhance page, without saving anything. */
-  async preview(id: string, business: BusinessInputs, planned: SourceKey[]) {
-    const v = await this.prisma.websiteValuation.findUnique({ where: { id } });
-    if (!v || v.kind === 'TEST' || v.status !== 'COMPLETED' || !v.resultJson) throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
-    const s = await this.settings();
-    const c = (v.resultJson as unknown as { collected: Collected }).collected;
-    const sources = { ...c.sources };
-    for (const k of planned) if (k === 'ga4' || k === 'gsc') sources[k] = 'verified';
-    if (planned.includes('ga4') && s.sources.social) sources.social = 'verified';
-    const signals = { ...c.signals };
-    // A planned GA4 connection supplies verified traffic; assume the estimate until it is read.
-    if (planned.includes('ga4') || planned.includes('gsc')) signals.verifiedOrganicVisits = signals.verifiedOrganicVisits ?? signals.organicVisits;
-    if (planned.includes('ga4') && signals.socialVisits === null) signals.socialVisits = 0;
-    const r = valuate(signals, sources, s, business);
-    return { valueLow: r.valueLow, valueHigh: r.valueHigh, valueMid: r.valueMid, currency: r.currency, confidence: r.confidence, confidenceLabel: r.confidenceLabel };
+  /** GET /valuations/:id/evidence — per-signal provenance. */
+  async evidence(id: string, viewer: { userId?: string | null; token?: string }) {
+    await this.readable(id, viewer);
+    return this.evidenceRows(id);
   }
 
-  async myValuations(userId: string) {
-    return this.prisma.websiteValuation.findMany({
-      where: { userId, kind: { in: ['ESTIMATE', 'VERIFIED'] } },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      select: { id: true, domain: true, kind: true, status: true, valueLow: true, valueHigh: true, valueMid: true, currency: true, confidence: true, createdAt: true },
-    });
+  private async evidenceRows(id: string) {
+    const rows = await this.prisma.valuationEvidence.findMany({ where: { valuationId: id }, orderBy: [{ source: 'asc' }, { metric: 'asc' }] });
+    return rows.map((e) => ({ source: e.source, sourceLabel: e.source === 'user' ? 'You (self-reported)' : (SOURCE_LABELS[e.source as SourceKey] ?? e.source), metric: e.metric, label: e.label, value: e.valueJson, unit: e.unit, classification: e.classification, status: e.status, observedAt: e.observedAt, periodStart: e.periodStart, periodEnd: e.periodEnd, missingReason: e.missingReason }));
   }
 
-  // ── Exports ────────────────────────────────────────────────────────────────
+  async preview(id: string, viewer: { userId?: string | null; token?: string }, financial: FinancialInputs, planned: ('gsc' | 'ga4')[]) {
+    const { v } = await this.readable(id, viewer);
+    if (v.status !== 'COMPLETED' && v.status !== 'EXPIRED') throw new HttpException({ code: 'VALUATION_NOT_READY', message: 'The valuation is still being calculated.' }, HttpStatus.CONFLICT);
+    const { config: c } = await this.methodology();
+    const rows = await this.evidenceRows(id);
+    const evid: Evidence[] = rows.map((e) => ({ source: e.source as SourceKey, metric: e.metric, label: e.label, value: e.value as Evidence['value'], classification: e.classification as Evidence['classification'], status: e.status as Evidence['status'], observedAt: e.observedAt.toISOString() }));
+    // Projection only: planned Google connections are assumed to succeed.
+    for (const p of planned) evid.push({ source: p, metric: `${p}.planned`, label: 'Planned connection', value: 1, classification: 'verified', status: 'available', observedAt: new Date().toISOString() });
+    const r = calculate(evid, c, financial);
+    return { projected: true, qualityScore: r.qualityScore, confidence: r.confidence, monetaryRange: r.monetary ? { low: r.monetary.low, high: r.monetary.high, currency: r.monetary.currency } : null, limitations: r.limitations };
+  }
 
-  private async exportAllowed(id: string, kind: 'pdf' | 'json') {
-    const v = await this.prisma.websiteValuation.findUnique({ where: { id } });
-    if (!v || v.kind === 'TEST') throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
-    if (v.status !== 'COMPLETED') throw new BadRequestException({ code: 'VALUATION_NOT_READY', message: 'The valuation is still being calculated.' });
-    const s = await this.settings();
-    const report = this.shape(v, s, this.accessFor(s, (await this.planOf(v.workspaceId)).code));
-    if (!report.exports[kind] || !v.workspaceId) {
-      throw new ForbiddenException({ code: 'EXPORT_NOT_IN_PLAN', message: kind === 'pdf' ? 'PDF downloads are available on plans with full valuation reports.' : 'JSON export is available on plans with API access.' });
+  async mine(userId: string) {
+    const rows = await this.prisma.websiteValuation.findMany({ where: { userId, kind: { not: 'TEST' } }, orderBy: { createdAt: 'desc' }, take: 50 });
+    return rows.map((v) => ({ ...this.shape(v), shareToken: this.shareToken(v.id) }));
+  }
+
+  // ── Report (PDF) ──────────────────────────────────────────────────────────
+
+  async pdf(id: string, viewer: { userId?: string | null; token?: string }) {
+    const { v: raw } = await this.readable(id, viewer);
+    const v = await this.freshen(raw);
+    if (v.status !== 'COMPLETED' && v.status !== 'EXPIRED') throw new HttpException({ code: 'VALUATION_NOT_READY', message: 'The valuation is still being calculated.' }, HttpStatus.CONFLICT);
+    const { config: c } = await this.methodology();
+    if (v.workspaceId) {
+      const used = await this.prisma.usageEvent.count({ where: { workspaceId: v.workspaceId, featureKey: 'valuation.pdf', occurredAt: { gte: monthStart() } } });
+      if (used >= c.limits.pdfPerMonth) throw new HttpException({ code: 'EXPORT_LIMIT_REACHED', message: `PDF downloads are limited to ${c.limits.pdfPerMonth} per month.` }, HttpStatus.TOO_MANY_REQUESTS);
+      await this.prisma.usageEvent.create({ data: { workspaceId: v.workspaceId, featureKey: 'valuation.pdf', units: 1, idempotencyKey: `valuation.pdf:${randomUUID()}` } });
     }
-    return { v, s, report };
-  }
-
-  async pdf(id: string) {
-    const { v, s, report } = await this.exportAllowed(id, 'pdf');
-    const used = await this.prisma.usageEvent.count({ where: { workspaceId: v.workspaceId!, featureKey: 'valuation.pdf', occurredAt: { gte: monthStart() } } });
-    if (used >= s.limits.pdfPerMonth) throw new HttpException({ code: 'EXPORT_LIMIT_REACHED', message: `PDF downloads are limited to ${s.limits.pdfPerMonth} per month.` }, HttpStatus.TOO_MANY_REQUESTS);
-    await this.prisma.usageEvent.create({ data: { workspaceId: v.workspaceId!, featureKey: 'valuation.pdf', units: 1, idempotencyKey: `valuation.pdf:${randomUUID()}` } });
-    const r = report.result!;
-    const money = (n: number | null) => (n === null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: r.currency, maximumFractionDigits: 0 }).format(n));
-    const fmt = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toLocaleString('en-US'));
-    const d = r.detail;
+    const s = this.shape(v);
+    const rows = await this.evidenceRows(id);
+    const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: v.currency, maximumFractionDigits: 0 }).format(n);
+    const fmt = (x: unknown) => (x === null || x === undefined ? '—' : typeof x === 'boolean' ? (x ? 'Yes' : 'No') : String(x));
     const sections: SectionPayload[] = [
-      { title: 'Estimated Website Value', summary: `${money(r.valueLow)} – ${money(r.valueHigh)} (midpoint ${money(r.valueMid)}). Confidence ${r.confidence}% (${r.confidenceLabel}).`, metrics: [
-        { label: 'Organic traffic / month', value: fmt(r.metrics.organicTraffic) },
-        { label: 'Referring domains', value: fmt(r.metrics.referringDomains) },
-        { label: 'Domain authority', value: r.metrics.domainAuthority === null ? '—' : `${r.metrics.domainAuthority}/100` },
-        { label: 'Content pages', value: fmt(r.metrics.contentPages) },
-      ] },
-      ...(r.breakdown ? [{ title: 'Value Breakdown', table: { columns: ['Factor', 'Contribution'], rows: r.breakdown.map((b) => [b.label, `${b.contributionPct}%`]) } }] : []),
-      { title: 'Key Value Drivers', bullets: r.drivers, empty: 'None identified.' },
-      { title: 'Potential Risks', bullets: r.risks, empty: 'None identified.' },
-      ...(d?.technical ? [{ title: 'Technical Health', metrics: [{ label: 'PageSpeed (mobile)', value: fmt(d.technical.pagespeedMobile) }, { label: 'PageSpeed (desktop)', value: fmt(d.technical.pagespeedDesktop) }, { label: 'Core Web Vitals', value: d.technical.coreWebVitals ?? '—' }] }] : []),
-      ...(d?.domain ? [{ title: 'Domain Signals', metrics: [{ label: 'Domain age', value: d.domain.ageYears === null ? '—' : `${d.domain.ageYears} years` }, { label: 'Registration', value: d.domain.status ?? '—' }, { label: 'TLD', value: `.${d.domain.tld}` }] }] : []),
-      ...(d?.opportunities ? [{ title: 'Ways to Increase Website Value', bullets: d.opportunities }] : []),
-      { title: 'Data Sources & Confidence', table: { columns: ['Source', 'Status'], rows: r.sources.filter((x) => x.state !== 'disabled').map((x) => [x.label, x.state]) } },
-      { title: 'Disclaimer', summary: s.report.disclaimer },
+      {
+        title: 'Summary',
+        summary: s.monetaryRange
+          ? `Indicative range ${money(s.monetaryRange.low)} – ${money(s.monetaryRange.high)} (owner earnings ${money(s.monetaryRange.earnings)} × comparable multiples ${s.monetaryRange.multipleLow}–${s.monetaryRange.multipleHigh}${s.monetaryRange.riskAdjusted ? ', risk-adjusted' : ''}).`
+          : 'Insufficient evidence for a monetary valuation.',
+        metrics: [
+          { label: 'Quality score', value: s.qualityScore === null ? 'Not enough evidence' : `${s.qualityScore}/100` },
+          { label: 'Confidence', value: s.confidence ?? '—' },
+          { label: 'Evidence coverage', value: `${s.evidenceCoveragePct ?? 0}%` },
+          { label: 'Methodology', value: s.methodologyVersion ?? '—' },
+        ],
+      },
+      ...(s.breakdown ? [{ title: 'Score composition', table: { columns: ['Category', 'Weight', 'Score'], rows: s.breakdown.map((b) => [CATEGORY_LABELS[b.category], `${b.weight}%`, b.score === null ? 'No evidence' : `${b.score}/100`]) } }] : []),
+      { title: 'Limitations', bullets: s.limitations, empty: 'None.' },
+      { title: 'Evidence', table: { columns: ['Source', 'Signal', 'Value', 'Class', 'Observed'], rows: rows.map((e) => [e.sourceLabel, e.label, e.status === 'available' ? `${fmt(e.value)}${e.unit ? ` ${e.unit}` : ''}` : `Unavailable: ${e.missingReason ?? ''}`, e.classification, e.observedAt.toISOString().slice(0, 10)]) } },
+      { title: 'Ways to improve', bullets: s.opportunities, empty: '—' },
+      { title: 'Disclosure', summary: `${c.disclaimer} Methodology ${s.methodologyVersion}; currency ${v.currency}; search market ${c.calculator.country.toUpperCase()} (${c.calculator.language}); calculated ${s.asOf ? new Date(s.asOf).toISOString().slice(0, 10) : '—'}.` },
     ];
-    return { filename: `website-value-${v.domain}.pdf`, body: await renderPdf({ title: 'Website Value Report', projectName: v.domain, domain: v.domain, period: v.kind === 'VERIFIED' ? 'Verified valuation' : 'Estimate from public data', generatedAt: new Date(), sections }) };
+    return { filename: `website-value-${v.domain}.pdf`, body: await renderPdf({ title: 'Website Value Report', projectName: v.domain, domain: v.domain, period: v.kind === 'VERIFIED' ? 'Enhanced valuation' : 'Public indicative estimate', generatedAt: new Date(), sections }) };
   }
 
-  async json(id: string) {
-    const { report } = await this.exportAllowed(id, 'json');
-    return report;
-  }
+  // ── Admin ─────────────────────────────────────────────────────────────────
 
-  // ── Admin ──────────────────────────────────────────────────────────────────
-
-  async adminSettings(userId: string) {
+  async adminConfig(userId: string) {
     await this.rbac.assertGlobalPermission(userId, 'system.read');
-    const s = await this.settings();
-    const plans = await this.prisma.plan.findMany({ where: { status: { not: 'ARCHIVED' } }, orderBy: { displayOrder: 'asc' }, select: { code: true, name: true } });
-    return { settings: s, defaults: DEFAULT_SETTINGS, plans, factorLabels: FACTOR_LABELS, sourceLabels: SOURCE_LABELS };
-  }
-
-  async updateSettings(userId: string, next: ValuationSettings, meta?: RequestMeta, reset = false) {
-    await this.rbac.assertGlobalPermission(userId, 'system.manage');
-    const merged = withDefaults(next);
-    const errors = validateSettings(merged);
-    if (errors.length) throw new BadRequestException({ code: 'INVALID_VALUATION_SETTINGS', message: errors.join(' ') });
-    const before = await this.settings();
-    const summary = reset ? 'Reset all settings to defaults' : describeChanges(before, merged);
-    await this.prisma.$transaction(async (tx) => {
-      await this.settingsStore.set(VALUATION_SETTING, merged as unknown as Prisma.InputJsonValue, userId, tx);
-      await this.audit.record(
-        { actorUserId: userId, actorRole: 'admin', action: reset ? 'valuation.settings.reset' : 'valuation.settings.update', targetType: 'system_setting', targetId: null, reason: summary.slice(0, 500), beforeState: before as unknown as Prisma.InputJsonObject, afterState: merged as unknown as Prisma.InputJsonObject, requestMeta: meta },
-        tx,
-      );
-    });
-    return merged;
-  }
-
-  async changes(userId: string, take = 25) {
-    await this.rbac.assertGlobalPermission(userId, 'system.read');
-    const where = { eventType: { in: ['valuation.settings.update', 'valuation.settings.reset'] } };
-    const [rows, total] = await Promise.all([
-      this.prisma.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, take: Math.min(take, 100), select: { id: true, createdAt: true, reason: true, actorUserId: true, eventType: true } }),
-      this.prisma.auditLog.count({ where }),
+    const current = await this.methodology();
+    const [versions, plans] = await Promise.all([
+      this.prisma.valuationMethodology.findMany({ orderBy: { effectiveAt: 'desc' }, take: 50, select: { id: true, version: true, checksum: true, approverId: true, note: true, effectiveAt: true } }),
+      this.prisma.plan.findMany({ where: { status: { not: 'ARCHIVED' } }, orderBy: { displayOrder: 'asc' }, select: { code: true, name: true } }),
     ]);
-    const users = await this.prisma.user.findMany({ where: { id: { in: rows.map((r) => r.actorUserId).filter((x): x is string => !!x) } }, select: { id: true, displayName: true, email: true } });
-    const name = new Map(users.map((u) => [u.id, u.displayName ?? u.email]));
-    return { total, rows: rows.map((r, i) => ({ id: r.id, at: r.createdAt, by: r.actorUserId ? (name.get(r.actorUserId) ?? 'Admin') : 'System', change: r.reason ?? r.eventType, current: i === 0 })) };
+    const users = await this.prisma.user.findMany({ where: { id: { in: versions.map((x) => x.approverId).filter((x): x is string => !!x) } }, select: { id: true, displayName: true, email: true } });
+    const who = new Map(users.map((u) => [u.id, u.displayName ?? u.email]));
+    return {
+      version: current.version,
+      config: current.config,
+      defaults: DEFAULT_CONFIG,
+      categoryLabels: CATEGORY_LABELS,
+      sourceLabels: SOURCE_LABELS,
+      plans,
+      versions: versions.map((x, i) => ({ ...x, approver: x.approverId ? (who.get(x.approverId) ?? 'Admin') : 'System', current: i === 0 })),
+    };
   }
 
-  async history(userId: string, q: { kind?: string; status?: string; domain?: string; take?: number }) {
+  async history(userId: string, q: { kind?: string; status?: string; domain?: string }) {
     await this.rbac.assertGlobalPermission(userId, 'system.read');
     const where: Prisma.WebsiteValuationWhereInput = {};
     if (q.kind && ['ESTIMATE', 'VERIFIED', 'TEST'].includes(q.kind)) where.kind = q.kind as ValuationKind;
-    if (q.status && ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED'].includes(q.status)) where.status = q.status as never;
+    if (q.status && Object.values(ValuationStatus).includes(q.status as ValuationStatus)) where.status = q.status as ValuationStatus;
     if (q.domain) where.domain = { contains: q.domain.trim().toLowerCase() };
-    const rows = await this.prisma.websiteValuation.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(q.take ?? 50, 200),
-      select: { id: true, domain: true, kind: true, status: true, valueLow: true, valueHigh: true, valueMid: true, currency: true, confidence: true, error: true, createdAt: true, completedAt: true, user: { select: { email: true } } },
-    });
-    return rows.map((r) => ({ ...r, user: r.user?.email ?? null }));
+    const rows = await this.prisma.websiteValuation.findMany({ where, orderBy: { createdAt: 'desc' }, take: 100, include: { user: { select: { email: true } } } });
+    return rows.map((r) => ({ id: r.id, domain: r.domain, kind: r.kind, status: r.status, qualityScore: r.qualityScore, confidence: r.confidenceGrade, valueLow: r.valueLow, valueHigh: r.valueHigh, currency: r.currency, methodologyVersion: r.methodologyVersion, error: r.error, createdAt: r.createdAt, completedAt: r.completedAt, user: r.user?.email ?? null }));
   }
 
-  /** Admin view of one valuation, including test runs (always full detail). */
-  async adminReport(userId: string, id: string) {
+  async adminDetail(userId: string, id: string) {
     await this.rbac.assertGlobalPermission(userId, 'system.read');
     const v = await this.prisma.websiteValuation.findUnique({ where: { id } });
     if (!v) throw new NotFoundException({ code: 'VALUATION_NOT_FOUND', message: 'Valuation not found.' });
-    const s = await this.settings();
-    return this.shape(v, s, 'full_api');
+    return { ...this.shape(v), evidence: await this.evidenceRows(id) };
   }
 
   async sources(userId: string) {
     await this.rbac.assertGlobalPermission(userId, 'system.read');
-    const s = await this.settings();
-    const since = new Date(Date.now() - 30 * 86400000);
+    const { config: c } = await this.methodology();
+    const since = new Date(Date.now() - 30 * DAY);
     const google = !!this.config.get('GOOGLE_OAUTH_CLIENT_ID') && !!this.config.get('GOOGLE_OAUTH_CLIENT_SECRET');
-    const configured: Record<SourceKey, { ok: boolean; note: string }> = {
-      ga4: { ok: google, note: google ? 'Read with each user’s own Google connection (verified valuations).' : 'Set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET.' },
-      gsc: { ok: google, note: google ? 'Read with each user’s own Google connection (verified valuations).' : 'Set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET.' },
-      dataforseo: { ok: this.dataforseo.configured, note: this.dataforseo.configured ? 'Traffic, keywords, backlinks and history.' : 'Set DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD.' },
-      pagespeed: { ok: true, note: this.config.get('PAGESPEED_API_KEY') ? 'Using PAGESPEED_API_KEY.' : 'Keyless (rate-limited); set PAGESPEED_API_KEY for production volume.' },
-      rdap: { ok: true, note: 'Public RDAP registry lookups (rdap.org).' },
-      social: { ok: google, note: 'Social and referral traffic from GA4 (verified valuations only).' },
+    const info: Record<SourceKey, { ok: boolean; note: string; provider: string; op: string; classification: string }> = {
+      crawler: { ok: true, note: 'Built in: home page, robots.txt and sitemap through the SSRF-safe fetcher.', provider: 'crawler', op: '', classification: 'Observed' },
+      pagespeed: { ok: true, note: this.config.get('PAGESPEED_API_KEY') ? 'Using PAGESPEED_API_KEY.' : 'Keyless (rate-limited); set PAGESPEED_API_KEY for production volume.', provider: 'pagespeed', op: 'valuation.', classification: 'Observed' },
+      rdap: { ok: true, note: 'IANA bootstrap → authoritative RDAP service; no key required.', provider: 'rdap', op: 'valuation.', classification: 'Public record' },
+      dataforseo: { ok: this.dataforseo.configured, note: this.dataforseo.configured ? 'Labs domain overview and history (modeled estimates).' : 'Set DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD.', provider: 'dataforseo', op: 'valuation.', classification: 'Modeled' },
+      gsc: { ok: google, note: google ? 'Read with each user’s own Google connection.' : 'Set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET.', provider: 'google', op: 'valuation.gsc', classification: 'Verified' },
+      ga4: { ok: google, note: google ? 'Read with each user’s own Google connection.' : 'Set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET.', provider: 'google', op: 'valuation.ga4', classification: 'Verified' },
     };
-    const usage = async (provider: string, opPrefix: string) => {
-      const where = { provider, operation: { startsWith: opPrefix }, createdAt: { gte: since } };
-      const [count, last] = await Promise.all([this.prisma.providerEvent.count({ where }), this.prisma.providerEvent.findFirst({ where, orderBy: { createdAt: 'desc' }, select: { createdAt: true, status: true } })]);
-      return { requests30d: count, lastSync: last?.createdAt ?? null, lastStatus: last?.status ?? null };
-    };
-    const u = {
-      ga4: await usage('google', 'valuation.ga4'),
-      gsc: await usage('google', 'valuation.gsc'),
-      dataforseo: await usage('dataforseo', 'valuation.'),
-      pagespeed: await usage('pagespeed', 'valuation.'),
-      rdap: await usage('rdap', 'valuation.'),
-      social: await usage('google', 'valuation.ga4'),
-    };
-    return SOURCES.map((k) => ({ key: k, label: SOURCE_LABELS[k], enabled: s.sources[k], configured: configured[k].ok, note: configured[k].note, ...u[k] }));
+    return Promise.all(
+      SOURCES.map(async (k) => {
+        const where = { provider: info[k].provider, operation: { startsWith: info[k].op }, createdAt: { gte: since } };
+        const [count, last] = k === 'crawler' ? [0, null] : await Promise.all([this.prisma.providerEvent.count({ where }), this.prisma.providerEvent.findFirst({ where, orderBy: { createdAt: 'desc' }, select: { createdAt: true } })]);
+        return { key: k, label: SOURCE_LABELS[k], enabled: c.sources[k], configured: info[k].ok, note: info[k].note, classification: info[k].classification, requests30d: count, lastSync: last?.createdAt ?? null };
+      }),
+    );
   }
 
   async usage(userId: string) {
     await this.rbac.assertGlobalPermission(userId, 'system.read');
-    const since = new Date(Date.now() - 30 * 86400000);
-    const [byKind, failed, domains, pdfs] = await Promise.all([
+    const since = new Date(Date.now() - 30 * DAY);
+    const [byKind, failed, monetary, pdfs] = await Promise.all([
       this.prisma.websiteValuation.groupBy({ by: ['kind'], where: { createdAt: { gte: since } }, _count: { _all: true } }),
       this.prisma.websiteValuation.count({ where: { createdAt: { gte: since }, status: 'FAILED' } }),
-      this.prisma.websiteValuation.findMany({ where: { createdAt: { gte: since } }, distinct: ['domain'], select: { domain: true } }),
+      this.prisma.websiteValuation.count({ where: { createdAt: { gte: since }, valueLow: { not: null } } }),
       this.prisma.usageEvent.count({ where: { featureKey: 'valuation.pdf', occurredAt: { gte: since } } }),
     ]);
-    return { since, byKind: Object.fromEntries(byKind.map((r) => [r.kind, r._count._all])), failed, uniqueDomains: domains.length, pdfExports: pdfs };
+    return { byKind: Object.fromEntries(byKind.map((r) => [r.kind, r._count._all])), failed, withMonetaryRange: monetary, pdfExports: pdfs };
   }
-}
-
-/** Human-readable summary of what changed, for the change history. */
-export function describeChanges(a: ValuationSettings, b: ValuationSettings) {
-  const out: string[] = [];
-  for (const f of Object.keys(b.weights) as (keyof ValuationSettings['weights'])[]) {
-    if (a.weights[f] !== b.weights[f]) out.push(`Updated ${FACTOR_LABELS[f]} weight (${a.weights[f]}% → ${b.weights[f]}%)`);
-  }
-  for (const k of Object.keys(b.sources) as SourceKey[]) if (a.sources[k] !== b.sources[k]) out.push(`${b.sources[k] ? 'Enabled' : 'Disabled'} ${SOURCE_LABELS[k]}`);
-  if (a.multipliers.min !== b.multipliers.min || a.multipliers.max !== b.multipliers.max) out.push(`Updated value multipliers (${a.multipliers.min}–${a.multipliers.max} → ${b.multipliers.min}–${b.multipliers.max})`);
-  if (a.industryAdjustmentPct !== b.industryAdjustmentPct) out.push(`Updated industry adjustment (±${a.industryAdjustmentPct}% → ±${b.industryAdjustmentPct}%)`);
-  if (JSON.stringify(a.confidence) !== JSON.stringify(b.confidence) || JSON.stringify(a.thresholds) !== JSON.stringify(b.thresholds)) out.push('Updated confidence rules');
-  if (JSON.stringify(a.access) !== JSON.stringify(b.access)) out.push('Updated plan access');
-  if (JSON.stringify(a.limits) !== JSON.stringify(b.limits)) out.push('Updated usage limits');
-  if (JSON.stringify(a.exports) !== JSON.stringify(b.exports)) out.push('Updated export options');
-  if (JSON.stringify(a.features) !== JSON.stringify(b.features)) out.push('Updated feature controls');
-  if (JSON.stringify(a.currency) !== JSON.stringify(b.currency) || a.showRange !== b.showRange) out.push('Updated currency and range display');
-  if (JSON.stringify(a.calculator) !== JSON.stringify(b.calculator)) out.push('Updated calculator settings');
-  if (JSON.stringify(a.report) !== JSON.stringify(b.report)) out.push('Updated report template');
-  if (a.valuePerVisitUsd !== b.valuePerVisitUsd) out.push(`Updated value per visit ($${a.valuePerVisitUsd} → $${b.valuePerVisitUsd})`);
-  return out.length ? out.join('; ') : 'Saved without changes';
 }
