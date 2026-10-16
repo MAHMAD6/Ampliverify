@@ -21,10 +21,10 @@ routes in [API.md](./API.md), inputs and gaps in [INPUTS.md](./INPUTS.md).
 | C — Workspace, account, settings | Done | Members/invitations/roles, MFA (TOTP), passkeys, sessions, notification preferences + feed, project defaults, data export and retention, AI & GEO preferences |
 | D — SEO audit engine | Done | Crawler (SSRF-safe, robots.txt), rule catalogue from the SEO Audit Guide, scoring, scheduled audits |
 | E — Optimization & verification | Done | Tasks from findings, statuses, assignment, verification re-checks |
-| F — Editor & CMS publishing | Done | Versioned documents, page import, live scoring, Claude suggestions, publishing to WordPress, Webflow, Shopify and signed custom webhooks (encrypted credentials) |
+| F — Editor & CMS publishing | Done | Versioned documents, page import, live scoring, AI suggestions (OpenAI Structured Outputs, with evidence IDs), publishing to WordPress, Webflow, Shopify and signed custom webhooks (encrypted credentials) |
 | G — Keyword research | Done | DataForSEO explorer/related/questions/competitors/SERP, lists, saved keywords, clusters |
 | H — Content strategy | Done | AI ideas and briefs, plans, clusters, optimized content, brief → editor |
-| I — AI Search (GEO) | Done | Prompts, schedules, checks on ChatGPT/Claude/Gemini/Perplexity, mentions, citations, competitors, snapshots, opportunities |
+| I — AI Search (GEO) | Done | Prompts, schedules, observations of Google AI Mode and Google AI Overview through DataForSEO saved as evidence (query, locale, surface, task, timestamp), mentions, citations, competitors, snapshots, opportunities |
 | J — Reports | Done | HTML/PDF/CSV generation, schedules, share links |
 | K — Admin CMS & careers | Done | Blog/guides/help/case studies, categories, authors, media, videos, events; jobs, applications with scanned uploads; contact and support inbox |
 | L — Admin operations | Done | Module controls, feature flags with rules, platform settings that take effect (maintenance mode, sign-up gate, admin MFA, passkeys, invitation expiry, workspace defaults, staff alerts), usage & costs, system health, incidents, admin search, sessions/devices |

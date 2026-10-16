@@ -9,8 +9,10 @@ Generated from the NestJS controllers (`apps/api/src/**/*.controller.ts`). All r
 ```
 
 ```json
-{ "data": null, "meta": {}, "error": { "code": "PERMISSION_DENIED", "message": "You do not have permission to perform this action." } }
+{ "data": null, "meta": {}, "error": { "code": "PERMISSION_DENIED", "message": "You do not have permission to perform this action.", "requestId": "req_3f2c…" } }
 ```
+
+Every response carries an `X-Request-Id` header (a well-formed incoming one is kept); errors repeat it as `error.requestId` for support and log correlation. Status codes follow the V1 manual: 400 invalid input, 401 unauthorized, 403 no access, 404 not found, 409 conflict, 422 unsupported URL, 429 limits, 502 provider failed, 503 provider unavailable.
 
 `BigInt` values (money in minor units, byte sizes) are serialized as strings. Validation is strict: unknown body fields are rejected (400).
 
@@ -18,7 +20,7 @@ Generated from the NestJS controllers (`apps/api/src/**/*.controller.ts`). All r
 
 - **Maintenance mode** (Super Admin → Settings → General): `/user/*` requests return 503 `MAINTENANCE` except for platform operators.
 - **Admin MFA** (Settings → Security): `/admin/*` requests return 403 `MFA_REQUIRED` when the token's `twoFactorEnabled` claim is false.
-- **Module controls** turn product modules off globally; **entitlements** (plan + workspace overrides) gate features and usage limits; metered actions charge credits per `credits.costs`.
+- **Module controls** turn product modules off globally; **entitlements** (plan + workspace overrides) gate features and usage limits; metered actions (audits, keyword lookups, GEO checks, AI actions, enhanced valuations) **reserve** credits per `credits.costs` when queued, **settle** actual usage on completion (unused units are returned) and **release** the reservation on failure or cancellation; orphaned reservations are released every 15 minutes. `GET /user/workspaces/:id/credits/balance` returns available and reserved totals.
 - **Rate limits**: public contact (5/hour per IP) and job applications (5/hour per email). The web app forwards the visitor IP; `TRUST_PROXY` decides which proxies are trusted.
 - **Outbound fetches** (audits, page import, WordPress) go through the SSRF-safe fetcher (public addresses only, ports 80/443, manual redirects).
 
@@ -401,7 +403,7 @@ Generated from the NestJS controllers (`apps/api/src/**/*.controller.ts`). All r
 | DELETE | `/user/workspaces/:id/members/:userId` | user |
 | PUT | `/user/workspaces/:id/members/:userId/role` | user |
 
-## engagement
+## Engagement (votes, comments, newsletter)
 
 | Method | Route | Access |
 |---|---|---|
@@ -419,25 +421,31 @@ Generated from the NestJS controllers (`apps/api/src/**/*.controller.ts`). All r
 | POST | `/public/newsletter/confirm` | public |
 | POST | `/public/newsletter/unsubscribe` | public |
 
-## valuation
+## Website Value Calculator
+
+Website Value Calculator (Valuation manual). Estimates need `consentVersion` and accept an `idempotencyKey`; non-owners read a result with its share token (`?t=`). States: queued → collecting → normalizing → calculating → completed / failed / cancelled / expired. Results are immutable and carry the methodology version, quality score, confidence (LOW/MEDIUM), a USD range only from owner earnings × dated comparables, limitations and per-signal evidence with provenance. `PATCH /admin/valuation/config` publishes a new append-only methodology version.
 
 | Method | Route | Access |
 |---|---|---|
-| GET | `/admin/valuation/changes` | admin |
+| GET | `/admin/valuation/config` | admin |
+| PATCH | `/admin/valuation/config` | admin |
 | GET | `/admin/valuation/history` | admin |
-| GET | `/admin/valuation/settings` | admin |
-| PUT | `/admin/valuation/settings` | admin |
-| POST | `/admin/valuation/settings/reset` | admin |
 | GET | `/admin/valuation/sources` | admin |
 | POST | `/admin/valuation/test` | admin |
 | GET | `/admin/valuation/usage` | admin |
 | GET | `/admin/valuation/valuations/:id` | admin |
 | POST | `/public/valuations` | public |
 | GET | `/public/valuations/:id` | public |
-| GET | `/public/valuations/:id/json` | public |
-| GET | `/public/valuations/:id/pdf` | public |
+| POST | `/public/valuations/:id/cancel` | public |
+| GET | `/public/valuations/:id/evidence` | public |
 | POST | `/public/valuations/:id/preview` | public |
+| GET | `/public/valuations/:id/report` | public |
 | GET | `/public/valuations/config` | public |
 | GET | `/user/valuations` | user |
 | POST | `/user/valuations` | user |
+| GET | `/user/valuations/:id` | user |
+| POST | `/user/valuations/:id/cancel` | user |
+| GET | `/user/valuations/:id/evidence` | user |
+| POST | `/user/valuations/:id/preview` | user |
+| GET | `/user/valuations/:id/report` | user |
 | POST | `/user/valuations/:id/verify` | user |
