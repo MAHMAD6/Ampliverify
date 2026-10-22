@@ -20,7 +20,7 @@ const label = (e: PublicPlan['entitlements'][number] | undefined) => {
 
 const FAQ = [
   ['Is there a free plan?', 'Yes — when a free plan is published it appears above with its limits. You can upgrade whenever you need more.'],
-  ['What are AI credits?', 'Credits are used for AI analysis, content generation, GEO tracking and premium features. Each action shows its credit cost before it runs.'],
+  ['What are AI credits?', 'Plans include two balances. Standard SEO audits use your monthly audit allowance, not credits. AI/GEO credits cover AI content suggestions, AI optimization and GEO visibility analysis; each action shows its credit cost, your balance and the balance afterwards before it runs. Plan credits are used before purchased credits.'],
   ['What is AI Search (GEO)?', 'Generative engine optimization helps your content be understood and cited by AI assistants and answer engines.'],
   ['How much do I save with annual billing?', 'Annual prices are shown when you switch to Annual; the saving is calculated from the published prices.'],
   ['Can I change or cancel my plan?', 'Yes. Upgrade, downgrade or cancel at any time from Billing & Plan in your account.'],
@@ -120,7 +120,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           )}
           <div className={s.grid4} style={{ marginTop: 22 }}>
             {[
-              ['All plans include AI credits', 'Credits are used for AI analysis, content generation, GEO tracking, and premium features.', <Coins key="c" size={20} />],
+              ['SEO audits + AI/GEO credits', 'Standard SEO audits come from your audit allowance; AI and GEO analysis uses credits, with the cost shown before each run.', <Coins key="c" size={20} />],
               ['Change or cancel anytime', 'Upgrade, downgrade, or cancel your plan at any time.', <Repeat key="r" size={20} />],
               ['Secure payments', 'All payments are processed securely by our payment provider.', <ShieldCheck key="s" size={20} />],
               ['Start small', 'Try the essentials and upgrade when you’re ready.', <Sprout key="f" size={20} />],

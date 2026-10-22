@@ -14,6 +14,8 @@ type Connection = {
   id: string;
   status: string;
   account: string | null;
+  scopes?: string[];
+  message?: string | null;
   connectedBy: string;
   createdAt: string;
   lastSync: { status: string; at: string; error: string | null } | null;
@@ -204,6 +206,7 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <b>
                     {ANALYTICS[key]?.mark === 'SC' ? 'Search Console' : 'Google Analytics'} · {c.account}
+                    {c.status === 'REAUTH_REQUIRED' && <span style={{ color: 'var(--amber)', fontWeight: 500 }}> · Reconnect required</span>}
                   </b>
                   <span style={{ display: 'flex', gap: 6 }}>
                     <ActionButton size="sm" variant="ghost" path={`/user/integrations/${c.id}/test`}>
@@ -214,11 +217,20 @@ export default async function IntegrationsSettingsPage({ searchParams }: { searc
                     </ActionButton>
                   </span>
                 </div>
+                {c.status === 'REAUTH_REQUIRED' && workspaceId && (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '8px 0', flexWrap: 'wrap' }}>
+                    <small style={{ color: 'var(--amber)' }}>Google access was revoked or expired. Syncing is paused until you reconnect.</small>
+                    <RedirectButton size="sm" path={`/user/workspaces/${workspaceId}/integrations/google/start`} body={{ provider: key }}>
+                      Reconnect Google
+                    </RedirectButton>
+                  </div>
+                )}
+                {c.scopes?.length ? <small style={{ color: 'var(--muted)', display: 'block' }}>Read-only access: {c.scopes.filter((x) => x.includes('googleapis')).map((x) => (x.includes('webmasters') ? 'Search Console' : 'Analytics')).join(', ')}</small> : null}
                 {c.projects.length > 0 && (
                   <ul style={{ fontSize: 14, color: 'var(--muted)', margin: '8px 0' }}>
                     {c.projects.map((pr) => (
                       <li key={pr.id}>
-                        {pr.name}: {pr.config?.propertyId ?? 'no property'} {pr.lastSyncAt ? `· last read ${formatDateTime(pr.lastSyncAt)}` : ''}
+                        {pr.name}: {pr.config?.propertyId ?? 'no property'} {pr.lastSyncAt ? `· last sync ${formatDateTime(pr.lastSyncAt)}` : '· not synced yet'}
                       </li>
                     ))}
                   </ul>

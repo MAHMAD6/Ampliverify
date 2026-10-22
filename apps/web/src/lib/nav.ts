@@ -131,6 +131,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { key: 'subscriptions', label: 'Subscriptions', href: '/admin/subscriptions' },
       { key: 'invoices', label: 'Billing & Invoices', href: '/admin/billing' },
       { key: 'credits', label: 'Credits & Adjustments', href: '/admin/credits' },
+      { key: 'margin', label: 'Revenue & Provider Cost', href: '/admin/billing/margin' },
     ],
   },
   {

@@ -35,7 +35,21 @@ export type AuditRunView = {
   pagesCrawled: number | null;
   page: { url: string; status: number; title: string | null; metaDescription: string | null; h1: string | null; wordCount: number; responseTimeMs: number } | null;
   site: { robotsFound: boolean; sitemapFound: boolean } | null;
+  /** Google PageSpeed Insights per strategy, or the recorded failure. */
+  pagespeed: Partial<Record<'mobile' | 'desktop', PageSpeedResult | { error: string; code: string }>> | null;
+  /** DataForSEO On-Page API diagnostics (site audits). */
+  onPage: { provider: string; taskId?: string; fetchedAt?: string; onpageScore?: number | null; pagesCrawled?: number | null; brokenLinks?: number | null; duplicateTitles?: number | null; duplicateDescriptions?: number | null; checks?: Record<string, number>; error?: string } | null;
   error: string | null;
+};
+
+export type PageSpeedResult = {
+  analyzedUrl: string;
+  strategy: 'mobile' | 'desktop';
+  fetchedAt: string;
+  scores: { performance: number | null; seo: number | null; accessibility: number | null; 'best-practices': number | null };
+  fieldData: string | null;
+  metrics: Record<string, string | null>;
+  opportunities: { id: string; title: string; score: number | null; displayValue: string | null; category: string }[];
 };
 
 export type AuditDetail = AuditRunView & {

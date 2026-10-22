@@ -42,6 +42,7 @@ export function PromptDetail({
   platforms,
   defaultPlatforms,
   creditPerPlatform,
+  available = null,
 }: {
   prompt: GeoPromptDetail;
   tab: PromptTab;
@@ -49,6 +50,8 @@ export function PromptDetail({
   platforms: GeoPlatformStatus[];
   defaultPlatforms: string[];
   creditPerPlatform: number | null;
+  /** AI/GEO credits available now, for the pre-run quote. */
+  available?: number | null;
 }) {
   const base = `/app/geo/prompts/${encodeURIComponent(prompt.id)}`;
   const running = !!prompt.runs[0] && RUNNING.has(prompt.runs[0].status);
@@ -56,7 +59,10 @@ export function PromptDetail({
   const keys = prompt.platformKeys.length ? prompt.platformKeys : defaultPlatforms.length ? defaultPlatforms : platforms.map((p) => p.key);
   const tracked = keys.map((k) => platforms.find((p) => p.key === k) ?? { key: k, name: k, configured: false });
   const cost = creditPerPlatform === null ? null : creditPerPlatform * Math.max(tracked.filter((p) => p.configured).length, 0);
-  const costLabel = cost === null ? '' : ` (${cost} credit${cost === 1 ? '' : 's'})`;
+  const costLabel = cost === null || cost === 0 ? '' : ` (${cost} credit${cost === 1 ? '' : 's'})`;
+  const short = cost !== null && available !== null && cost > available;
+  // Quote before execution (Hybrid pricing §2): cost, balance and balance after.
+  const quote = cost && available !== null ? `Run this check for ${cost} credit${cost === 1 ? '' : 's'}? Balance ${available} → ${available - cost} after completion.` : undefined;
   const ok = prompt.results.filter((r) => r.status === 'SUCCEEDED');
   const allCitations = ok.flatMap((r) => r.citations.map((c) => ({ ...c, platform: r.platform.name })));
   const visibility = ok.length ? Math.round((ok.filter((r) => r.mentioned).length / ok.length) * 100) : null;
@@ -64,7 +70,7 @@ export function PromptDetail({
   const lastChecked = prompt.latestRun ? (prompt.latestRun.completedAt ?? prompt.latestRun.startedAt) : null;
 
   const runButton = (
-    <ActionButton icon={<Play size={16} />} path={`/user/geo/prompts/${prompt.id}/run`} body={{}} disabled={running || prompt.status !== 'ACTIVE'} title={prompt.status !== 'ACTIVE' ? 'Resume tracking to run checks.' : undefined}>
+    <ActionButton icon={<Play size={16} />} path={`/user/geo/prompts/${prompt.id}/run`} body={{}} confirm={quote} disabled={running || prompt.status !== 'ACTIVE' || short} title={prompt.status !== 'ACTIVE' ? 'Resume tracking to run checks.' : short ? `Needs ${cost} credits — you have ${available}.` : undefined}>
       {running ? 'Checking…' : `Run a Check Now${costLabel}`}
     </ActionButton>
   );

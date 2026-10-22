@@ -93,3 +93,46 @@ export function PlanDefaultsForms({ plans, defaultPlan, signupGrant }: { plans: 
     </div>
   );
 }
+
+/** Subscription credit rollover (`credits.policy`). Off = plan credits expire at the period end. */
+export function CreditPolicyForm({ rollover }: { rollover: boolean }) {
+  return (
+    <ApiForm method="PUT" path="/admin/settings/credits.policy" submitLabel="Save Policy" successMessage="Credit policy saved." transform={(v) => ({ value: { rollover: v.rollover === 'yes' } })}>
+      <Field label="Unused plan credits at period end" htmlFor="cp-rollover" hint="Purchased credits never expire with the plan period.">
+        <Select id="cp-rollover" name="rollover" defaultValue={rollover ? 'yes' : 'no'}>
+          <option value="no">Expire (recommended)</option>
+          <option value="yes">Roll over</option>
+        </Select>
+      </Field>
+    </ApiForm>
+  );
+}
+
+const BUDGET_FIELDS = [
+  ['dataforseo', 'DataForSEO monthly ceiling (USD)'],
+  ['openai', 'OpenAI monthly ceiling (USD)'],
+  ['alertPct', 'Alert staff at (% of ceiling)'],
+  ['openaiUsdPer1MInput', 'OpenAI price per 1M input tokens (USD)'],
+  ['openaiUsdPer1MOutput', 'OpenAI price per 1M output tokens (USD)'],
+] as const;
+
+/** Provider spend ceilings (`providers.budgets`). Empty = no ceiling. */
+export function ProviderBudgetsForm({ budgets }: { budgets: Record<string, number | null> }) {
+  return (
+    <ApiForm
+      method="PUT"
+      path="/admin/settings/providers.budgets"
+      submitLabel="Save Budgets"
+      successMessage="Provider budgets saved."
+      transform={(v) => ({ value: Object.fromEntries(BUDGET_FIELDS.map(([k]) => [k, v[`b_${k}`] === '' || v[`b_${k}`] === undefined ? null : Number(v[`b_${k}`])])) })}
+    >
+      <div style={{ display: 'grid', gap: 10 }}>
+        {BUDGET_FIELDS.map(([k, label]) => (
+          <Field key={k} label={label} htmlFor={`b-${k}`}>
+            <Input id={`b-${k}`} name={`b_${k}`} type="number" min={0} step="any" defaultValue={budgets[k] ?? ''} placeholder={k === 'alertPct' ? '80' : 'No ceiling'} />
+          </Field>
+        ))}
+      </div>
+    </ApiForm>
+  );
+}

@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, Param, ParseUUIDPipe, Post, Query, RawBodyRequest, Req } from '@nestjs/common';
 import { Request } from 'express';
+import { Type } from 'class-transformer';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { Public } from '../common/decorators/public.decorator';
@@ -24,7 +25,7 @@ class CreditCheckoutDto {
 
 class QuoteDto {
   @IsIn(['geo.check', 'ai.suggestion', 'ai.content_ideas', 'ai.content_brief', 'keywords.lookup', 'valuation.enhanced']) featureKey: string;
-  @IsOptional() @IsInt() @Min(1) @Max(1000) units?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) units?: number;
 }
 
 class CancelDto {
@@ -51,9 +52,8 @@ export class BillingController {
     return this.billing.balances(actor.userId, workspaceId);
   }
 
-  @Post('user/workspaces/:workspaceId/credits/quote')
-  @HttpCode(200)
-  quote(@CurrentActor() actor: AuthenticatedActor, @Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Body() dto: QuoteDto) {
+  @Get('user/workspaces/:workspaceId/credits/quote')
+  quote(@CurrentActor() actor: AuthenticatedActor, @Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Query() dto: QuoteDto) {
     return this.billing.quote(actor.userId, workspaceId, dto.featureKey, dto.units ?? 1);
   }
 

@@ -10,7 +10,7 @@ import type { Finding } from '@/lib/app-types';
 import s from '../audit.module.css';
 
 /** URL bar + "Analyze for" mode; starts a real audit run. */
-export function RunAuditForm({ projectId, defaultUrl, mode, scope = 'PAGE' }: { projectId: string; defaultUrl: string; mode: string; scope?: 'PAGE' | 'SITE' }) {
+export function RunAuditForm({ projectId, defaultUrl, mode, scope = 'PAGE', allowanceLeft = null }: { projectId: string; defaultUrl: string; mode: string; scope?: 'PAGE' | 'SITE'; allowanceLeft?: number | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -19,20 +19,34 @@ export function RunAuditForm({ projectId, defaultUrl, mode, scope = 'PAGE' }: { 
       className={s.runBar}
       onSubmit={(e) => {
         e.preventDefault();
-        const url = String(new FormData(e.currentTarget).get('url') ?? '').trim();
+        const form = new FormData(e.currentTarget);
+        const url = String(form.get('url') ?? '').trim();
+        const psi = form.get('pagespeed') === 'on';
+        const onPage = scope === 'SITE' && form.get('onpage') === 'on';
         setError(null);
         start(async () => {
           const apiMode = mode === 'geo' ? 'GEO' : mode === 'both' ? 'BOTH' : 'SEO';
-          const result = await apiAction<{ id: string }>('POST', `/user/projects/${projectId}/audits`, { ...(url ? { url } : {}), mode: apiMode, scope });
+          const result = await apiAction<{ id: string }>('POST', `/user/projects/${projectId}/audits`, { ...(url ? { url } : {}), mode: apiMode, scope, ...(psi ? { includePageSpeed: true, strategies: ['mobile', 'desktop'] } : {}), ...(onPage ? { includeOnPageApi: true } : {}) });
           if (!result.ok) return setError(result.message);
           router.push(`/app/audit?${new URLSearchParams({ ...(url && { url }), mode, run: result.data.id })}`);
         });
       }}
     >
       <input name="url" type="url" defaultValue={defaultUrl} placeholder="https://example.com/page" aria-label="Page URL" className={s.url} />
-      <Button type="submit" size="lg" disabled={pending}>
+      <Button type="submit" size="lg" disabled={pending || allowanceLeft === 0}>
         {pending ? 'Starting…' : 'Run Audit'} <ArrowRight size={18} />
       </Button>
+      <div className={s.runOptions}>
+        <label>
+          <input type="checkbox" name="pagespeed" defaultChecked /> Include Google PageSpeed Insights (mobile + desktop)
+        </label>
+        {scope === 'SITE' && (
+          <label>
+            <input type="checkbox" name="onpage" /> Add DataForSEO On-Page diagnostics
+          </label>
+        )}
+        <small>{allowanceLeft === null ? 'Standard audits use your audit allowance, not AI/GEO credits.' : allowanceLeft === 0 ? 'No audits left this period. Your allowance resets with your plan period.' : `${allowanceLeft} audit${allowanceLeft === 1 ? '' : 's'} left this period · no AI/GEO credits used.`}</small>
+      </div>
       {error && (
         <div style={{ flexBasis: '100%' }}>
           <ActionMessage error={error} />

@@ -6,6 +6,8 @@ import { AutoSubmitSelect } from '@/components/ui/AutoSubmitSelect';
 import { StateView } from '@/components/ui/StateView';
 import { AddPrompt, GeoShell, GeoTable, geoPeriod, loadGeo, pct } from '@/components/app/geo/GeoShell';
 import { apiGet, qs } from '@/lib/api';
+import { getQuote, quoteText } from '@/lib/credits';
+import { getAppContext } from '@/lib/project';
 import type { GeoPromptRow } from '@/lib/app-types';
 import { formatDateTime } from '@/lib/format';
 import s from '@/components/app/geo/geo.module.css';
@@ -28,7 +30,10 @@ type Search = { period?: string; q?: string; platform?: string; status?: string;
 export default async function GeoOverviewPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const period = geoPeriod(sp.period);
-  const { project, platforms } = await loadGeo(period);
+  const { project, platforms, creditPerPlatform } = await loadGeo(period);
+  const quote = await getAppContext().then((c) => getQuote(c.workspaceId, 'geo.check', Math.max(1, platforms.filter((x) => x.configured).length)));
+  const confirmRun = quote && quote.cost > 0 ? `Run this check for ${quote.cost} credits? Balance ${quote.available} → ${quote.after} after completion.` : undefined;
+  void creditPerPlatform;
   const res = project ? await apiGet<GeoPromptRow[]>(`/user/projects/${project.id}/geo/prompts${qs({ q: sp.q, platform: sp.platform, status: sp.status })}`, { auth: true }) : null;
   const prompts = [...(res?.ok ? res.data : [])];
   const sort = sp.sort ?? 'updated';
@@ -89,7 +94,7 @@ export default async function GeoOverviewPage({ searchParams }: { searchParams: 
           p.platforms.length ? `${cited(p)}/${p.platforms.length}` : '—',
           p.lastRun ? (RUNNING.has(p.lastRun.status) ? 'Checking…' : formatDateTime(p.lastRun.completedAt ?? p.lastRun.startedAt)) : 'Never',
           <span key="a" className={s.rowActions}>
-            <ActionButton size="sm" variant="outline" icon={<Play size={14} />} path={`/user/geo/prompts/${p.id}/run`} body={{}} disabled={p.status !== 'ACTIVE' || (!!p.lastRun && RUNNING.has(p.lastRun.status))}>
+            <ActionButton size="sm" variant="outline" icon={<Play size={14} />} path={`/user/geo/prompts/${p.id}/run`} body={{}} confirm={confirmRun} disabled={p.status !== 'ACTIVE' || (!!p.lastRun && RUNNING.has(p.lastRun.status)) || (quote ? !quote.sufficient : false)} title={quote && !quote.sufficient ? quoteText(quote) ?? undefined : undefined}>
               Run
             </ActionButton>
             <ActionButton size="sm" variant="ghost" icon={p.status === 'PAUSED' ? <Play size={14} /> : <Pause size={14} />} method="PATCH" path={`/user/geo/prompts/${p.id}`} body={{ status: p.status === 'PAUSED' ? 'ACTIVE' : 'PAUSED' }}>

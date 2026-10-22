@@ -548,6 +548,8 @@ export class AuditsService implements OnModuleInit {
       pagesCrawled: summary.pagesCrawled ?? null,
       page: summary.page ?? null,
       site: summary.site ?? null,
+      pagespeed: summary.pagespeed ?? null,
+      onPage: summary.onPage ?? null,
       error: summary.error ?? null,
     };
   }

@@ -7,6 +7,7 @@ import { UsageHeader } from '@/components/app/usage/UsageHeader';
 import { getAppContext } from '@/lib/project';
 import { apiGet } from '@/lib/api';
 import type { BillingOverview, LedgerEntry } from '@/lib/app-types';
+import { getBalances } from '@/lib/credits';
 import { featureLabel, formatDate, formatDateTime, formatNumber, humanize } from '@/lib/format';
 import s from '@/components/app/usage/usage.module.css';
 
@@ -14,7 +15,7 @@ export const metadata = { title: 'Usage & Credits' };
 
 /** Usage feature keys → their plan limit keys. */
 const FEATURES = [
-  { key: 'seo.audit_run', limit: 'limit.audit_runs', title: 'SEO Audits', text: 'Pages analyzed by audits', icon: <Search size={22} /> },
+  { key: 'seo.audit_run', limit: 'limit.audit_runs', title: 'SEO Audits', text: 'Standard audits (allowance — no credits)', icon: <Search size={22} /> },
   { key: 'ai.action', limit: 'limit.ai_actions', title: 'AI Content Generations', text: 'Ideas, briefs and editor suggestions', icon: <FileText size={22} /> },
   { key: 'geo.check', limit: 'limit.geo_queries', title: 'GEO Checks', text: 'AI platform answers checked', icon: <Sparkles size={22} /> },
   { key: 'keywords.lookup', limit: 'limit.keyword_lookups', title: 'Keyword Lookups', text: 'Keyword research requests', icon: <KeyRound size={22} /> },
@@ -38,6 +39,7 @@ const REASON: Record<string, string> = {
 export default async function UsagePage({ searchParams }: { searchParams: Promise<{ purchase?: string }> }) {
   const { purchase } = await searchParams;
   const { workspaceId } = await getAppContext();
+  const balances = await getBalances(workspaceId);
   const [billingRes, ledgerRes, usageRes] = workspaceId
     ? await Promise.all([
         apiGet<BillingOverview>(`/user/workspaces/${workspaceId}/billing`, { auth: true }),
@@ -83,20 +85,46 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
           </div>
         </section>
         <section className={s.card}>
+          <h2>SEO Audits Remaining</h2>
+          <div className={s.big}>
+            {balances ? (balances.seoAudits.remaining === null ? 'Unlimited' : `${formatNumber(balances.seoAudits.remaining)} of ${formatNumber(balances.seoAudits.limit ?? 0)}`) : '—'}
+          </div>
+          <p>
+            Standard audits use your monthly audit allowance, not credits.
+            {balances?.seoAudits.reserved ? ` ${balances.seoAudits.reserved} held by running audits.` : ''}
+            {balances?.seoAudits.maxPagesPerAudit ? ` Up to ${balances.seoAudits.maxPagesPerAudit} pages per site audit.` : ''}
+          </p>
+        </section>
+        <section className={s.card}>
           <h2>
-            Credit Balances <Info size={15} />
+            AI/GEO Credits Available <Info size={15} />
           </h2>
           <ul className={s.balances}>
             <li>
-              <i /> <span>Plan credits received</span> {billing ? formatNumber(planCredits) : '—'}
+              <i /> <span>Plan credits (used first)</span> {balances ? formatNumber(balances.credits.subscription) : billing ? formatNumber(planCredits) : '—'}
             </li>
             <li>
-              <i /> <span>Purchased & bonus credits</span> {billing ? formatNumber(purchased) : '—'}
+              <i /> <span>Purchased credits</span> {balances ? formatNumber(balances.credits.purchased) : billing ? formatNumber(purchased) : '—'}
             </li>
+            {balances && balances.credits.other > 0 && (
+              <li>
+                <i /> <span>Bonus credits</span> {formatNumber(balances.credits.other)}
+              </li>
+            )}
+            {balances && balances.credits.reserved > 0 && (
+              <li>
+                <i /> <span>Held by running jobs</span> {formatNumber(balances.credits.reserved)}
+              </li>
+            )}
             <li className={s.total}>
               <i /> <span>Total Available Credits</span> {balance === null ? '—' : formatNumber(balance)}
             </li>
           </ul>
+          {balances && balances.credits.expiringSoon > 0 && (
+            <p style={{ marginTop: 8 }}>
+              {formatNumber(balances.credits.expiringSoon)} plan credits expire {balances.credits.nextExpiry ? `on ${formatDate(balances.credits.nextExpiry)}` : 'soon'}.
+            </p>
+          )}
         </section>
         <section className={`${s.card} ${s.withIcon}`}>
           <span className={s.roundIcon}>
@@ -154,7 +182,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
                     Limit <b>{l === null ? (billing ? 'No limit' : '—') : formatNumber(l)}</b>
                   </div>
                 </div>
-                <small>{billing?.creditCosts[f.key] ? `${billing.creditCosts[f.key]} credit(s) per unit` : 'Included in your plan (no credits)'}</small>
+                <small>{f.key === 'seo.audit_run' ? 'Uses your audit allowance (no credits)' : billing?.creditCosts[f.key] ? `${billing.creditCosts[f.key]} credit(s) per unit` : 'Included in your plan (no credits)'}</small>
               </div>
             );
           })}

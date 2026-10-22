@@ -8,6 +8,7 @@ import { ProjectContext } from '@/components/app/ModuleSetup';
 import { apiGet, qs } from '@/lib/api';
 import { formatDate, formatDateTime, humanize } from '@/lib/format';
 import { getAppContext } from '@/lib/project';
+import { getQuote, quoteText } from '@/lib/credits';
 import s from './content.module.css';
 
 export type ContentTab = 'ideas' | 'clusters' | 'plan' | 'briefs' | 'optimized';
@@ -138,10 +139,12 @@ async function Ideas({ projectId, aiAvailable, status }: { projectId: string; ai
   const filter = ['DRAFT', 'IN_PROGRESS', 'COMPLETED', 'ARCHIVED'].includes(status ?? '') ? status : undefined;
   const res = await apiGet<Idea[]>(`/user/projects/${projectId}/content/ideas${qs({ status: filter })}`, { auth: true });
   const ideas = res.ok ? res.data : [];
+  const quote = await getAppContext().then((c) => getQuote(c.workspaceId, 'ai.content_ideas'));
   return (
     <>
-      <Panel title="Generate Topic Opportunities" description="Claude proposes ideas from this project's domain, saved keywords, audit findings and AI search gaps. Uses credits.">
+      <Panel title="Generate Topic Opportunities" description="AI proposes ideas from this project's domain, saved keywords, audit findings and AI search gaps. Suggestions are recommendations, not measured data.">
         {!aiAvailable && <Notice tone="neutral">{AI_OFF}</Notice>}
+        {aiAvailable && quoteText(quote) && <Notice tone={quote && !quote.sufficient ? 'amber' : 'neutral'}>{quoteText(quote)}</Notice>}
         <ApiForm path={`/user/projects/${projectId}/content/ideas/generate`} submitLabel="Generate Ideas" successMessage="Ideas generated.">
           <div className={s.formRow}>
             <Field label="Focus topic (optional)" htmlFor="ci-topic">
@@ -215,9 +218,10 @@ async function Ideas({ projectId, aiAvailable, status }: { projectId: string; ai
 async function Briefs({ projectId, aiAvailable }: { projectId: string; aiAvailable: boolean }) {
   const res = await apiGet<Brief[]>(`/user/projects/${projectId}/content/briefs`, { auth: true });
   const briefs = res.ok ? res.data : [];
+  const quote = aiAvailable ? await getAppContext().then((c) => getQuote(c.workspaceId, 'ai.content_brief')) : null;
   return (
     <>
-      <Panel title="New Content Brief" description="A brief gives the writer the outline, questions to answer and keywords to cover.">
+      <Panel title="New Content Brief" description={`A brief gives the writer the outline, questions to answer and keywords to cover.${quote ? ` AI draft: ${quoteText(quote)}` : ''}`}>
         <ApiForm path={`/user/projects/${projectId}/content/briefs`} submitLabel="Create Brief" redirectTo="/app/content/briefs/{id}">
           <div className={s.formRow}>
             <Field label="Working title" htmlFor="cb-title">

@@ -73,10 +73,12 @@ Every external provider is optional; the dependent feature is disabled with an e
 | Email (transactional, scheduled reports, staff alerts) | Amazon SES v2: `SES_REGION`, `EMAIL_FROM` (verified identity), optional `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` / `SES_CONFIGURATION_SET` |
 | AI ideas, briefs, editor suggestions | OpenAI Responses API with Structured Outputs: `OPENAI_API_KEY`, optional `OPENAI_MODEL` |
 | GEO / AI Search observations | DataForSEO Google AI Mode and Google organic (AI Overview), Standard queued mode: `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`. Results are saved provider evidence; no LLM answer is presented as an AI platform's ranking |
-| Keyword research, Website Value Calculator | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` (valuations also use Google PageSpeed Insights: optional `PAGESPEED_API_KEY`, and public RDAP) |
+| Keyword research, Website Value Calculator | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` (valuations also use Google PageSpeed Insights and public RDAP). Optional `DATAFORSEO_BASE_URL`; keyword/SERP results are cached 24h; site audits can add On-Page API diagnostics |
 | Job queue, shared throttling | `REDIS_URL` (BullMQ dispatch with a PostgreSQL outbox and a dead-letter queue; without it the API polls PostgreSQL) |
 | CMS (WordPress, Webflow, Shopify, custom webhook) and Google credentials encryption | `INTEGRATION_ENCRYPTION_KEY` (32+ characters) |
-| Google Search Console / GA4 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` |
+| Google Search Console / GA4 (Google manual V1.1) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (register `https://<host>/app/integrations/google/callback`), optional `GOOGLE_TOKEN_ENCRYPTION_KEY`. OAuth uses PKCE and single-use state; GSC syncs daily and GA4 every 6 hours into `google_metrics` |
+| PageSpeed Insights (audits, valuation) | `GOOGLE_PAGESPEED_API_KEY` (restricted to the PageSpeed API) |
+| Pricing model | Hybrid: SEO audits use the plan allowance (`limit.audit_runs`, `limit.audit_max_pages`); AI/GEO actions use credits priced in `credits.costs`; plan credits (`credits.monthly_grant`) are granted per period and spent before purchased credits; provider ceilings in `providers.budgets` |
 | File storage | Private S3-compatible bucket: `STORAGE_DRIVER=s3` + `S3_*`; report downloads use short-lived signed URLs (`S3_SIGNED_URL_SECONDS`). Local `STORAGE_DIR` for development only |
 | Applicant file malware scanning | `CLAMAV_HOST`, `CLAMAV_PORT` (files stay undownloadable until scanned clean) |
 

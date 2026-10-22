@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowRight, BarChart3, CalendarDays, ChevronRight, Clock3, FileText, Globe, Info, Layers, Lightbulb, ListChecks, Search, Sparkles, Target } from 'lucide-react';
 import { ProjectHeader } from '@/components/app/projects/ProjectHeader';
+import { GoogleDataPanel, type GoogleSource } from '@/components/app/projects/GoogleDataPanel';
 import { Badge, ButtonLink, Card, EmptyState, Field, Grid, IconCircle, Input, Panel, Select } from '@/components/ui';
 import { ApiForm } from '@/components/ui/actions';
 import { apiGet } from '@/lib/api';
@@ -45,11 +46,12 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
   const result = await apiGet<Project>(`/user/projects/${encodeURIComponent(id)}`, { auth: true });
   if (!result.ok) notFound();
   const project = result.data;
-  const [summaryRes, recsRes, settingsRes, billingRes] = await Promise.all([
+  const [summaryRes, recsRes, settingsRes, billingRes, googleRes] = await Promise.all([
     apiGet<ProjectSummary>(`/user/projects/${project.id}/summary`, { auth: true }),
     apiGet<Recommendations>(`/user/projects/${project.id}/recommendations`, { auth: true }),
     apiGet<ProjectSettings>(`/user/projects/${project.id}/settings`, { auth: true }),
     apiGet<BillingOverview>(`/user/workspaces/${project.workspaceId}/billing`, { auth: true }),
+    apiGet<GoogleSource[]>(`/user/projects/${project.id}/google/overview`, { auth: true }),
   ]);
   const sum = summaryRes.ok ? summaryRes.data : null;
   const recs = recsRes.ok ? recsRes.data.items.slice(0, 5) : [];
@@ -154,6 +156,8 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
               ))}
             </Grid>
           </Panel>
+
+          <GoogleDataPanel projectId={project.id} sources={googleRes.ok ? googleRes.data : []} />
 
           <Grid cols={2}>
             <Panel title={<span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}><Clock3 size={20} color="var(--blue)" /> Recent Activity</span>} flushHead>

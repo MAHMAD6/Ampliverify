@@ -4,6 +4,8 @@ import { EmptyState, Notice, PageHeader } from '@/components/ui';
 import { AutoRefresh, ActionButton } from '@/components/ui/actions';
 import { ProjectContext } from '@/components/app/ModuleSetup';
 import { RunAuditForm } from '@/components/app/audit/AuditControls';
+import { ProviderResults } from '@/components/app/audit/ProviderResults';
+import { getBalances } from '@/lib/credits';
 import { FindingList } from '@/components/app/audit/FindingList';
 import { getAppContext } from '@/lib/project';
 import { apiGet } from '@/lib/api';
@@ -30,7 +32,7 @@ const tone = (n: number | null | undefined) => (n === null || n === undefined ? 
  */
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ url?: string; mode?: string; tab?: string; run?: string }> }) {
   const { url, mode = 'seo', tab = 'Overview', run } = await searchParams;
-  const { selectedProject, projects } = await getAppContext();
+  const { selectedProject, projects, workspaceId } = await getAppContext();
   const project = selectedProject ?? (projects.length === 1 ? projects[0] : null);
 
   if (!project) {
@@ -74,7 +76,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       <ProjectContext project={project} />
       <AutoRefresh active={running} />
       <PageHeader title="On-Page SEO Audit" description="Analyze your page for SEO, AI search visibility, and content. Get actionable recommendations to improve and verify your results." />
-      <RunAuditForm projectId={project.id} defaultUrl={pageUrl} mode={mode} />
+      <RunAuditForm projectId={project.id} defaultUrl={pageUrl} mode={mode} allowanceLeft={(await getBalances(workspaceId))?.seoAudits.remaining ?? null} />
       <div className={s.modes}>
         <b>
           Analyze for <Info size={14} />
@@ -97,7 +99,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
       )}
       {audit?.status === 'FAILED' && (
         <Notice tone="amber" title="The audit could not be completed">
-          {audit.error ?? 'The page could not be fetched.'} No credits were used.
+          {audit.error ?? 'The page could not be fetched.'} Your audit allowance was not used.
         </Notice>
       )}
 
@@ -115,6 +117,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           </div>
         ))}
       </div>
+
+      {audit && (audit.status === 'SUCCEEDED' || audit.status === 'PARTIAL') && active === 'Overview' && <ProviderResults audit={audit} />}
 
       <nav className={s.tabs} aria-label="Audit sections">
         {TABS.map((t) => (

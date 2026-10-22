@@ -3,6 +3,7 @@ import { SeoEditor, type EditorDoc } from '@/components/app/editor/SeoEditor';
 import type { WpConnection } from '@/components/app/cms/ConnectWebsite';
 import { apiGet } from '@/lib/api';
 import { getAppContext } from '@/lib/project';
+import { getQuote, quoteText } from '@/lib/credits';
 
 export const metadata = { title: 'On-Page SEO Editor' };
 
@@ -12,7 +13,8 @@ export default async function EditorDocumentPage({ params }: { params: Promise<{
   const { id } = await params;
   const res = await apiGet<EditorDoc>(`/user/editor/documents/${encodeURIComponent(id)}`, { auth: true });
   if (!res.ok) notFound();
-  const { projects } = await getAppContext();
+  const { projects, workspaceId } = await getAppContext();
+  const quote = res.data.aiAvailable ? await getQuote(workspaceId, 'ai.suggestion') : null;
   const project = projects.find((p) => p.id === res.data.projectId) ?? null;
   const integrations = project ? await apiGet<ProviderRow[]>(`/user/workspaces/${project.workspaceId}/integrations`, { auth: true }) : null;
   // Every connected CMS can receive this document.
@@ -24,6 +26,8 @@ export default async function EditorDocumentPage({ params }: { params: Promise<{
       doc={res.data}
       projectName={project?.name ?? null}
       connections={cms}
+      aiCostNote={quoteText(quote)}
+      aiBlocked={quote ? !quote.sufficient : false}
     />
   );
 }

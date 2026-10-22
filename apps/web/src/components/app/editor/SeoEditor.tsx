@@ -113,7 +113,20 @@ const payload = (sections: Section[], meta: Meta): Content => ({
  * or rejects, version history and WordPress publishing. Unsaved edits are
  * also kept on this device so a closed tab does not lose work.
  */
-export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; projectName: string | null; connections: { id: string; label: string; provider?: string }[] }) {
+export function SeoEditor({
+  doc,
+  projectName,
+  connections,
+  aiCostNote = null,
+  aiBlocked = false,
+}: {
+  doc: EditorDoc;
+  projectName: string | null;
+  connections: { id: string; label: string; provider?: string }[];
+  /** Credit quote shown before AI suggestions run (Hybrid pricing §2). */
+  aiCostNote?: string | null;
+  aiBlocked?: boolean;
+}) {
   const router = useRouter();
   const backupKey = `av-editor:${doc.id}`;
   const [ready, setReady] = useState(false);
@@ -670,9 +683,10 @@ export function SeoEditor({ doc, projectName, connections }: { doc: EditorDoc; p
               {!doc.aiAvailable && <Notice tone="neutral">{AI_OFF}</Notice>}
               <Textarea rows={2} value={ask} onChange={(ev) => setAsk(ev.target.value)} maxLength={900} placeholder="Ask for specific edits, e.g. “Add an FAQ answering the three most common questions about this topic.”" disabled={!doc.aiAvailable} />
               <div>
-                <Button icon={<Sparkles size={16} />} disabled={!doc.aiAvailable || !ask.trim() || !!busy} onClick={() => suggest({ instruction: ask })}>
+                <Button icon={<Sparkles size={16} />} disabled={!doc.aiAvailable || aiBlocked || !ask.trim() || !!busy} onClick={() => suggest({ instruction: ask })}>
                   {busy === 'suggest' ? 'Thinking…' : 'Get Suggestions'}
                 </Button>
+                {doc.aiAvailable && aiCostNote && <small style={{ display: 'block', marginTop: 6, color: aiBlocked ? 'var(--red)' : 'var(--muted)' }}>{aiCostNote}</small>}
               </div>
             </div>
           )}
