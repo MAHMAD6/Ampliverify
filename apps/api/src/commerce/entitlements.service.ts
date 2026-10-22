@@ -108,11 +108,12 @@ export class EntitlementsService {
     const plan = await this.resolve(workspaceId, db);
     const limit = plan.features?.get(limitKey);
     if (!limit || limit.limit === null) return { used: null, limit: null };
-    const agg = await db.usageEvent.aggregate({
-      where: { workspaceId, featureKey: usageFeatureKey, occurredAt: { gte: plan.periodStart } },
-      _sum: { units: true },
-    });
-    const used = Number(agg._sum.units ?? new Prisma.Decimal(0));
+    const [agg, held] = await Promise.all([
+      db.usageEvent.aggregate({ where: { workspaceId, featureKey: usageFeatureKey, occurredAt: { gte: plan.periodStart } }, _sum: { units: true } }),
+      // Units held by queued/running jobs count as used until settled or released.
+      db.creditReservation.aggregate({ where: { workspaceId, featureKey: usageFeatureKey, status: 'RESERVED' }, _sum: { units: true } }),
+    ]);
+    const used = Number(agg._sum.units ?? new Prisma.Decimal(0)) + (held._sum.units ?? 0);
     if (used + units > limit.limit) {
       throw new ForbiddenException({
         code: 'PLAN_LIMIT_REACHED',
@@ -120,6 +121,26 @@ export class EntitlementsService {
       });
     }
     return { used, limit: limit.limit };
+  }
+
+  /** Numeric limit for a LIMIT feature, or null when the plan sets none (unlimited). */
+  async limitOf(workspaceId: string, limitKey: string, db: Db = this.prisma) {
+    const plan = await this.resolve(workspaceId, db);
+    const v = plan.features?.get(limitKey)?.limit;
+    return v === undefined || v === null ? null : Number(v);
+  }
+
+  /** Allowance status for a LIMIT feature this period: used, held by running jobs, limit. */
+  async allowance(workspaceId: string, limitKey: string, usageFeatureKey: string, db: Db = this.prisma) {
+    const plan = await this.resolve(workspaceId, db);
+    const limit = plan.features?.get(limitKey)?.limit ?? null;
+    const [agg, held] = await Promise.all([
+      db.usageEvent.aggregate({ where: { workspaceId, featureKey: usageFeatureKey, occurredAt: { gte: plan.periodStart } }, _sum: { units: true } }),
+      db.creditReservation.aggregate({ where: { workspaceId, featureKey: usageFeatureKey, status: 'RESERVED' }, _sum: { units: true } }),
+    ]);
+    const used = Number(agg._sum.units ?? 0);
+    const reserved = held._sum.units ?? 0;
+    return { limit: limit === null ? null : Number(limit), used, reserved, remaining: limit === null ? null : Math.max(0, Number(limit) - used - reserved), periodStart: plan.periodStart };
   }
 
   /** Project-count limit (`limit.projects`), counted live rather than from usage. */

@@ -148,6 +148,8 @@ enum ConnectionStatus {
   ERROR
   DISCONNECTED
   REVOKED
+  /// Google refresh token revoked or invalid: syncing stops until the user reconnects.
+  REAUTH_REQUIRED
 
   @@map("connection_status")
 }
@@ -795,6 +797,8 @@ model Project {
   usageEvents       UsageEvent[]
   roleAssignments   RoleAssignment[]
 
+  googleMetrics GoogleMetric[]
+
   @@unique([workspaceId, slug])
   @@index([workspaceId, status, createdAt(sort: Desc)])
   @@index([organizationId])
@@ -865,6 +869,8 @@ model ProjectDataSource {
 
   project              Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   workspaceIntegration WorkspaceIntegration @relation(fields: [workspaceIntegrationId], references: [id], onDelete: Cascade)
+
+  googleMetrics GoogleMetric[]
 
   @@unique([projectId, workspaceIntegrationId, sourceType])
   @@index([projectId, status])
@@ -1933,6 +1939,11 @@ model WorkspaceIntegration {
   providerId         String           @map("provider_id") @db.Uuid
   status             ConnectionStatus @default(PENDING)
   externalAccountRef String?          @map("external_account_ref")
+  /// Provider account identity (Google `sub`), so reconnects update the same connection.
+  externalSubjectId  String?          @map("external_subject_id")
+  /// OAuth scopes actually granted.
+  scopes             String[]         @default([])
+  lastErrorCode      String?          @map("last_error_code")
   connectedBy        String           @map("connected_by") @db.Uuid
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1966,8 +1977,16 @@ model IntegrationToken {
 model SyncRun {
   id                     String    @id @default(uuid()) @db.Uuid
   workspaceIntegrationId String    @map("workspace_integration_id") @db.Uuid
+  /// Project data source synced (Google property mapped to a project).
+  dataSourceId           String?   @map("data_source_id") @db.Uuid
   syncType               String    @map("sync_type")
+  /// Idempotency key: a retried or duplicate trigger never creates a second run.
+  syncKey                String?   @unique @map("sync_key")
   status                 RunStatus @default(QUEUED)
+  attempts               Int       @default(0)
+  rowsUpserted           Int       @default(0) @map("rows_upserted")
+  /// Last date the provider had data for (Search Console reports with a lag).
+  dataThrough            DateTime? @map("data_through") @db.Date
   startedAt              DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
   completedAt            DateTime? @map("completed_at") @db.Timestamptz(6)
   errorCode              String?   @map("error_code")
@@ -2766,7 +2785,7 @@ model WebsiteValuation {
   requesterHash       String?         @map("requester_hash")
   /// Client-supplied key: the same key never creates a second job or charge.
   idempotencyKey      String?         @unique @map("idempotency_key")
-    consentVersion      String?         @map("consent_version")
+  consentVersion      String?         @map("consent_version")
   methodologyVersion  String?         @map("methodology_version")
   inputsJson          Json?           @map("inputs_json")
   resultJson          Json?           @map("result_json")
@@ -2933,6 +2952,8 @@ model CreditReservation {
   referenceType  String                  @map("reference_type")
   referenceId    String                  @map("reference_id") @db.Uuid
   idempotencyKey String                  @unique @map("idempotency_key")
+  /// Allowance units held (e.g. 1 SEO audit) while the job runs.
+  units          Int                     @default(1)
   expiresAt      DateTime                @map("expires_at") @db.Timestamptz(6)
   createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
   settledAt      DateTime?               @map("settled_at") @db.Timestamptz(6)
@@ -2940,4 +2961,82 @@ model CreditReservation {
   @@index([workspaceId, status])
   @@index([status, expiresAt])
   @@map("credit_reservations")
+}
+
+/// OAuth authorization transaction (Google manual §3): single-use, short-lived,
+/// bound to the initiating user and workspace, with the PKCE verifier sealed.
+model OAuthTransaction {
+  id                 String    @id @default(uuid()) @db.Uuid
+  /// SHA-256 of the `state` value sent to the provider.
+  stateHash          String    @unique @map("state_hash")
+  provider           String
+  userId             String    @map("user_id") @db.Uuid
+  workspaceId        String    @map("workspace_id") @db.Uuid
+  codeVerifierSealed String    @map("code_verifier_sealed")
+  returnTo           String?   @map("return_to")
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt             DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([expiresAt])
+  @@map("oauth_transactions")
+}
+
+/// Normalized Google metrics (Search Console / GA4), keyed by property, date and
+/// dimension so retried syncs upsert instead of duplicating (Google manual §7).
+model GoogleMetric {
+  id              String   @id @default(uuid()) @db.Uuid
+  dataSourceId    String   @map("data_source_id") @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  source          String
+  propertyId      String   @map("property_id")
+  date            DateTime @db.Date
+  /// `date` for daily totals, or `query` / `page` for period breakdowns ending on `date`.
+  dimension       String
+  dimensionValue  String   @default("") @map("dimension_value")
+  clicks          Int?
+  impressions     Int?
+  ctr             Float?
+  position        Float?
+  sessions        Int?
+  activeUsers     Int?     @map("active_users")
+  engagedSessions Int?     @map("engaged_sessions")
+  conversions     Float?
+  fetchedAt       DateTime @default(now()) @map("fetched_at") @db.Timestamptz(6)
+
+  dataSource ProjectDataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([dataSourceId, source, date, dimension, dimensionValue])
+  @@index([projectId, source, dimension, date])
+  @@map("google_metrics")
+}
+
+enum CreditGrantSource {
+  SUBSCRIPTION
+  SIGNUP
+  PROMOTIONAL
+  ADJUSTMENT
+  PURCHASE
+
+  @@map("credit_grant_source")
+}
+
+/// Credit lots (Hybrid pricing guide §5). Spending is assigned to lots in
+/// policy order: subscription credits first (earliest expiry), purchased last.
+/// The ledger stays authoritative; lots drive expiry and reporting.
+model CreditGrant {
+  id            String            @id @default(uuid()) @db.Uuid
+  workspaceId   String            @map("workspace_id") @db.Uuid
+  source        CreditGrantSource
+  amount        Decimal           @db.Decimal(18, 4)
+  ledgerEntryId String            @unique @map("ledger_entry_id") @db.Uuid
+  referenceType String?           @map("reference_type")
+  referenceId   String?           @map("reference_id")
+  expiresAt     DateTime?         @map("expires_at") @db.Timestamptz(6)
+  expiredAt     DateTime?         @map("expired_at") @db.Timestamptz(6)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([workspaceId, expiresAt])
+  @@map("credit_grants")
 }

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, Length, MaxLength, MinLength } from 'class-validator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
@@ -41,6 +42,8 @@ export class KeywordsController {
     return { configured: this.keywords.configured };
   }
 
+  // Per-user rate limit on paid provider lookups (DataForSEO summary §4).
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post('projects/:projectId/keywords/research')
   research(@CurrentActor() a: AuthenticatedActor, @Param('projectId', ParseUUIDPipe) id: string, @Body() dto: ResearchDto) {
     return this.keywords.research(a.userId, id, dto);

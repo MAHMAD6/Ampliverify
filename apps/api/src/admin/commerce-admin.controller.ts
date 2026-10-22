@@ -240,6 +240,11 @@ export class CommerceAdminController {
     return this.commerce.getSubscription(actor.userId, id);
   }
 
+  @Get('billing/margin')
+  margin(@CurrentActor() actor: AuthenticatedActor, @Query('month') month?: string) {
+    return this.commerce.margin(actor.userId, month);
+  }
+
   @Get('invoices')
   invoices(@CurrentActor() actor: AuthenticatedActor, @Query('status') status?: string) {
     return this.commerce.listInvoices(actor.userId, status);

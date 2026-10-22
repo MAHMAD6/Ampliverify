@@ -223,7 +223,7 @@ export class EditorService {
     const ws = await this.prisma.workspace.findUniqueOrThrow({ where: { id: project.workspaceId } });
     const tone = (ws.settingsJson as { aiGeo?: { aiTone?: string } } | null)?.aiGeo?.aiTone;
 
-    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: project.id, actorId, referenceType: 'editor_document', referenceId: id }, (usage) =>
+    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: project.id, actorId, referenceType: 'editor_document', referenceId: id, operation: 'ai.suggestion' }, (usage) =>
       this.openai.generateJson<{ suggestions: { type: SuggestionType; title: string; explanation: string; original: string; replacement: string; issueKeys: string[] }[] }>(
         {
           system: `You are an on-page SEO and GEO editor. Suggest specific, minimal edits that improve how this page ranks in search and how likely AI assistants are to quote it: direct answers, clear headings, the focus keyword used naturally, accurate metadata, scannable structure. Quote "original" exactly from the draft so the edit can be applied. Never invent facts, numbers, quotes or sources.${tone ? ` Match this tone: ${tone}.` : ''} Write in ${ws.language}.`,

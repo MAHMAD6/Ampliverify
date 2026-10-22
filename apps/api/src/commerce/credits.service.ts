@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { CreditReason, Prisma } from '@prisma/client';
+import { CreditGrantSource, CreditReason, Prisma } from '@prisma/client';
 import { Db, PrismaService } from '../prisma/prisma.service';
 import { SETTING, SettingsService } from './settings.service';
 
@@ -13,7 +13,15 @@ export type LedgerEntryInput = {
   createdBy?: string | null;
   /** Admin corrections may take a balance below zero; usage never may. */
   allowNegative?: boolean;
+  /** For positive entries: the credit lot's source and expiry (defaults from `reason`). */
+  grant?: { source: CreditGrantSource; expiresAt?: Date | null };
 };
+
+/** Lot consumption order (Hybrid guide §5): subscription credits first, purchased credits last. */
+const LOT_ORDER: Record<CreditGrantSource, number> = { SUBSCRIPTION: 0, SIGNUP: 1, PROMOTIONAL: 1, ADJUSTMENT: 2, PURCHASE: 3 };
+const LOT_SOURCE: Partial<Record<CreditReason, CreditGrantSource>> = { PLAN_GRANT: 'SUBSCRIPTION', PURCHASE: 'PURCHASE', PROMOTIONAL: 'PROMOTIONAL', ADJUSTMENT_CREDIT: 'ADJUSTMENT' };
+
+export type CreditLot = { id: string; source: CreditGrantSource; amount: number; remaining: number; expiresAt: Date | null; createdAt: Date };
 
 export type ChargeInput = {
   workspaceId: string;
@@ -80,7 +88,100 @@ export class CreditsService {
       },
     });
     await tx.creditWallet.update({ where: { id: wallet.id }, data: { balanceCache: next } });
+    const source = delta.greaterThan(0) ? (input.grant?.source ?? LOT_SOURCE[input.reason]) : undefined;
+    if (source) {
+      await tx.creditGrant.create({ data: { workspaceId: input.workspaceId, source, amount: delta, ledgerEntryId: entry.id, referenceType: input.referenceType ?? null, referenceId: input.referenceId ?? null, expiresAt: input.grant?.expiresAt ?? null } });
+    }
     return entry;
+  }
+
+  /**
+   * Credit lots with their remaining amounts. The ledger is authoritative; net
+   * consumption (granted − balance) is assigned to lots in policy order —
+   * subscription credits (earliest expiry) first, purchased credits last — so
+   * remaining amounts never depend on which job spent them.
+   */
+  async lots(workspaceId: string, db: Db = this.prisma): Promise<CreditLot[]> {
+    const [rows, wallet] = await Promise.all([
+      db.creditGrant.findMany({ where: { workspaceId, expiredAt: null } }),
+      db.creditWallet.findUnique({ where: { workspaceId } }),
+    ]);
+    const balance = Number(wallet?.balanceCache ?? 0);
+    const sorted = rows.sort(
+      (a, b) =>
+        LOT_ORDER[a.source] - LOT_ORDER[b.source] ||
+        (a.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.expiresAt?.getTime() ?? Number.MAX_SAFE_INTEGER) ||
+        a.createdAt.getTime() - b.createdAt.getTime(),
+    );
+    let consumed = Math.max(0, sorted.reduce((t, l) => t + Number(l.amount), 0) - balance);
+    return sorted.map((l) => {
+      const amount = Number(l.amount);
+      const used = Math.min(amount, consumed);
+      consumed -= used;
+      return { id: l.id, source: l.source, amount, remaining: Math.round((amount - used) * 10_000) / 10_000, expiresAt: l.expiresAt, createdAt: l.createdAt };
+    });
+  }
+
+  /** Expires lots past their expiry date: their remaining credits leave the balance (EXPIRATION). */
+  async expireLots(now = new Date()) {
+    const due = await this.prisma.creditGrant.findMany({ where: { expiredAt: null, expiresAt: { lt: now } }, select: { workspaceId: true }, distinct: ['workspaceId'], take: 500 });
+    let expired = 0;
+    for (const { workspaceId } of due) {
+      await this.prisma.$transaction(async (tx) => {
+        const wallet = await this.ensureWallet(workspaceId, tx);
+        await tx.$queryRaw`SELECT "id" FROM "credit_wallets" WHERE "id" = ${wallet.id}::uuid FOR UPDATE`;
+        for (const lot of (await this.lots(workspaceId, tx)).filter((l) => l.expiresAt && l.expiresAt < now)) {
+          if (lot.remaining > 0) {
+            await this.applyEntry(tx, { workspaceId, delta: -lot.remaining, reason: 'EXPIRATION', referenceType: 'credit_grant', referenceId: lot.id, idempotencyKey: `expire:${lot.id}`, allowNegative: true });
+          }
+          await tx.creditGrant.update({ where: { id: lot.id }, data: { expiredAt: now } });
+          expired++;
+        }
+      });
+    }
+    return expired;
+  }
+
+  /**
+   * Subscription credits for the current billing period (`credits.monthly_grant`),
+   * granted exactly once per period and expiring at the period end unless
+   * rollover is enabled. Called on invoice.paid and by a periodic sweep.
+   */
+  async grantPeriodCredits(subscriptionId: string) {
+    const sub = await this.prisma.subscription.findUnique({ where: { id: subscriptionId }, include: { plan: { include: { entitlements: { include: { feature: true } } } } } });
+    if (!sub || !['ACTIVE', 'TRIALING'].includes(sub.status)) return null;
+    const ent = sub.plan.entitlements.find((e) => e.feature.key === 'credits.monthly_grant' && e.enabled);
+    const amount = Number(ent?.limitNumeric ?? 0);
+    if (amount <= 0) return null;
+    const policy = await this.settings.get<{ rollover?: boolean }>(SETTING.creditPolicy, {});
+    return this.prisma.$transaction((tx) =>
+      this.applyEntry(tx, {
+        workspaceId: sub.workspaceId,
+        delta: amount,
+        reason: 'PLAN_GRANT',
+        referenceType: 'subscription',
+        referenceId: sub.id,
+        idempotencyKey: `plan-grant:${sub.id}:${sub.currentPeriodStart.toISOString()}`,
+        grant: { source: 'SUBSCRIPTION', expiresAt: policy.rollover ? null : sub.currentPeriodEnd },
+      }),
+    );
+  }
+
+  async grantDuePeriodCredits() {
+    const subs = await this.prisma.subscription.findMany({ where: { status: { in: ['ACTIVE', 'TRIALING'] }, currentPeriodStart: { lte: new Date() }, currentPeriodEnd: { gt: new Date() } }, select: { id: true } });
+    for (const s of subs) await this.grantPeriodCredits(s.id).catch(() => undefined);
+    return subs.length;
+  }
+
+  /**
+   * Quote before execution (Hybrid guide §2): cost, current balance and the
+   * estimated balance afterwards. Nothing is reserved.
+   */
+  async quote(workspaceId: string, featureKey: string, units = 1, amount?: number) {
+    const cost = amount !== undefined ? new Prisma.Decimal(amount) : await this.costOf(featureKey, units);
+    const { available, reserved } = await this.balanceDetail(workspaceId);
+    const after = new Prisma.Decimal(available).sub(cost);
+    return { featureKey, units, cost: Number(cost), available: Number(available), reserved: Number(reserved), after: Number(after), sufficient: !after.isNegative() };
   }
 
   /**
@@ -164,6 +265,7 @@ export class CreditsService {
           referenceType: input.referenceType,
           referenceId: input.referenceId,
           idempotencyKey: input.idempotencyKey,
+          units: input.units ?? 1,
           expiresAt: new Date(Date.now() + (input.ttlMinutes ?? 120) * 60_000),
         },
       });
@@ -223,7 +325,18 @@ export class CreditsService {
       this.balance(workspaceId),
       this.prisma.creditReservation.aggregate({ where: { workspaceId, status: 'RESERVED' }, _sum: { amount: true } }),
     ]);
-    return { available, reserved: reserved._sum.amount ?? new Prisma.Decimal(0) };
+    const lots = await this.lots(workspaceId);
+    const by = (s: CreditGrantSource[]) => lots.filter((l) => s.includes(l.source)).reduce((t, l) => t + l.remaining, 0);
+    const soon = new Date(Date.now() + 7 * 86_400_000);
+    return {
+      available,
+      reserved: reserved._sum.amount ?? new Prisma.Decimal(0),
+      subscription: by(['SUBSCRIPTION']),
+      purchased: by(['PURCHASE']),
+      other: by(['SIGNUP', 'PROMOTIONAL', 'ADJUSTMENT']),
+      expiringSoon: lots.filter((l) => l.expiresAt && l.expiresAt < soon).reduce((t, l) => t + l.remaining, 0),
+      nextExpiry: lots.filter((l) => l.expiresAt && l.remaining > 0).map((l) => l.expiresAt!).sort((a, b) => a.getTime() - b.getTime())[0] ?? null,
+    };
   }
 
   ledger(workspaceId: string, limit = 100) {

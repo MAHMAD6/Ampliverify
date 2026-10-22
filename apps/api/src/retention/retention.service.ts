@@ -36,6 +36,8 @@ export class RetentionService implements OnModuleInit {
     this.jobs.registerPeriodic('retention.purge', DAY, async () => void (await this.run()));
     // Orphan credit reservations (jobs that never finished) are released.
     this.jobs.registerPeriodic('credits.release_expired', 15 * 60_000, async () => void (await this.credits.releaseExpiredReservations()));
+    this.jobs.registerPeriodic('credits.expire_lots', 60 * 60_000, async () => void (await this.credits.expireLots()));
+    this.jobs.registerPeriodic('credits.period_grants', 60 * 60_000, async () => void (await this.credits.grantDuePeriodCredits()));
   }
 
   async run(now = new Date()) {

@@ -176,6 +176,7 @@ export class OrganizationsService {
         referenceId: workspace.id,
         idempotencyKey: `signup-grant:${workspace.id}`,
         createdBy: actorId,
+        grant: { source: 'SIGNUP' },
       });
     }
     return workspace;

@@ -113,32 +113,35 @@ describe('SEO audits and Optimization Center', () => {
     await h.jobs.drain(['audit.run']);
   });
 
-  it('charges credits when a cost is configured and refunds failed audits', async () => {
-    const { user, projectId, workspaceId } = await h.onboard('payer', {});
+  it('uses the SEO audit allowance, never credits: held while running, released on failure (Hybrid pricing)', async () => {
+    const { user, projectId, workspaceId } = await h.onboard('allowance', {});
     const auth = { authorization: user.bearer };
+    const me = await h.prisma.user.findFirstOrThrow({ where: { authSubject: user.authSubject } });
+    const feature = await h.prisma.feature.findUniqueOrThrow({ where: { key: 'limit.audit_runs' } });
+    await h.prisma.workspaceEntitlementOverride.create({ data: { workspaceId, featureId: feature.id, enabled: true, limitNumeric: 1, reason: 'test', createdBy: me.id } });
+    const before = await h.prisma.systemSetting.findUnique({ where: { key: 'credits.costs' } });
     await h.prisma.systemSetting.upsert({ where: { key: 'credits.costs' }, create: { key: 'credits.costs', valueJson: { 'seo.audit_run': 5 } }, update: { valueJson: { 'seo.audit_run': 5 } } });
     try {
-      const denied = await h.api().post(`/api/v1/user/projects/${projectId}/audits`).set(auth).send({ url: `${site.origin}/` }).expect(402);
-      expect(denied.body.error.code).toBe('INSUFFICIENT_CREDITS');
-
-      const wallet = await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } });
-      await h.prisma.creditLedger.create({ data: { walletId: wallet.id, delta: 12, reason: 'PROMOTIONAL', idempotencyKey: `test-grant-${wallet.id}` } });
-      await h.prisma.creditWallet.update({ where: { id: wallet.id }, data: { balanceCache: 12 } });
-
-      await h.api().post(`/api/v1/user/projects/${projectId}/audits`).set(auth).send({ url: `${site.origin}/` }).expect(201);
-      expect(Number((await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } })).balanceCache)).toBe(7);
-
-      // A page that cannot be fetched fails the run and refunds.
+      // No credits at all, yet the audit runs: audits deduct the allowance, not AI/GEO credits.
       const failing = await h.api().post(`/api/v1/user/projects/${projectId}/audits`).set(auth).send({ url: `${site.origin.replace(/:\d+$/, ':1')}/` }).expect(201);
-      expect(Number((await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } })).balanceCache)).toBe(2);
+      const held = await h.api().get(`/api/v1/user/workspaces/${workspaceId}/balances`).set(auth).expect(200);
+      expect(held.body.data.seoAudits).toMatchObject({ limit: 1, used: 0, reserved: 1, remaining: 0 });
+      expect(held.body.data.credits.available).toBe(0);
+      const denied = await h.api().post(`/api/v1/user/projects/${projectId}/audits`).set(auth).send({ url: `${site.origin}/` }).expect(403);
+      expect(denied.body.error.code).toBe('PLAN_LIMIT_REACHED');
+
+      // A failed audit releases its allowance unit.
       await h.jobs.drain(['audit.run']);
-      const failed = await h.api().get(`/api/v1/user/audits/${failing.body.data.id}`).set(auth).expect(200);
-      expect(failed.body.data.status).toBe('FAILED');
-      expect(Number((await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } })).balanceCache)).toBe(7);
-      const sum = await h.prisma.creditLedger.aggregate({ where: { walletId: wallet.id }, _sum: { delta: true } });
-      expect(Number(sum._sum.delta)).toBe(7);
+      expect((await h.api().get(`/api/v1/user/audits/${failing.body.data.id}`).set(auth).expect(200)).body.data.status).toBe('FAILED');
+      await h.api().post(`/api/v1/user/projects/${projectId}/audits`).set(auth).send({ url: `${site.origin}/` }).expect(201);
+      await h.jobs.drain(['audit.run']);
+      const after = await h.api().get(`/api/v1/user/workspaces/${workspaceId}/balances`).set(auth).expect(200);
+      expect(after.body.data.seoAudits).toMatchObject({ limit: 1, used: 1, reserved: 0, remaining: 0 });
+      const wallet = await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } });
+      expect(await h.prisma.creditLedger.count({ where: { walletId: wallet.id } })).toBe(0);
     } finally {
-      await h.prisma.systemSetting.delete({ where: { key: 'credits.costs' } });
+      if (before) await h.prisma.systemSetting.update({ where: { key: 'credits.costs' }, data: { valueJson: before.valueJson as object } });
+      else await h.prisma.systemSetting.delete({ where: { key: 'credits.costs' } });
     }
   });
 });

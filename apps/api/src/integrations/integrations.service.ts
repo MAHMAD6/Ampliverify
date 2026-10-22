@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
-import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RbacService } from '../rbac/rbac.service';
 import { ProjectsService } from '../projects/projects.service';
@@ -26,15 +25,12 @@ import {
   webhookSend,
   WebhookSecret,
 } from './cms-connectors';
+import { GOOGLE_PROVIDERS, GoogleProvider, GoogleService, SOURCE_LABEL } from './google.service';
 
 /** Providers that can receive editor documents. */
 export const CMS_PROVIDERS = ['wordpress', 'webflow', 'shopify', 'custom_webhook'] as const;
 
-const GOOGLE_PROVIDERS = ['google_search_console', 'google_analytics'] as const;
-type GoogleProvider = (typeof GOOGLE_PROVIDERS)[number];
-
 type WordPressSecret = { siteUrl: string; username: string; password: string };
-type GoogleSecret = { refreshToken: string; accessToken?: string; expiresAt?: number };
 
 /**
  * Workspace integrations: CMS publishing (WordPress application passwords,
@@ -52,6 +48,7 @@ export class IntegrationsService {
     private readonly entitlements: EntitlementsService,
     private readonly editor: EditorService,
     private readonly config: ConfigService,
+    private readonly google: GoogleService,
   ) {}
 
   private box() {
@@ -69,7 +66,7 @@ export class IntegrationsService {
   }
 
   get googleConfigured() {
-    return !!this.config.get('GOOGLE_OAUTH_CLIENT_ID') && !!this.config.get('GOOGLE_OAUTH_CLIENT_SECRET');
+    return this.google.configured;
   }
 
   async list(userId: string, workspaceId: string) {
@@ -87,11 +84,13 @@ export class IntegrationsService {
         key: p.key,
         name: p.name,
         authType: p.authType,
-        available: p.authType === 'OAUTH2' ? this.googleConfigured && !!this.config.get('INTEGRATION_ENCRYPTION_KEY') : !!this.config.get('INTEGRATION_ENCRYPTION_KEY'),
+        available: p.authType === 'OAUTH2' ? this.googleConfigured : !!this.config.get('INTEGRATION_ENCRYPTION_KEY'),
         connections: conns.map((c) => ({
           id: c.id,
           status: c.status,
           account: c.externalAccountRef,
+          scopes: c.scopes,
+          message: c.status === 'REAUTH_REQUIRED' ? 'Reconnect Google to continue syncing.' : null,
           connectedBy: c.connector.displayName ?? c.connector.email,
           createdAt: c.createdAt,
           lastSync: c.syncRuns[0] ? { status: c.syncRuns[0].status, at: c.syncRuns[0].startedAt, error: c.syncRuns[0].errorCode } : null,
@@ -128,13 +127,20 @@ export class IntegrationsService {
     const integ = await this.prisma.workspaceIntegration.findUnique({ where: { id: integrationId } });
     if (!integ) throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Integration not found.' });
     const ws = await this.rbac.requireWorkspace(userId, integ.workspaceId, 'integration.manage');
+    const provider = await this.prisma.integrationProvider.findUnique({ where: { id: integ.providerId } });
+    let revoked = false;
+    if (provider && (GOOGLE_PROVIDERS as readonly string[]).includes(provider.key)) {
+      // Stop scheduled syncs and revoke the grant at Google before removing credentials.
+      await this.google.stopSyncs(integrationId);
+      revoked = await this.google.revoke(integrationId);
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.integrationToken.deleteMany({ where: { workspaceIntegrationId: integrationId } });
       await tx.projectDataSource.updateMany({ where: { workspaceIntegrationId: integrationId }, data: { status: 'DISCONNECTED' } });
       await tx.workspaceIntegration.update({ where: { id: integrationId }, data: { status: 'DISCONNECTED' } });
-      await this.auditLog.record({ actorUserId: userId, organizationId: ws.organizationId, workspaceId: ws.id, action: 'workspace.integration.disconnect', targetType: 'workspace_integration', targetId: integrationId, requestMeta: meta }, tx);
+      await this.auditLog.record({ actorUserId: userId, organizationId: ws.organizationId, workspaceId: ws.id, action: 'workspace.integration.disconnect', targetType: 'workspace_integration', targetId: integrationId, afterState: { revoked }, requestMeta: meta }, tx);
     });
-    return { id: integrationId, status: 'DISCONNECTED' };
+    return { id: integrationId, status: 'DISCONNECTED', revoked };
   }
 
   // ── WordPress ──────────────────────────────────────────────────────────
@@ -192,7 +198,14 @@ export class IntegrationsService {
   }
 
   async testConnection(userId: string, integrationId: string) {
-    const { integ, secret } = await this.secretOf<WordPressSecret & GoogleSecret>(integrationId);
+    const row = await this.prisma.workspaceIntegration.findUnique({ where: { id: integrationId }, include: { provider: true } });
+    if (row && (GOOGLE_PROVIDERS as readonly string[]).includes(row.provider.key)) {
+      await this.rbac.requireWorkspace(userId, row.workspaceId, 'integration.manage');
+      const ok = !!(await this.google.accessToken(integrationId, true).catch(() => null));
+      if (ok) await this.prisma.workspaceIntegration.update({ where: { id: integrationId }, data: { status: 'CONNECTED', lastErrorCode: null } });
+      return { ok, ...(ok ? {} : { message: 'Reconnect Google to continue syncing.' }) };
+    }
+    const { integ, secret } = await this.secretOf<WordPressSecret>(integrationId);
     await this.rbac.requireWorkspace(userId, integ.workspaceId, 'integration.manage');
     let ok = false;
     if (integ.provider.key === 'wordpress') {
@@ -207,8 +220,6 @@ export class IntegrationsService {
     } else if (integ.provider.key === 'custom_webhook') {
       const res = await webhookSend(secret as unknown as WebhookSecret, 'ping', { workspaceId: integ.workspaceId }, this.allowPrivate);
       ok = res.status >= 200 && res.status < 300;
-    } else {
-      ok = !!(await this.googleAccessToken(integrationId).catch(() => null));
     }
     await this.prisma.workspaceIntegration.update({ where: { id: integrationId }, data: { status: ok ? 'CONNECTED' : 'ERROR' } });
     return { ok };
@@ -308,107 +319,61 @@ export class IntegrationsService {
     return result;
   }
 
-  // ── Google (Search Console, Analytics 4) ───────────────────────────────
+  // ── Google (Search Console, Analytics 4) — see GoogleService ─────────────
 
-  private stateSecret() {
-    return this.config.get<string>('INTEGRATION_ENCRYPTION_KEY') ?? '';
+  googleStart(userId: string, workspaceId: string, provider: GoogleProvider, returnTo?: string) {
+    return this.google.start(userId, workspaceId, provider, returnTo);
   }
 
-  private signState(payload: object) {
-    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    return `${body}.${createHmac('sha256', this.stateSecret()).update(body).digest('base64url')}`;
+  googleCallback(userId: string, input: { code?: string; state: string; error?: string }, meta?: RequestMeta) {
+    return this.google.callback(userId, input, meta);
   }
 
-  private readState(state: string) {
-    const [body, sig] = state.split('.');
-    const expected = createHmac('sha256', this.stateSecret()).update(body ?? '').digest('base64url');
-    if (!body || !sig || sig.length !== expected.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
-      throw new BadRequestException({ code: 'INVALID_STATE', message: 'The connection request expired. Please try again.' });
-    }
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as { workspaceId: string; userId: string; provider: GoogleProvider; exp: number; returnTo?: string };
-    if (payload.exp < Date.now()) throw new BadRequestException({ code: 'INVALID_STATE', message: 'The connection request expired. Please try again.' });
-    return payload;
-  }
-
-  async googleStart(userId: string, workspaceId: string, provider: GoogleProvider, returnTo?: string) {
-    await this.rbac.requireWorkspace(userId, workspaceId, 'integration.manage');
-    if (!GOOGLE_PROVIDERS.includes(provider)) throw new BadRequestException({ code: 'UNKNOWN_PROVIDER', message: 'Unknown Google integration.' });
-    if (!this.googleConfigured) throw new ServiceUnavailableException({ code: 'GOOGLE_NOT_CONFIGURED', message: 'Google integrations are not available yet.' });
-    this.box();
-    const p = await this.prisma.integrationProvider.findUniqueOrThrow({ where: { key: provider } });
-    const scopes = [...((p.scopesJson as string[]) ?? []), 'openid', 'email'];
-    const params = new URLSearchParams({
-      client_id: String(this.config.get('GOOGLE_OAUTH_CLIENT_ID')),
-      redirect_uri: `${this.webUrl}/app/integrations/google/callback`,
-      response_type: 'code',
-      scope: scopes.join(' '),
-      access_type: 'offline',
-      prompt: 'consent',
-      include_granted_scopes: 'true',
-      // returnTo is a same-site path the web app redirects to after the callback.
-      state: this.signState({ workspaceId, userId, provider, exp: Date.now() + 10 * 60_000, ...(returnTo && /^\/(?![/\\])/.test(returnTo) ? { returnTo } : {}) }),
-    });
-    return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
-  }
-
-  async googleCallback(userId: string, code: string, state: string, meta?: RequestMeta) {
-    const s = this.readState(state);
-    if (s.userId !== userId) throw new BadRequestException({ code: 'INVALID_STATE', message: 'Please finish connecting with the same account.' });
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: String(this.config.get('GOOGLE_OAUTH_CLIENT_ID')),
-        client_secret: String(this.config.get('GOOGLE_OAUTH_CLIENT_SECRET')),
-        redirect_uri: `${this.webUrl}/app/integrations/google/callback`,
-        grant_type: 'authorization_code',
-      }),
-    });
-    const token = (await res.json()) as { access_token?: string; refresh_token?: string; expires_in?: number; id_token?: string; error_description?: string };
-    if (!res.ok || !token.refresh_token) throw new BadRequestException({ code: 'GOOGLE_AUTH_FAILED', message: token.error_description ?? 'Google did not grant offline access. Try again.' });
-    const email = token.id_token ? (JSON.parse(Buffer.from(token.id_token.split('.')[1], 'base64url').toString('utf8')) as { email?: string }).email : undefined;
-    const secret: GoogleSecret = { refreshToken: token.refresh_token, accessToken: token.access_token, expiresAt: Date.now() + (token.expires_in ?? 3600) * 1000 };
-    const connection = await this.storeConnection(userId, s.workspaceId, s.provider, email ?? 'Google account', secret, meta);
-    return { ...connection, returnTo: s.returnTo ?? null };
-  }
-
-  private async googleAccessToken(integrationId: string) {
-    const { secret } = await this.secretOf<GoogleSecret>(integrationId);
-    if (secret.accessToken && secret.expiresAt && secret.expiresAt > Date.now() + 60_000) return secret.accessToken;
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: String(this.config.get('GOOGLE_OAUTH_CLIENT_ID')), client_secret: String(this.config.get('GOOGLE_OAUTH_CLIENT_SECRET')), refresh_token: secret.refreshToken, grant_type: 'refresh_token' }),
-    });
-    const token = (await res.json()) as { access_token?: string; expires_in?: number };
-    if (!res.ok || !token.access_token) {
-      await this.prisma.workspaceIntegration.update({ where: { id: integrationId }, data: { status: 'ERROR' } });
-      throw new BadRequestException({ code: 'GOOGLE_TOKEN_EXPIRED', message: 'Google access expired. Reconnect the account.' });
-    }
-    const sealed = this.box().seal(JSON.stringify({ ...secret, accessToken: token.access_token, expiresAt: Date.now() + (token.expires_in ?? 3600) * 1000 }));
-    await this.prisma.integrationToken.updateMany({ where: { workspaceIntegrationId: integrationId }, data: { accessSecretRef: sealed } });
-    return token.access_token;
-  }
-
-  private async googleGet<T>(integrationId: string, url: string, init?: { method?: string; body?: unknown }) {
-    const access = await this.googleAccessToken(integrationId);
-    const res = await fetch(url, { method: init?.method ?? 'GET', headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' }, body: init?.body ? JSON.stringify(init.body) : undefined });
-    const json = (await res.json().catch(() => ({}))) as T & { error?: { message?: string } };
-    if (!res.ok) throw new BadRequestException({ code: 'GOOGLE_API_ERROR', message: json.error?.message ?? `Google API error ${res.status}.` });
-    return json;
+  private googleGet<T>(integrationId: string, url: string, init?: { method?: string; body?: unknown }) {
+    return this.google.request<T>(integrationId, url, { ...init, operation: url.includes('analyticsdata') ? 'ga4.report' : 'gsc.query', product: url.includes('analyticsdata') ? 'ga4' : 'gsc' });
   }
 
   /** Properties available on a connected Google account (GSC sites or GA4 properties). */
-  async googleProperties(userId: string, integrationId: string) {
-    const { integ } = await this.secretOf<GoogleSecret>(integrationId);
+  async googleProperties(userId: string, integrationId: string, refresh = false) {
+    const integ = await this.prisma.workspaceIntegration.findUnique({ where: { id: integrationId } });
+    if (!integ || integ.status === 'DISCONNECTED') throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Integration not found.' });
     await this.rbac.requireWorkspace(userId, integ.workspaceId, 'workspace.read');
-    if (integ.provider.key === 'google_search_console') {
-      const r = await this.googleGet<{ siteEntry?: { siteUrl: string; permissionLevel: string }[] }>(integrationId, 'https://www.googleapis.com/webmasters/v3/sites');
-      return (r.siteEntry ?? []).map((s) => ({ id: s.siteUrl, name: s.siteUrl, permission: s.permissionLevel }));
-    }
-    const r = await this.googleGet<{ accountSummaries?: { displayName: string; propertySummaries?: { property: string; displayName: string }[] }[] }>(integrationId, 'https://analyticsadmin.googleapis.com/v1beta/accountSummaries');
-    return (r.accountSummaries ?? []).flatMap((a) => (a.propertySummaries ?? []).map((p) => ({ id: p.property, name: `${a.displayName} › ${p.displayName}` })));
+    return this.google.properties(integrationId, refresh);
+  }
+
+  /** Connection status: scopes, state, linked properties and last sync (Google manual §5). */
+  async googleStatus(userId: string, integrationId: string) {
+    const integ = await this.prisma.workspaceIntegration.findUnique({
+      where: { id: integrationId },
+      include: { provider: true, dataSources: { include: { project: { select: { id: true, name: true } } } }, syncRuns: { orderBy: { startedAt: 'desc' }, take: 1 } },
+    });
+    if (!integ || !(GOOGLE_PROVIDERS as readonly string[]).includes(integ.provider.key)) throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Google connection not found.' });
+    await this.rbac.requireWorkspace(userId, integ.workspaceId, 'workspace.read');
+    const last = integ.syncRuns[0];
+    return {
+      id: integ.id,
+      provider: integ.provider.key,
+      status: integ.status,
+      account: integ.externalAccountRef,
+      scopes: integ.scopes,
+      message: integ.status === 'REAUTH_REQUIRED' ? 'Reconnect Google to continue syncing.' : integ.status === 'DISCONNECTED' ? 'Disconnected.' : null,
+      lastSync: last ? { status: last.status, startedAt: last.startedAt, completedAt: last.completedAt, errorCode: last.errorCode, dataThrough: last.dataThrough } : null,
+      properties: integ.dataSources.map((d) => ({ dataSourceId: d.id, project: d.project, propertyId: (d.configJson as { propertyId?: string } | null)?.propertyId ?? null, status: d.status, lastSyncAt: d.lastSyncAt })),
+    };
+  }
+
+  /** Project Google overview with attribution and freshness. */
+  async googleOverview(userId: string, projectId: string, days: number) {
+    await this.projects.requireProject(userId, projectId, 'project.read');
+    return this.google.overview(projectId, days);
+  }
+
+  /** Queues a sync now for the project's Google sources. */
+  async googleSyncNow(userId: string, projectId: string) {
+    await this.projects.requireProject(userId, projectId, 'project.update');
+    const sources = await this.prisma.projectDataSource.findMany({ where: { projectId, status: 'CONNECTED', sourceType: { in: ['GOOGLE_SEARCH_CONSOLE', 'GOOGLE_ANALYTICS'] }, workspaceIntegration: { status: 'CONNECTED' } } });
+    for (const s of sources) await this.google.requestSync(s.id);
+    return { queued: sources.length };
   }
 
   /** Checks the caller may read the connection and that the property belongs to it. */
@@ -522,12 +487,19 @@ export class IntegrationsService {
     const integ = await this.prisma.workspaceIntegration.findUnique({ where: { id: input.integrationId }, include: { provider: true } });
     if (!integ || integ.workspaceId !== project.workspaceId) throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Integration not found in this workspace.' });
     const sourceType = integ.provider.key.toUpperCase();
+    if ((GOOGLE_PROVIDERS as readonly string[]).includes(integ.provider.key)) {
+      if (!input.propertyId) throw new BadRequestException({ code: 'PROPERTY_REQUIRED', message: 'Choose the property to use for this project.' });
+      if (integ.provider.key === 'google_analytics' && !/^properties\/\d+$/.test(input.propertyId)) throw new BadRequestException({ code: 'GA4_PROPERTY_INVALID', message: 'GA4 property IDs must be numeric (properties/123).' });
+      const available = await this.googleProperties(userId, integ.id);
+      if (!available.some((p) => p.id === input.propertyId)) throw new BadRequestException({ code: 'PROPERTY_NOT_FOUND', message: 'That property is not available on the connected Google account.' });
+    }
     const ds = await this.prisma.projectDataSource.upsert({
       where: { projectId_workspaceIntegrationId_sourceType: { projectId, workspaceIntegrationId: integ.id, sourceType } },
       create: { projectId, workspaceIntegrationId: integ.id, sourceType, status: 'CONNECTED', configJson: input.propertyId ? { propertyId: input.propertyId } : Prisma.DbNull },
       update: { status: 'CONNECTED', configJson: input.propertyId ? { propertyId: input.propertyId } : Prisma.DbNull },
     });
     await this.auditLog.record({ actorUserId: userId, organizationId: project.organizationId, workspaceId: project.workspaceId, action: 'project.datasource.link', targetType: 'project_data_source', targetId: ds.id, afterState: { sourceType, propertyId: input.propertyId ?? null }, requestMeta: meta });
+    if ((GOOGLE_PROVIDERS as readonly string[]).includes(integ.provider.key)) await this.google.requestSync(ds.id).catch(() => undefined);
     return ds;
   }
 
@@ -551,6 +523,23 @@ export class IntegrationsService {
     if (!ds) return { connected: false, rows: [] };
     const siteUrl = (ds.configJson as { propertyId?: string } | null)?.propertyId;
     if (!siteUrl) return { connected: true, configured: false, rows: [] };
+    const attribution = { source: SOURCE_LABEL.GOOGLE_SEARCH_CONSOLE, note: 'Search Console rows are subject to Google data availability; long-tail queries may be omitted.' };
+    if (input.days === 28) {
+      const stored = await this.google.storedBreakdown(ds.id, input.dimension);
+      if (stored) {
+        const end = new Date(`${stored.dataThrough}T00:00:00Z`);
+        return {
+          connected: true,
+          configured: true,
+          siteUrl,
+          ...attribution,
+          syncedAt: stored.fetchedAt,
+          startDate: new Date(end.getTime() - 27 * 86_400_000).toISOString().slice(0, 10),
+          endDate: stored.dataThrough,
+          rows: stored.rows.map((x) => ({ key: x.dimensionValue, clicks: x.clicks ?? 0, impressions: x.impressions ?? 0, ctr: Math.round((x.ctr ?? 0) * 10000) / 100, position: x.position === null ? null : Math.round(x.position * 10) / 10 })),
+        };
+      }
+    }
     const end = new Date(Date.now() - 2 * 86_400_000);
     const start = new Date(end.getTime() - Math.min(Math.max(input.days, 7), 480) * 86_400_000);
     const r = await this.googleGet<{ rows?: { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[] }>(
@@ -563,6 +552,8 @@ export class IntegrationsService {
       connected: true,
       configured: true,
       siteUrl,
+      ...attribution,
+      syncedAt: new Date(),
       startDate: start.toISOString().slice(0, 10),
       endDate: end.toISOString().slice(0, 10),
       rows: (r.rows ?? []).map((x) => ({ key: x.keys[0], clicks: x.clicks, impressions: x.impressions, ctr: Math.round(x.ctr * 10000) / 100, position: Math.round(x.position * 10) / 10 })),
@@ -581,13 +572,13 @@ export class IntegrationsService {
       body: {
         dateRanges: [{ startDate: `${Math.min(Math.max(days, 7), 365)}daysAgo`, endDate: 'yesterday' }],
         dimensions: [{ name: 'landingPagePlusQueryString' }],
-        metrics: [{ name: 'sessions' }, { name: 'engagedSessions' }, { name: 'conversions' }],
+        metrics: [{ name: 'sessions' }, { name: 'engagedSessions' }, { name: 'keyEvents' }],
         dimensionFilter: { filter: { fieldName: 'sessionDefaultChannelGroup', stringFilter: { value: 'Organic Search' } } },
         limit: 100,
       },
     });
     await this.prisma.projectDataSource.update({ where: { id: ds.id }, data: { lastSyncAt: new Date() } });
-    return { connected: true, configured: true, rows: (r.rows ?? []).map((x) => ({ page: x.dimensionValues[0].value, sessions: Number(x.metricValues[0].value), engaged: Number(x.metricValues[1].value), conversions: Number(x.metricValues[2].value) })) };
+    return { connected: true, configured: true, source: SOURCE_LABEL.GOOGLE_ANALYTICS, syncedAt: new Date(), rows: (r.rows ?? []).map((x) => ({ page: x.dimensionValues[0].value, sessions: Number(x.metricValues[0].value), engaged: Number(x.metricValues[1].value), conversions: Number(x.metricValues[2].value) })) };
   }
 }
 

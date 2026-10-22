@@ -6,6 +6,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { AuditService } from '../audit/audit.service';
 import { JobsService } from '../jobs/jobs.service';
 import { CreditsService } from '../commerce/credits.service';
+import { ProviderBudgetService } from '../commerce/provider-budget.service';
 import { EntitlementsService } from '../commerce/entitlements.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ContentStorageService } from '../storage/content-storage.service';
@@ -73,6 +74,7 @@ export class GeoService implements OnModuleInit {
     private readonly notifications: NotificationsService,
     private readonly storage: ContentStorageService,
     private readonly providers: GeoProviders,
+    private readonly budgets: ProviderBudgetService,
   ) {}
 
   onModuleInit() {
@@ -323,6 +325,7 @@ export class GeoService implements OnModuleInit {
       throw new ServiceUnavailableException({ code: 'GEO_PROVIDERS_NOT_CONFIGURED', message: 'None of the selected AI platforms is connected yet.' });
     }
     await this.entitlements.assertWithinLimit(project.workspaceId, 'limit.geo_queries', USAGE_FEATURE, platforms.length);
+    await this.budgets.assertWithinBudget('dataforseo');
 
     const run = await this.prisma.$transaction(async (tx) => {
       const created = await tx.geoRun.create({ data: { promptId, trigger, status: 'QUEUED' } });

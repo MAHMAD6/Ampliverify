@@ -4,8 +4,11 @@ import { CreditsService } from '../commerce/credits.service';
 import { EntitlementsService } from '../commerce/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpenAiService, type UsageContext } from './openai.service';
+import { ProviderBudgetService } from '../commerce/provider-budget.service';
 
 export const AI_USAGE_FEATURE = 'ai.action';
+/** Published credit price keys per AI operation (`credits.costs`; Hybrid guide §3). */
+export type AiOperation = 'ai.suggestion' | 'ai.content_ideas' | 'ai.content_brief';
 
 /**
  * Gate for AI-assisted actions: module switch, plan feature (`ai.suggest`),
@@ -19,6 +22,7 @@ export class AiGateService {
     private readonly credits: CreditsService,
     private readonly entitlements: EntitlementsService,
     private readonly prisma: PrismaService,
+    private readonly budgets: ProviderBudgetService,
   ) {}
 
   get configured() {
@@ -26,7 +30,7 @@ export class AiGateService {
   }
 
   async run<T>(
-    ctx: { workspaceId: string; projectId: string; actorId: string; referenceType: string; referenceId?: string },
+    ctx: { workspaceId: string; projectId: string; actorId: string; referenceType: string; referenceId?: string; operation: AiOperation },
     fn: (usage: Pick<UsageContext, 'providerUsageIds'>) => Promise<T>,
   ): Promise<T> {
     await this.entitlements.assertModuleEnabled('ai');
@@ -35,9 +39,11 @@ export class AiGateService {
     if (!this.openai.configured) {
       throw new ServiceUnavailableException({ code: 'AI_NOT_CONFIGURED', message: 'AI features are not available yet.' });
     }
+    await this.budgets.assertWithinBudget('openai');
     const reservation = await this.credits.reserve({
       workspaceId: ctx.workspaceId,
       featureKey: AI_USAGE_FEATURE,
+      amount: Number(await this.credits.costOf(ctx.operation)),
       referenceType: ctx.referenceType,
       referenceId: ctx.referenceId ?? ctx.projectId,
       idempotencyKey: `ai:${randomUUID()}`,

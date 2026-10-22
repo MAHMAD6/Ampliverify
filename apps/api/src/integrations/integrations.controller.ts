@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
@@ -27,8 +28,14 @@ class GoogleStartDto {
   @IsOptional() @IsString() @MaxLength(300) returnTo?: string;
 }
 class GoogleCallbackDto {
-  @IsString() @MaxLength(2048) code: string;
-  @IsString() @MaxLength(4096) state: string;
+  @IsOptional() @IsString() @MaxLength(2048) code?: string;
+  @IsString() @MaxLength(200) state: string;
+  @IsOptional() @IsString() @MaxLength(100) error?: string;
+}
+class LinkPropertyDto {
+  @IsUUID() projectId: string;
+  @IsUUID() integrationId: string;
+  @IsString() @MaxLength(500) propertyId: string;
 }
 class PublishDto {
   @IsUUID() integrationId: string;
@@ -81,15 +88,32 @@ export class IntegrationsController {
   }
   @Post('integrations/google/callback')
   googleCallback(@CurrentActor() a: AuthenticatedActor, @Body() dto: GoogleCallbackDto, @Req() req: Request) {
-    return this.integrations.googleCallback(a.userId, dto.code, dto.state, requestMeta(req));
+    return this.integrations.googleCallback(a.userId, dto, requestMeta(req));
+  }
+  @Get('integrations/:id/status')
+  googleStatus(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.integrations.googleStatus(a.userId, id);
+  }
+  @Post('integrations/google/link-property')
+  linkProperty(@CurrentActor() a: AuthenticatedActor, @Body() dto: LinkPropertyDto, @Req() req: Request) {
+    return this.integrations.linkProject(a.userId, dto.projectId, { integrationId: dto.integrationId, propertyId: dto.propertyId }, requestMeta(req));
+  }
+  @Get('projects/:projectId/google/overview')
+  googleOverview(@CurrentActor() a: AuthenticatedActor, @Param('projectId', ParseUUIDPipe) id: string, @Query('days') days?: string) {
+    return this.integrations.googleOverview(a.userId, id, days ? Number(days) : 28);
+  }
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @Post('projects/:projectId/google/sync')
+  googleSync(@CurrentActor() a: AuthenticatedActor, @Param('projectId', ParseUUIDPipe) id: string) {
+    return this.integrations.googleSyncNow(a.userId, id);
   }
   @Post('integrations/:id/test')
   test(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.integrations.testConnection(a.userId, id);
   }
   @Get('integrations/:id/properties')
-  properties(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.integrations.googleProperties(a.userId, id);
+  properties(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Query('refresh') refresh?: string) {
+    return this.integrations.googleProperties(a.userId, id, refresh === '1' || refresh === 'true');
   }
   @Get('integrations/:id/wordpress/content')
   wpContent(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Query('type') type?: string, @Query('q') q?: string) {

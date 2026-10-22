@@ -20,6 +20,8 @@ const EDITABLE_SETTINGS: Record<string, (v: unknown) => boolean> = {
   [SETTING.notifications]: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
   [SETTING.security]: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
   [SETTING.appearance]: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
+  [SETTING.creditPolicy]: (v) => !!v && typeof v === 'object' && !Array.isArray(v) && (v as { rollover?: unknown }).rollover !== undefined && typeof (v as { rollover?: unknown }).rollover === 'boolean',
+  [SETTING.providerBudgets]: (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v as object).every((n) => n === null || (typeof n === 'number' && n >= 0)),
 };
 
 export const MODULE_KEYS = ['seo_audit', 'optimization', 'seo_editor', 'content', 'keywords', 'geo', 'reports', 'ai', 'integrations', 'careers', 'blog'];
@@ -300,8 +302,8 @@ export class OperationsService {
         { key: 'email', label: 'Email (Amazon SES)', configured: has('SES_REGION') },
         { key: 'openai', label: 'AI (OpenAI Responses API)', configured: has('OPENAI_API_KEY') },
         { key: 'dataforseo', label: 'Search data & GEO (DataForSEO)', configured: has('DATAFORSEO_LOGIN') && has('DATAFORSEO_PASSWORD') },
-        { key: 'pagespeed', label: 'PageSpeed Insights', configured: has('PAGESPEED_API_KEY') },
-        { key: 'google', label: 'Google OAuth (Search Console / GA4)', configured: has('GOOGLE_OAUTH_CLIENT_ID') && has('GOOGLE_OAUTH_CLIENT_SECRET') },
+        { key: 'pagespeed', label: 'PageSpeed Insights', configured: has('GOOGLE_PAGESPEED_API_KEY') || has('PAGESPEED_API_KEY') },
+        { key: 'google', label: 'Google OAuth (Search Console / GA4)', configured: (has('GOOGLE_CLIENT_ID') || has('GOOGLE_OAUTH_CLIENT_ID')) && (has('GOOGLE_CLIENT_SECRET') || has('GOOGLE_OAUTH_CLIENT_SECRET')) },
         { key: 'queue', label: 'Job queue (Redis)', configured: has('REDIS_URL') },
         { key: 'storage', label: this.config.get<string>('STORAGE_DRIVER') === 's3' ? 'Object storage (S3)' : 'File storage (local disk)', configured: this.config.get<string>('STORAGE_DRIVER') === 's3' },
       ],

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
 import { AuditService } from '../audit/audit.service';
 import { CreditsService } from '../commerce/credits.service';
+import { ProviderBudgetService } from '../commerce/provider-budget.service';
 import { EntitlementsService } from '../commerce/entitlements.service';
 import { ContentStorageService } from '../storage/content-storage.service';
 import { normalizeHost } from '../common/utils/domain';
@@ -33,6 +34,7 @@ export class KeywordsService {
     private readonly entitlements: EntitlementsService,
     private readonly storage: ContentStorageService,
     private readonly provider: DataForSeoClient,
+    private readonly budgets: ProviderBudgetService,
   ) {}
 
   get configured() {
@@ -57,6 +59,7 @@ export class KeywordsService {
       throw new BadRequestException({ code: 'QUERY_REQUIRED', message: 'Enter a keyword.' });
     }
 
+    await this.budgets.assertWithinBudget('dataforseo');
     // Reserve first; a failed provider call releases the reservation (V1 manual §6).
     const record = await this.prisma.$transaction(async (tx) => {
       const q = await tx.keywordQuery.create({ data: { projectId, query, locale: language, countryCode: country, tool: input.tool, createdBy: actorId } });

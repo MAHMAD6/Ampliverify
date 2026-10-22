@@ -3,11 +3,12 @@ import { ProjectsModule } from '../projects/projects.module';
 import { EditorModule } from '../editor/editor.module';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
+import { GoogleService } from './google.service';
 
 @Module({
   imports: [ProjectsModule, EditorModule],
   controllers: [IntegrationsController],
-  providers: [IntegrationsService],
-  exports: [IntegrationsService],
+  providers: [IntegrationsService, GoogleService],
+  exports: [IntegrationsService, GoogleService],
 })
 export class IntegrationsModule {}

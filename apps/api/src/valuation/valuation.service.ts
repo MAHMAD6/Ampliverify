@@ -387,7 +387,7 @@ export class ValuationService implements OnModuleInit {
     tasks.push(c.sources.crawler ? this.cached(`crawler:${d}`, 'crawler', c.cacheHours.crawler, () => collectCrawler(d, this.allowPrivate)) : Promise.resolve(off('crawler', CRAWLER_METRICS)));
     tasks.push(
       c.sources.pagespeed
-        ? this.cached(`pagespeed:${d}`, 'pagespeed', c.cacheHours.pagespeed, () => this.timed('pagespeed', 'valuation.pagespeed', () => collectPageSpeed(d, this.config.get<string>('PAGESPEED_API_KEY') || undefined))).then(
+        ? this.cached(`pagespeed:${d}`, 'pagespeed', c.cacheHours.pagespeed, () => this.timed('pagespeed', 'valuation.pagespeed', () => collectPageSpeed(d, this.config.get<string>('GOOGLE_PAGESPEED_API_KEY') || this.config.get<string>('PAGESPEED_API_KEY') || undefined))).then(
             (r) => ((screenshot = r.screenshot), r.evidence),
             (e: Error) => missing('pagespeed', PAGESPEED_METRICS, e.message),
           )
@@ -602,14 +602,14 @@ export class ValuationService implements OnModuleInit {
     await this.rbac.assertGlobalPermission(userId, 'system.read');
     const { config: c } = await this.methodology();
     const since = new Date(Date.now() - 30 * DAY);
-    const google = !!this.config.get('GOOGLE_OAUTH_CLIENT_ID') && !!this.config.get('GOOGLE_OAUTH_CLIENT_SECRET');
+    const google = !!(this.config.get('GOOGLE_CLIENT_ID') || this.config.get('GOOGLE_OAUTH_CLIENT_ID')) && !!(this.config.get('GOOGLE_CLIENT_SECRET') || this.config.get('GOOGLE_OAUTH_CLIENT_SECRET'));
     const info: Record<SourceKey, { ok: boolean; note: string; provider: string; op: string; classification: string }> = {
       crawler: { ok: true, note: 'Built in: home page, robots.txt and sitemap through the SSRF-safe fetcher.', provider: 'crawler', op: '', classification: 'Observed' },
-      pagespeed: { ok: true, note: this.config.get('PAGESPEED_API_KEY') ? 'Using PAGESPEED_API_KEY.' : 'Keyless (rate-limited); set PAGESPEED_API_KEY for production volume.', provider: 'pagespeed', op: 'valuation.', classification: 'Observed' },
+      pagespeed: { ok: true, note: this.config.get('GOOGLE_PAGESPEED_API_KEY') || this.config.get('PAGESPEED_API_KEY') ? 'Using the server-side PageSpeed key.' : 'Keyless (rate-limited); set GOOGLE_PAGESPEED_API_KEY for production volume.', provider: 'pagespeed', op: 'valuation.', classification: 'Observed' },
       rdap: { ok: true, note: 'IANA bootstrap → authoritative RDAP service; no key required.', provider: 'rdap', op: 'valuation.', classification: 'Public record' },
       dataforseo: { ok: this.dataforseo.configured, note: this.dataforseo.configured ? 'Labs domain overview and history (modeled estimates).' : 'Set DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD.', provider: 'dataforseo', op: 'valuation.', classification: 'Modeled' },
-      gsc: { ok: google, note: google ? 'Read with each user’s own Google connection.' : 'Set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET.', provider: 'google', op: 'valuation.gsc', classification: 'Verified' },
-      ga4: { ok: google, note: google ? 'Read with each user’s own Google connection.' : 'Set GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET.', provider: 'google', op: 'valuation.ga4', classification: 'Verified' },
+      gsc: { ok: google, note: google ? 'Read with each user’s own Google connection.' : 'Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.', provider: 'google', op: 'valuation.gsc', classification: 'Verified' },
+      ga4: { ok: google, note: google ? 'Read with each user’s own Google connection.' : 'Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.', provider: 'google', op: 'valuation.ga4', classification: 'Verified' },
     };
     return Promise.all(
       SOURCES.map(async (k) => {

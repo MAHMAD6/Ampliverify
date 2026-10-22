@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { FindingStatus } from '@prisma/client';
 import { Request } from 'express';
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
 import { requestMeta } from '../common/types/request-meta.type';
@@ -32,6 +32,19 @@ class RequestAuditDto {
   @IsString()
   @Matches(/^[\w.:-]{8,100}$/)
   idempotencyKey?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  includePageSpeed?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsIn(['mobile', 'desktop'], { each: true })
+  strategies?: ('mobile' | 'desktop')[];
+
+  @IsOptional()
+  @IsBoolean()
+  includeOnPageApi?: boolean;
 }
 
 class FindingStatusDto {

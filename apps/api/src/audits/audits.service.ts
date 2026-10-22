@@ -1,4 +1,7 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { ServiceUnavailableException, BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { PageSpeedService, type Strategy } from '../pagespeed/pagespeed.service';
+import { DataForSeoClient } from '../keywords/dataforseo.client';
+import { ProviderBudgetService } from '../commerce/provider-budget.service';
 import { ConfigService } from '@nestjs/config';
 import { FindingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,9 +28,16 @@ export type AuditRequest = {
   maxPages?: number;
   /** Client-supplied key: repeating a request with the same key returns the first run (V1 manual §3). */
   idempotencyKey?: string;
+  /** Adds Google PageSpeed Insights for the start URL (V1 manual §3 step 6). */
+  includePageSpeed?: boolean;
+  strategies?: Strategy[];
+  /** Site audits: add DataForSEO On-Page API technical diagnostics. */
+  includeOnPageApi?: boolean;
 };
 
 type RunRequestJson = {
+  pagespeed?: Strategy[];
+  onPageApi?: boolean;
   url: string;
   scope: AuditScope;
   mode: AuditMode;
@@ -50,6 +60,9 @@ export class AuditsService implements OnModuleInit {
   private readonly logger = new Logger(AuditsService.name);
 
   constructor(
+    private readonly dataforseo: DataForSeoClient,
+    private readonly budgets: ProviderBudgetService,
+    private readonly pagespeed: PageSpeedService,
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
     private readonly auditLog: AuditService,
@@ -78,7 +91,6 @@ export class AuditsService implements OnModuleInit {
     await this.entitlements.assertModuleEnabled('seo_audit');
     await this.entitlements.assertFeature(project.workspaceId, 'seo.on_page_audit');
     if (mode !== 'SEO') await this.entitlements.assertFeature(project.workspaceId, 'geo.audit');
-    await this.entitlements.assertWithinLimit(project.workspaceId, 'limit.audit_runs', USAGE_FEATURE);
 
     const domains = await this.prisma.domain.findMany({ where: { projectId }, orderBy: { createdAt: 'asc' } });
     let url: URL;
@@ -118,25 +130,31 @@ export class AuditsService implements OnModuleInit {
       if (previous) return this.runView(previous);
     }
 
-    const maxPages = scope === 'SITE' ? Math.min(Math.max(req.maxPages ?? 25, 1), 200) : 1;
-    const requestJson: RunRequestJson = { url: url.toString(), scope, mode, maxPages, requestedBy: actorId };
+    // Crawl size is capped per plan (`limit.audit_max_pages`, hard cap 200).
+    const planCap = await this.entitlements.limitOf(project.workspaceId, 'limit.audit_max_pages');
+    const cap = Math.min(200, planCap ?? 200);
+    if (scope === 'SITE' && req.maxPages && req.maxPages > cap) {
+      throw new BadRequestException({ code: 'AUDIT_PAGE_LIMIT', message: `Your plan allows up to ${cap} pages per site audit.` });
+    }
+    const maxPages = scope === 'SITE' ? Math.min(Math.max(req.maxPages ?? Math.min(25, cap), 1), cap) : 1;
+    const strategies = req.includePageSpeed ? ([...new Set(req.strategies?.length ? req.strategies : (['mobile', 'desktop'] as Strategy[]))] as Strategy[]) : [];
+    const onPageApi = !!req.includeOnPageApi && scope === 'SITE';
+    if (onPageApi) {
+      if (!this.dataforseo.configured) throw new ServiceUnavailableException({ code: 'DATAFORSEO_NOT_CONFIGURED', message: 'On-Page diagnostics are not available yet.' });
+      await this.budgets.assertWithinBudget('dataforseo');
+    }
+    const requestJson: RunRequestJson = { url: url.toString(), scope, mode, maxPages, requestedBy: actorId, ...(strategies.length ? { pagespeed: strategies } : {}), ...(onPageApi ? { onPageApi } : {}) };
 
     const run = await this.prisma.$transaction(async (tx) => {
+      // Hybrid pricing: a standard audit uses one SEO audit allowance unit, never AI/GEO credits.
+      // The allowance check and the reservation happen atomically per workspace.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`allowance:${project.workspaceId}:${USAGE_FEATURE}`}))`;
+      await this.entitlements.assertWithinLimit(project.workspaceId, 'limit.audit_runs', USAGE_FEATURE, 1, tx);
       const created = await tx.auditRun.create({
         data: { projectId, domainId: domain!.id, trigger, status: 'QUEUED', summaryJson: { request: requestJson } as Prisma.InputJsonObject },
       });
-      // Reserve the page budget now; completion settles the pages actually checked and returns the rest.
       await this.credits.reserve(
-        {
-          workspaceId: project.workspaceId,
-          featureKey: USAGE_FEATURE,
-          units: scope === 'SITE' ? maxPages : 1,
-          referenceType: 'audit_run',
-          referenceId: created.id,
-          idempotencyKey: `audit:${created.id}`,
-          actorId,
-          ttlMinutes: 120,
-        },
+        { workspaceId: project.workspaceId, featureKey: USAGE_FEATURE, units: 1, amount: 0, referenceType: 'audit_run', referenceId: created.id, idempotencyKey: `audit:${created.id}`, actorId, ttlMinutes: 120 },
         tx,
       );
       await this.jobs.enqueue(AUDIT_QUEUE, { runId: created.id }, { jobKey: jobKey ?? `audit:${created.id}` }, tx);
@@ -306,13 +324,24 @@ export class AuditsService implements OnModuleInit {
         responseTimeMs: first.metrics.responseTimeMs,
       },
     };
+    // Optional PageSpeed Insights for the start URL; a failure is recorded, never scored.
+    if (request.pagespeed?.length) {
+      const psi: Record<string, unknown> = {};
+      for (const strategy of request.pagespeed) {
+        psi[strategy] = await this.pagespeed.run(first.metrics.finalUrl || request.url, strategy).catch((err: { response?: { code?: string; message?: string } }) => ({ error: err.response?.message ?? 'Performance analysis could not be completed.', code: err.response?.code ?? 'PAGESPEED_FAILED' }));
+      }
+      (summary as Record<string, unknown>).pagespeed = psi;
+    }
+    // DataForSEO On-Page API: crawl diagnostics for the site, stored with provenance.
+    if (request.onPageApi) (summary as Record<string, unknown>).onPage = await this.onPageDiagnostics(new URL(request.url).hostname, request.maxPages);
+
     // Some pages could not be fetched: the audit is PARTIAL (V1 manual audit states).
     await this.prisma.auditRun.update({
       where: { id: runId },
       data: { status: result.errors.length > 0 && request.scope === 'SITE' ? 'PARTIAL' : 'SUCCEEDED', completedAt: new Date(), summaryJson: summary as unknown as Prisma.InputJsonObject },
     });
     const reservation = await this.prisma.creditReservation.findUnique({ where: { idempotencyKey: `audit:${runId}` } });
-    if (reservation) await this.credits.settle(reservation.id, { projectId: run.projectId, units: n, actualAmount: await this.credits.costOf(USAGE_FEATURE, request.scope === 'SITE' ? n : 1) });
+    if (reservation) await this.credits.settle(reservation.id, { projectId: run.projectId, units: 1 });
     await this.completeVerifications(runId);
 
     if (request.requestedBy) {
@@ -343,6 +372,26 @@ export class AuditsService implements OnModuleInit {
     await this.releaseReservation(runId, 'audit canceled');
     await this.failVerifications(runId, 'Audit canceled');
     return { id: runId, status: 'CANCELED' };
+  }
+
+  /** Starts a DataForSEO On-Page task and polls its summary (bounded); failures are recorded, not scored. */
+  private async onPageDiagnostics(host: string, maxPages: number) {
+    try {
+      const task = await this.dataforseo.onPageStart(host, maxPages);
+      const deadline = Date.now() + 8 * 60_000;
+      for (let delay = 15_000; Date.now() < deadline; delay = Math.min(delay * 1.5, 45_000)) {
+        await new Promise((r) => setTimeout(r, delay));
+        const { ready, result } = await this.dataforseo.onPageSummary(task.id);
+        if (!ready) continue;
+        const metrics = (result?.page_metrics ?? {}) as { onpage_score?: number; checks?: Record<string, number>; broken_links?: number; duplicate_title?: number; duplicate_description?: number };
+        const crawl = (result?.crawl_status ?? {}) as { pages_crawled?: number };
+        const checks = Object.entries(metrics.checks ?? {}).filter(([, n]) => typeof n === 'number' && n > 0).sort((a, b) => b[1] - a[1]).slice(0, 25);
+        return { provider: 'DataForSEO On-Page API', taskId: task.id, fetchedAt: new Date().toISOString(), onpageScore: metrics.onpage_score ?? null, pagesCrawled: crawl.pages_crawled ?? null, brokenLinks: metrics.broken_links ?? null, duplicateTitles: metrics.duplicate_title ?? null, duplicateDescriptions: metrics.duplicate_description ?? null, checks: Object.fromEntries(checks) };
+      }
+      return { provider: 'DataForSEO On-Page API', taskId: task.id, error: 'The On-Page crawl did not finish in time; results are incomplete.' };
+    } catch (err) {
+      return { provider: 'DataForSEO On-Page API', error: ((err as { response?: { message?: string } }).response?.message ?? 'On-Page diagnostics could not be completed.') };
+    }
   }
 
   private async releaseReservation(runId: string, reason: string) {

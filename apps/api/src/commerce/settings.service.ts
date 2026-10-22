@@ -35,6 +35,10 @@ export const SETTING = {
   signupCredits: 'credits.signup_grant',
   /** Purchasable credit packs: `[{ code, credits, amountMinor, currency }]`. */
   creditPacks: 'credits.packs',
+  /** `{ rollover: boolean }` — whether unused subscription credits survive the period end (default: no). */
+  creditPolicy: 'credits.policy',
+  /** `{ [provider]: monthlyUsd }` provider spend ceilings; `alertPct` warns staff first. */
+  providerBudgets: 'providers.budgets',
   general: 'platform.general',
   notifications: 'platform.notifications',
   security: 'platform.security',

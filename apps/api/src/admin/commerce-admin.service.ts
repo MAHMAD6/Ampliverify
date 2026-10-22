@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RbacService } from '../rbac/rbac.service';
 import { AuditService } from '../audit/audit.service';
 import { CreditsService } from '../commerce/credits.service';
+import { ProviderBudgetService } from '../commerce/provider-budget.service';
 import { BillingService } from '../billing/billing.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 
@@ -30,7 +31,58 @@ export class CommerceAdminService {
     private readonly auditLog: AuditService,
     private readonly credits: CreditsService,
     private readonly billing: BillingService,
+    private readonly budgets: ProviderBudgetService,
   ) {}
+
+  /**
+   * Revenue, provider cost, credits consumed and contribution margin for a
+   * month, by plan and workspace (Hybrid guide §7). Provider cost is what was
+   * recorded per call; calls not linked to a workspace are shown separately.
+   */
+  async margin(userId: string, month?: string) {
+    await this.guard(userId);
+    const m = /^\d{4}-\d{2}$/.test(month ?? '') ? month! : new Date().toISOString().slice(0, 7);
+    const from = new Date(`${m}-01T00:00:00Z`);
+    const to = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
+    const [revenue, credits, cost, unattributed, subs, workspaces, providers] = await Promise.all([
+      this.prisma.$queryRaw<{ workspace_id: string; minor: bigint }[]>`
+        SELECT x."workspace_id", SUM(x.minor)::bigint AS minor FROM (
+          SELECT i."workspace_id", i."total_minor" AS minor FROM "invoices" i WHERE i."status" = 'PAID' AND i."issued_at" >= ${from} AND i."issued_at" < ${to}
+          UNION ALL
+          SELECT c."workspace_id", c."amount_minor" FROM "credit_purchases" c WHERE c."status" = 'SUCCEEDED' AND c."created_at" >= ${from} AND c."created_at" < ${to}
+        ) x GROUP BY x."workspace_id"`,
+      this.prisma.$queryRaw<{ workspace_id: string; used: string }[]>`
+        SELECT w."workspace_id", (-SUM(l."delta"))::text AS used FROM "credit_ledger" l JOIN "credit_wallets" w ON w."id" = l."wallet_id"
+         WHERE l."reason" = 'USAGE' AND l."created_at" >= ${from} AND l."created_at" < ${to} GROUP BY w."workspace_id"`,
+      this.prisma.$queryRaw<{ workspace_id: string; minor: bigint }[]>`
+        SELECT u."workspace_id", COALESCE(SUM(p."cost_minor"), 0)::bigint AS minor FROM "provider_usage" p JOIN "usage_events" u ON u."id" = p."usage_event_id"
+         WHERE p."created_at" >= ${from} AND p."created_at" < ${to} GROUP BY u."workspace_id"`,
+      this.prisma.providerUsage.aggregate({ where: { usageEventId: null, createdAt: { gte: from, lt: to } }, _sum: { costMinor: true } }),
+      this.prisma.subscription.findMany({ where: { status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } }, select: { workspaceId: true, plan: { select: { code: true, name: true } } } }),
+      this.prisma.workspace.findMany({ select: { id: true, name: true } }),
+      this.budgets.status(),
+    ]);
+    const planOf = new Map(subs.map((s) => [s.workspaceId, s.plan]));
+    const nameOf = new Map(workspaces.map((w) => [w.id, w.name]));
+    const ids = new Set([...revenue.map((r) => r.workspace_id), ...credits.map((r) => r.workspace_id), ...cost.map((r) => r.workspace_id)]);
+    const rows = [...ids].map((id) => {
+      const rev = Number(revenue.find((r) => r.workspace_id === id)?.minor ?? 0);
+      const pc = Number(cost.find((r) => r.workspace_id === id)?.minor ?? 0);
+      return { workspaceId: id, workspace: nameOf.get(id) ?? id, plan: planOf.get(id)?.code ?? null, revenueMinor: rev, providerCostMinor: pc, creditsConsumed: Number(credits.find((r) => r.workspace_id === id)?.used ?? 0), marginMinor: rev - pc };
+    });
+    const byPlan = new Map<string, { plan: string; workspaces: number; revenueMinor: number; providerCostMinor: number; creditsConsumed: number; marginMinor: number }>();
+    for (const r of rows) {
+      const k = r.plan ?? 'none';
+      const p = byPlan.get(k) ?? { plan: k, workspaces: 0, revenueMinor: 0, providerCostMinor: 0, creditsConsumed: 0, marginMinor: 0 };
+      p.workspaces++;
+      p.revenueMinor += r.revenueMinor;
+      p.providerCostMinor += r.providerCostMinor;
+      p.creditsConsumed += r.creditsConsumed;
+      p.marginMinor += r.marginMinor;
+      byPlan.set(k, p);
+    }
+    return { month: m, currency: 'USD', plans: [...byPlan.values()], workspaces: rows.sort((a, b) => a.marginMinor - b.marginMinor).slice(0, 200), unattributedProviderCostMinor: Number(unattributed._sum.costMinor ?? 0), providers };
+  }
 
   private guard(userId: string, permission = 'commerce.manage') {
     return this.rbac.assertGlobalPermission(userId, permission);

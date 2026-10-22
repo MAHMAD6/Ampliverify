@@ -6,6 +6,7 @@ import { ValuationModule } from './valuation/valuation.module';
 import { EngagementModule } from './engagement/engagement.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { createRedis, RedisThrottlerStorage } from './redis/redis';
+import { PageSpeedModule } from './pagespeed/pagespeed.service';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
 import { PlatformGuard } from './platform/platform.guard';
 import { ConfigModule } from '@nestjs/config';
@@ -73,6 +74,7 @@ import { InsightsModule } from './insights/insights.module';
     PlatformModule,
     RetentionModule,
     ValuationModule,
+    PageSpeedModule,
     EngagementModule,
     // Per-user (or per-IP when anonymous) request budget; see RateLimitGuard.
     // Counters live in Redis when REDIS_URL is set, so limits hold across API instances.

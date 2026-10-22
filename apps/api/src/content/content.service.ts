@@ -123,7 +123,7 @@ export class ContentService {
     const project = await this.projects.requireProject(actorId, projectId, 'content.write');
     const count = Math.min(Math.max(input.count ?? 8, 3), 20);
     const context = await this.projectContext(projectId);
-    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId, actorId, referenceType: 'content_ideas' }, (usage) =>
+    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId, actorId, referenceType: 'content_ideas', operation: 'ai.content_ideas' }, (usage) =>
       this.openai.generateJson<IdeaOut>(
         {
           system:
@@ -198,7 +198,7 @@ export class ContentService {
     const serp = brief.primaryKeywordId
       ? await this.prisma.serpSnapshot.findFirst({ where: { keywordId: brief.primaryKeywordId }, orderBy: { capturedAt: 'desc' }, include: { results: { orderBy: { position: 'asc' }, take: 10 } } })
       : null;
-    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: brief.projectId, actorId, referenceType: 'content_brief', referenceId: id }, (usage) =>
+    const out = await this.ai.run({ workspaceId: project.workspaceId, projectId: brief.projectId, actorId, referenceType: 'content_brief', referenceId: id, operation: 'ai.content_brief' }, (usage) =>
       this.openai.generateJson<Record<string, unknown>>(
         {
           system:

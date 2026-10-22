@@ -129,6 +129,28 @@ export class BillingService implements OnModuleInit {
     return this.credits.balanceDetail(workspaceId);
   }
 
+  /** The two balances users see (Hybrid guide §2): SEO audit allowance and AI/GEO credits. */
+  async balances(userId: string, workspaceId: string) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'usage.read');
+    const [audits, credits, costs, maxPages] = await Promise.all([
+      this.entitlements.allowance(workspaceId, 'limit.audit_runs', 'seo.audit_run'),
+      this.credits.balanceDetail(workspaceId),
+      this.settings.get<Record<string, number>>(SETTING.creditCosts, {}),
+      this.entitlements.limitOf(workspaceId, 'limit.audit_max_pages'),
+    ]);
+    return {
+      seoAudits: { ...audits, maxPagesPerAudit: maxPages },
+      credits: { available: Number(credits.available), reserved: Number(credits.reserved), subscription: credits.subscription, purchased: credits.purchased, other: credits.other, expiringSoon: credits.expiringSoon, nextExpiry: credits.nextExpiry },
+      prices: costs,
+    };
+  }
+
+  /** Credit quote before running a metered action: cost, balance, balance after. */
+  async quote(userId: string, workspaceId: string, featureKey: string, units = 1) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'usage.read');
+    return this.credits.quote(workspaceId, featureKey, Math.min(Math.max(Math.round(units), 1), 1000));
+  }
+
   async ledger(userId: string, workspaceId: string, limit?: number) {
     await this.rbac.requireWorkspace(userId, workspaceId, 'usage.read');
     return this.credits.ledger(workspaceId, limit);
@@ -436,14 +458,11 @@ export class BillingService implements OnModuleInit {
     });
 
     if (type === 'invoice.paid' && sub) {
-      // Monthly credit allowance included in the plan (feature `credits.monthly_grant`).
-      const plan = await this.entitlements.resolve(workspaceId);
-      const grant = plan.features?.get('credits.monthly_grant')?.limit ?? 0;
-      if (grant > 0) {
-        await this.prisma.$transaction((tx) =>
-          this.credits.applyEntry(tx, { workspaceId, delta: grant, reason: 'PLAN_GRANT', referenceType: 'invoice', referenceId: invoice.id, idempotencyKey: `plan-grant:${obj.id}` }),
-        );
-      }
+      // Subscription AI/GEO credits for the period (`credits.monthly_grant`), exactly once per period.
+      const fresh = obj.subscription ? await this.stripe.request<StripeObject>('GET', `/subscriptions/${obj.subscription}`).catch(() => null) : null;
+      if (fresh) await this.upsertSubscription(fresh);
+      await this.credits.grantPeriodCredits(sub.id);
+      void invoice;
     }
     if (type === 'invoice.payment_failed' || type === 'invoice.paid') {
       const owners = await this.workspaceOwners(workspaceId);
