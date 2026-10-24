@@ -1,7 +1,7 @@
 {
   "name": "ampliverify",
   "private": true,
-  "description": "AmpliVerify — Audit • Optimize • Verify. Multi-tenant SEO / AI-search SaaS.",
+  "description": "AmpliVerify \u2014 Audit \u2022 Optimize \u2022 Verify. Multi-tenant SEO / AI-search SaaS.",
   "workspaces": [
     "apps/*"
   ],
@@ -19,7 +19,14 @@
     "dev:web": "npm run dev --workspace apps/web"
   },
   "overrides": {
-    "deepmerge-ts": "$deepmerge-ts"
+    "deepmerge-ts": "$deepmerge-ts",
+    "body-parser": "^2.4.0",
+    "multer": "2.5.0",
+    "undici": "^7.30.1",
+    "zod": "^4.6.7",
+    "@nestjs/platform-express": {
+      "multer": "2.5.0"
+    }
   },
   "devDependencies": {
     "deepmerge-ts": "^8.0.2"
