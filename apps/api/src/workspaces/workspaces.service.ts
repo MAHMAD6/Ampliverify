@@ -332,6 +332,12 @@ export class WorkspacesService implements OnModuleInit {
       throw new ForbiddenException({ code: 'INVITATION_EMAIL_MISMATCH', message: `This invitation was sent to a different email address. Sign in as ${inv.email}.` });
     }
     const role = await this.prisma.role.findUniqueOrThrow({ where: { key: inv.roleKey } });
+    // Seats are re-checked at acceptance: the plan may have changed since the invitation was sent.
+    const seatLimit = (await this.entitlements.resolve(inv.workspaceId)).features?.get('limit.team_members')?.limit;
+    if (seatLimit !== undefined && seatLimit !== null) {
+      const members = await this.prisma.workspaceMembership.count({ where: { workspaceId: inv.workspaceId, status: 'ACTIVE', userId: { not: userId } } });
+      if (members >= seatLimit) throw new ForbiddenException({ code: 'PLAN_LIMIT_REACHED', message: 'This workspace has no free seats on its plan. Ask the owner to upgrade.' });
+    }
     await this.prisma.$transaction(async (tx) => {
       await tx.organizationMembership.upsert({
         where: { organizationId_userId: { organizationId: inv.workspace.organizationId, userId } },

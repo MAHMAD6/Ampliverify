@@ -240,6 +240,11 @@ export class CommerceAdminController {
     return this.commerce.getSubscription(actor.userId, id);
   }
 
+  @Get('plans/:code/entitlement-versions')
+  entitlementVersions(@CurrentActor() actor: AuthenticatedActor, @Param('code') code: string) {
+    return this.commerce.entitlementVersions(actor.userId, code);
+  }
+
   @Get('billing/margin')
   margin(@CurrentActor() actor: AuthenticatedActor, @Query('month') month?: string) {
     return this.commerce.margin(actor.userId, month);

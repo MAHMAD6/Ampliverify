@@ -15,15 +15,15 @@ import { RequestMeta } from '../common/types/request-meta.type';
 import { WorkspaceSettings } from '../workspaces/workspaces.service';
 import { renderCsv, renderHtml, renderPdf, SectionPayload } from './report-render';
 
-export const SECTION_KEYS = ['overview', 'audit', 'recommendations', 'tasks', 'geo', 'geo_citations', 'keywords', 'content'] as const;
+export const SECTION_KEYS = ['overview', 'audit', 'recommendations', 'tasks', 'geo', 'geo_citations', 'keywords', 'content', 'search_console', 'analytics'] as const;
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 const DEFAULT_SECTIONS: Record<ReportType, SectionKey[]> = {
   SEO_AUDIT: ['overview', 'audit', 'recommendations', 'tasks'],
-  KEYWORD: ['overview', 'keywords'],
+  KEYWORD: ['overview', 'search_console', 'keywords'],
   GEO_VISIBILITY: ['overview', 'geo', 'geo_citations'],
   CONTENT: ['overview', 'content'],
-  EXECUTIVE_SUMMARY: ['overview', 'audit', 'geo', 'tasks', 'content'],
+  EXECUTIVE_SUMMARY: ['overview', 'search_console', 'analytics', 'audit', 'geo', 'tasks', 'content'],
   CUSTOM: ['overview'],
 };
 
@@ -201,6 +201,51 @@ export class ReportsService implements OnModuleInit {
         const days = Math.max(1, Math.round((to.getTime() - from.getTime()) / 86_400_000));
         const rows = await this.geo.citations(actorId, projectId, days);
         return { title: 'Sources cited by AI', table: { columns: ['Domain', 'Your site', 'Citations', 'Platforms'], rows: rows.slice(0, 30).map((r) => [r.domain, r.own ? 'Yes' : 'No', String(r.citations), r.platforms.join(', ')]) }, empty: 'No citations recorded yet.' };
+      }
+      case 'search_console':
+      case 'analytics': {
+        // Stored, attributed Google metrics only (Google manual §1: source, date range, freshness, partial-data warnings).
+        const gsc = key === 'search_console';
+        const sourceType = gsc ? 'GOOGLE_SEARCH_CONSOLE' : 'GOOGLE_ANALYTICS';
+        const label = gsc ? 'Google Search Console' : 'Google Analytics 4';
+        const ds = await this.prisma.projectDataSource.findFirst({ where: { projectId, sourceType }, include: { workspaceIntegration: { select: { status: true } } } });
+        if (!ds) return { title: label, empty: `${label} is not connected to this project.` };
+        const day = (d: Date) => d.toISOString().slice(0, 10);
+        const daily = await this.prisma.googleMetric.findMany({ where: { dataSourceId: ds.id, dimension: 'date', date: { gte: new Date(day(from)), lte: new Date(day(to)) } }, orderBy: { date: 'asc' } });
+        const lastRun = await this.prisma.syncRun.findFirst({ where: { dataSourceId: ds.id, status: 'SUCCEEDED' }, orderBy: { completedAt: 'desc' } });
+        const freshness = `Source: ${label} (${(ds.configJson as { propertyId?: string } | null)?.propertyId ?? 'property'}). Last sync ${ds.lastSyncAt ? day(ds.lastSyncAt) : 'never'}${lastRun?.dataThrough ? `, data through ${day(lastRun.dataThrough)}` : ''}.`;
+        const warnings: string[] = [];
+        if (ds.workspaceIntegration.status === 'REAUTH_REQUIRED') warnings.push('Google access needs to be reconnected; recent data may be missing.');
+        if (daily.length && day(daily[0].date) > day(from)) warnings.push(`Data starts ${day(daily[0].date)}; earlier days in this period were not available.`);
+        if (gsc) warnings.push('Search Console rows are subject to Google data availability and privacy filtering; long-tail queries may be omitted.');
+        if (!daily.length) return { title: label, summary: freshness, empty: 'No data available for this period.', bullets: warnings };
+        const sum = (k: 'clicks' | 'impressions' | 'sessions' | 'activeUsers' | 'engagedSessions') => daily.reduce((t, m) => t + (m[k] ?? 0), 0);
+        if (gsc) {
+          const queries = await this.prisma.googleMetric.findMany({ where: { dataSourceId: ds.id, dimension: 'query' }, orderBy: [{ date: 'desc' }, { clicks: 'desc' }], take: 25 });
+          const impressions = sum('impressions');
+          return {
+            title: 'Search performance (Google Search Console)',
+            summary: `${freshness} Period ${day(daily[0].date)} – ${day(daily[daily.length - 1].date)}.`,
+            metrics: [
+              { label: 'Clicks', value: sum('clicks').toLocaleString('en-US') },
+              { label: 'Impressions', value: impressions.toLocaleString('en-US') },
+              { label: 'CTR', value: impressions ? `${Math.round((sum('clicks') / impressions) * 1000) / 10}%` : '—' },
+              { label: 'Avg. position', value: fmt(Math.round((daily.reduce((t, m) => t + (m.position ?? 0) * (m.impressions ?? 0), 0) / Math.max(impressions, 1)) * 10) / 10) },
+            ],
+            table: { columns: ['Top query (last 28 days of data)', 'Clicks', 'Impressions', 'Position'], rows: queries.map((q) => [q.dimensionValue, String(q.clicks ?? 0), String(q.impressions ?? 0), fmt(q.position === null ? null : Math.round(q.position * 10) / 10)]) },
+            bullets: warnings,
+          };
+        }
+        return {
+          title: 'Traffic (Google Analytics 4)',
+          summary: `${freshness} Period ${day(daily[0].date)} – ${day(daily[daily.length - 1].date)}.`,
+          metrics: [
+            { label: 'Sessions', value: sum('sessions').toLocaleString('en-US') },
+            { label: 'Active users (daily sum)', value: sum('activeUsers').toLocaleString('en-US') },
+            { label: 'Engaged sessions', value: sum('engagedSessions').toLocaleString('en-US') },
+          ],
+          bullets: [...warnings, 'GA4 can revise recent days; figures reflect the last sync.'],
+        };
       }
       case 'keywords': {
         const lists = await this.prisma.keywordList.findMany({ where: { projectId }, include: { items: { include: { keyword: { include: { metricSnapshots: { orderBy: { capturedAt: 'desc' }, take: 1 } } } } } } });

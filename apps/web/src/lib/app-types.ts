@@ -98,7 +98,7 @@ export type WorkspaceView = {
 
 export type BillingOverview = {
   plan: { code: string | null; name: string | null };
-  subscription: { id: string; status: string; currentPeriodStart: string; currentPeriodEnd: string; cancelAtPeriodEnd: boolean; interval: 'MONTHLY' | 'ANNUAL' | null; amountMinor: string | null; currency: string | null } | null;
+  subscription: { id: string; status: string; currentPeriodStart: string; currentPeriodEnd: string; cancelAtPeriodEnd: boolean; graceEndsAt?: string | null; interval: 'MONTHLY' | 'ANNUAL' | null; amountMinor: string | null; currency: string | null } | null;
   periodStart: string;
   periodEnd: string | null;
   credits: { balance: string; lowThreshold: number; low: boolean };

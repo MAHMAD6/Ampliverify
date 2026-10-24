@@ -39,6 +39,17 @@ export class CommerceAdminService {
    * month, by plan and workspace (Hybrid guide §7). Provider cost is what was
    * recorded per call; calls not linked to a workspace are shown separately.
    */
+  /** Historical entitlement rule sets for a plan, newest first. */
+  async entitlementVersions(userId: string, code: string) {
+    await this.guard(userId);
+    const plan = await this.prisma.plan.findUnique({ where: { code } });
+    if (!plan) throw new NotFoundException({ code: 'PLAN_NOT_FOUND', message: 'Plan not found.' });
+    const rows = await this.prisma.planEntitlementVersion.findMany({ where: { planId: plan.id }, orderBy: { version: 'desc' }, take: 50 });
+    const users = await this.prisma.user.findMany({ where: { id: { in: rows.map((r) => r.changedBy).filter((x): x is string => !!x) } }, select: { id: true, email: true, displayName: true } });
+    const who = new Map(users.map((u) => [u.id, u.displayName ?? u.email]));
+    return rows.map((r) => ({ version: r.version, createdAt: r.createdAt, changedBy: r.changedBy ? (who.get(r.changedBy) ?? 'Admin') : 'System', entitlements: r.snapshotJson }));
+  }
+
   async margin(userId: string, month?: string) {
     await this.guard(userId);
     const m = /^\d{4}-\d{2}$/.test(month ?? '') ? month! : new Date().toISOString().slice(0, 7);
@@ -189,6 +200,17 @@ export class CommerceAdminService {
         };
         await tx.planEntitlement.upsert({ where: { planId_featureId: { planId: plan.id, featureId: feature.id } }, create: { planId: plan.id, featureId: feature.id, ...data }, update: data });
       }
+      // Immutable version snapshot of the full rule set after this change.
+      const all = await tx.planEntitlement.findMany({ where: { planId: plan.id }, include: { feature: true }, orderBy: { feature: { key: 'asc' } } });
+      const last = await tx.planEntitlementVersion.findFirst({ where: { planId: plan.id }, orderBy: { version: 'desc' } });
+      await tx.planEntitlementVersion.create({
+        data: {
+          planId: plan.id,
+          version: (last?.version ?? 0) + 1,
+          changedBy: userId,
+          snapshotJson: all.map((e) => ({ key: e.feature.key, enabled: e.enabled, limit: e.limitNumeric?.toString() ?? null, config: e.configJson ?? null })) as Prisma.InputJsonArray,
+        },
+      });
       await this.auditLog.record(
         {
           actorUserId: userId,

@@ -1,6 +1,8 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
+import type { Redis } from 'ioredis';
+import { createRedis } from '../redis/redis';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -34,6 +36,17 @@ export class DataForSeoClient {
 
   get configured() {
     return !!this.config.get('DATAFORSEO_LOGIN') && !!this.config.get('DATAFORSEO_PASSWORD');
+  }
+
+  private redisClient: Redis | null | undefined;
+
+  /** Shared Redis cache when REDIS_URL is set. */
+  private redis() {
+    if (this.redisClient === undefined) {
+      const url = this.config.get<string>('REDIS_URL');
+      this.redisClient = url ? createRedis(url, 'dataforseo-cache') : null;
+    }
+    return this.redisClient;
   }
 
   /** DATAFORSEO_BASE_URL (default https://api.dataforseo.com/v3); only HTTPS hosts are accepted. */
@@ -89,9 +102,19 @@ export class DataForSeoClient {
    */
   async cachedPost(path: string, task: Record<string, unknown>, operation: string, ttlHours = 24): Promise<Item | null> {
     const key = `dfs:${createHash('sha256').update(`${path}|${JSON.stringify(task)}`).digest('hex')}`;
+    // Redis first (shared, fast), PostgreSQL as the durable fallback.
+    const redis = this.redis();
+    if (redis) {
+      const cached = await redis.get(key).catch(() => null);
+      if (cached !== null) return JSON.parse(cached) as Item | null;
+    }
     const hit = await this.prisma.providerCache.findUnique({ where: { key } });
-    if (hit && hit.expiresAt > new Date()) return hit.valueJson as Item | null;
+    if (hit && hit.expiresAt > new Date()) {
+      if (redis) await redis.set(key, JSON.stringify(hit.valueJson), 'PX', Math.max(1000, hit.expiresAt.getTime() - Date.now())).catch(() => undefined);
+      return hit.valueJson as Item | null;
+    }
     const result = await this.post(path, task, operation);
+    if (redis) await redis.set(key, JSON.stringify(result), 'EX', ttlHours * 3600).catch(() => undefined);
     const expiresAt = new Date(Date.now() + ttlHours * 3600_000);
     const value = (result ?? Prisma.JsonNull) as Prisma.InputJsonValue;
     await this.prisma.providerCache.upsert({ where: { key }, create: { key, provider: 'dataforseo', valueJson: value, expiresAt }, update: { valueJson: value, fetchedAt: new Date(), expiresAt } }).catch(() => undefined);

@@ -63,6 +63,19 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
     <>
       <UsageHeader periodStart={billing?.periodStart} periodEnd={billing?.periodEnd} />
 
+      {billing?.subscription?.status === 'PAST_DUE' && (
+        <div className={s.note} style={{ marginBottom: 16, borderColor: 'var(--amber)' }}>
+          <Info size={18} />
+          <span>
+            Your last payment failed.{' '}
+            {billing.subscription.graceEndsAt && new Date(billing.subscription.graceEndsAt) > new Date()
+              ? `Paid features stay available until ${formatDate(billing.subscription.graceEndsAt)}. Update your payment method to avoid interruption.`
+              : 'The grace period has ended, so paid features are paused until payment succeeds.'}{' '}
+            <Link href="/app/settings/billing">Update payment method</Link>
+          </span>
+        </div>
+      )}
+
       {purchase === 'success' && (
         <div className={s.note} style={{ marginBottom: 16 }}>
           <Info size={18} />

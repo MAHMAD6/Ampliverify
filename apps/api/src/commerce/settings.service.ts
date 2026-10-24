@@ -37,6 +37,8 @@ export const SETTING = {
   creditPacks: 'credits.packs',
   /** `{ rollover: boolean }` — whether unused subscription credits survive the period end (default: no). */
   creditPolicy: 'credits.policy',
+  /** Days a past-due subscription keeps paid access after a failed payment (default 7). */
+  graceDays: 'billing.grace_days',
   /** `{ [provider]: monthlyUsd }` provider spend ceilings; `alertPct` warns staff first. */
   providerBudgets: 'providers.budgets',
   general: 'platform.general',

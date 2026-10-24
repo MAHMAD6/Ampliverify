@@ -6,6 +6,7 @@ import { CurrentActor } from '../common/decorators/current-actor.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
 import { requestMeta } from '../common/types/request-meta.type';
 import { OptimizationService } from './optimization.service';
+import { ActionPlanService } from './action-plan.service';
 
 class CreateTaskDto {
   @IsOptional()
@@ -63,7 +64,10 @@ class UpdateTaskDto {
 
 @Controller('user')
 export class OptimizationController {
-  constructor(private readonly optimization: OptimizationService) {}
+  constructor(
+    private readonly optimization: OptimizationService,
+    private readonly plans: ActionPlanService,
+  ) {}
 
   @Get('projects/:projectId/recommendations')
   recommendations(
@@ -72,6 +76,16 @@ export class OptimizationController {
     @Query() filters: Record<string, string>,
   ) {
     return this.optimization.recommendations(actor.userId, projectId, filters);
+  }
+
+  @Get('projects/:projectId/action-plan')
+  actionPlan(@CurrentActor() actor: AuthenticatedActor, @Param('projectId', ParseUUIDPipe) projectId: string) {
+    return this.plans.latest(actor.userId, projectId);
+  }
+
+  @Post('projects/:projectId/action-plan')
+  generateActionPlan(@CurrentActor() actor: AuthenticatedActor, @Param('projectId', ParseUUIDPipe) projectId: string) {
+    return this.plans.generate(actor.userId, projectId);
   }
 
   @Post('projects/:projectId/reanalyze')

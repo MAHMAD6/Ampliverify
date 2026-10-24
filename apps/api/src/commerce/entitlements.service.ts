@@ -10,6 +10,8 @@ export type WorkspacePlan = {
   planName: string | null;
   subscriptionId: string | null;
   subscriptionStatus: string | null;
+  /** Past-due subscriptions keep paid access until this time. */
+  graceEndsAt?: Date | null;
   periodStart: Date;
   periodEnd: Date | null;
   /** null = no plan applies, so nothing is restricted. */
@@ -35,11 +37,18 @@ export class EntitlementsService {
   ) {}
 
   async resolve(workspaceId: string, db: Db = this.prisma): Promise<WorkspacePlan> {
-    const subscription = await db.subscription.findFirst({
+    const live = await db.subscription.findFirst({
       where: { workspaceId, status: { in: [...LIVE_STATUSES] } },
       orderBy: { currentPeriodEnd: 'desc' },
       include: { plan: { include: { entitlements: { include: { feature: true } } } } },
     });
+    // Failed payment: paid access continues for the grace period, then the workspace
+    // falls back to the default plan until payment succeeds.
+    let subscription = live;
+    if (live?.status === 'PAST_DUE' && live.pastDueSince) {
+      const grace = Number(await this.settings.get<number>(SETTING.graceDays, 7, db));
+      if (Date.now() - live.pastDueSince.getTime() > Math.max(0, grace) * 86_400_000) subscription = null;
+    }
 
     let plan = subscription?.plan ?? null;
     if (!plan) {
@@ -70,7 +79,8 @@ export class EntitlementsService {
       planCode: plan?.code ?? null,
       planName: plan?.name ?? null,
       subscriptionId: subscription?.id ?? null,
-      subscriptionStatus: subscription?.status ?? null,
+      subscriptionStatus: live?.status ?? null,
+      graceEndsAt: live?.status === 'PAST_DUE' && live.pastDueSince ? new Date(live.pastDueSince.getTime() + Number(await this.settings.get<number>(SETTING.graceDays, 7, db)) * 86_400_000) : null,
       periodStart: subscription?.currentPeriodStart ?? monthStart(),
       periodEnd: subscription?.currentPeriodEnd ?? null,
       // Overrides alone (no plan) only restrict what they name.

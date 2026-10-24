@@ -27,6 +27,9 @@ export default async function KeywordOverviewPage() {
   const { selectedProject } = await getAppContext();
   const recent = selectedProject ? await apiGet<Recent[]>(`/user/projects/${selectedProject.id}/keywords/research`, { auth: true }) : null;
   const rows = recent?.ok ? recent.data : [];
+  type Perf = { connected: boolean; configured?: boolean; source?: string; note?: string; syncedAt?: string; startDate?: string; endDate?: string; siteUrl?: string; rows: { key: string; clicks: number; impressions: number; ctr: number; position: number | null }[] };
+  const perf = selectedProject ? await apiGet<Perf>(`/user/projects/${selectedProject.id}/search-performance?dimension=query&days=28`, { auth: true }) : null;
+  const gsc = perf?.ok ? perf.data : null;
   return (
     <>
       <PageHeader title="Keyword Research" description="Research keywords, analyze search intent and competition, and manage the keywords you save for your projects." />
@@ -46,6 +49,51 @@ export default async function KeywordOverviewPage() {
           </Link>
         ))}
       </Grid>
+      <Panel title="Your Search Console Queries" description={gsc?.connected && gsc.configured ? `Queries that already bring impressions to ${gsc.siteUrl}, ${gsc.startDate} – ${gsc.endDate}.` : 'Authorized Search Console data for this project.'}>
+        {!gsc?.connected || !gsc.configured ? (
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)' }}>
+            Connect Google Search Console and choose this project’s property in <Link href="/app/settings/integrations" style={{ color: 'var(--blue)' }}>Settings → Integrations</Link> to see the queries you already rank for.
+          </p>
+        ) : gsc.rows.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)' }}>No data available for this period.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <thead>
+                <tr>
+                  {['Query', 'Clicks', 'Impressions', 'CTR', 'Position'].map((h) => (
+                    <th key={h} style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {gsc.rows.slice(0, 20).map((r) => (
+                  <tr key={r.key}>
+                    <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>
+                      <Link href={`/app/keywords/explorer?q=${encodeURIComponent(r.key)}`} style={{ color: 'var(--blue)' }}>
+                        {r.key}
+                      </Link>
+                    </td>
+                    <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>{r.clicks.toLocaleString('en-US')}</td>
+                    <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>{r.impressions.toLocaleString('en-US')}</td>
+                    <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>{r.ctr}%</td>
+                    <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--line)' }}>{r.position ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {gsc?.source && (
+          <small style={{ display: 'block', marginTop: 8, color: 'var(--muted)' }}>
+            Source: {gsc.source}
+            {gsc.syncedAt ? ` · last sync ${formatDateTime(gsc.syncedAt)}` : ''}. {gsc.note}
+          </small>
+        )}
+      </Panel>
+      <div style={{ height: 16 }} />
       <Panel title="Recent Research">
         {rows.length ? (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 8 }}>

@@ -95,6 +95,7 @@ export class BillingService implements OnModuleInit {
         currentPeriodStart: subscription.currentPeriodStart,
         currentPeriodEnd: subscription.currentPeriodEnd,
         cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+        graceEndsAt: plan.graceEndsAt ?? null,
         interval: subscription.items[0]?.planPrice.billingInterval ?? null,
         amountMinor: subscription.items[0]?.planPrice.amountMinor ?? null,
         currency: subscription.items[0]?.planPrice.currency ?? null,
@@ -405,7 +406,9 @@ export class BillingService implements OnModuleInit {
     };
     await this.prisma.$transaction(async (tx) => {
       const before = await tx.subscription.findUnique({ where: { providerSubscriptionId: obj.id } });
-      const sub = await tx.subscription.upsert({ where: { providerSubscriptionId: obj.id }, create: { ...data, providerSubscriptionId: obj.id }, update: data });
+      // Dunning: remember when payment started failing (grace period, Hybrid guide §6).
+      const pastDueSince = data.status === 'PAST_DUE' ? (before?.status === 'PAST_DUE' ? (before.pastDueSince ?? new Date()) : new Date()) : null;
+      const sub = await tx.subscription.upsert({ where: { providerSubscriptionId: obj.id }, create: { ...data, pastDueSince, providerSubscriptionId: obj.id }, update: { ...data, pastDueSince } });
       for (const item of items) {
         const price = prices.find((p) => p.providerPriceId === item.price.id);
         if (!price) continue;

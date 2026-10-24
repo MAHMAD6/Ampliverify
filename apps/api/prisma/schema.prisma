@@ -1838,6 +1838,8 @@ model Subscription {
   currentPeriodStart     DateTime           @map("current_period_start") @db.Timestamptz(6)
   currentPeriodEnd       DateTime           @map("current_period_end") @db.Timestamptz(6)
   cancelAtPeriodEnd      Boolean            @default(false) @map("cancel_at_period_end")
+  /// Set when the subscription became PAST_DUE; paid access ends after the grace period.
+  pastDueSince           DateTime?          @map("past_due_since") @db.Timestamptz(6)
   canceledAt             DateTime?          @map("canceled_at") @db.Timestamptz(6)
   createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -3039,4 +3041,18 @@ model CreditGrant {
 
   @@index([workspaceId, expiresAt])
   @@map("credit_grants")
+}
+
+/// Immutable snapshot of a plan's entitlements after each admin change
+/// (Hybrid guide §7: keep historical versions of entitlement rules).
+model PlanEntitlementVersion {
+  id           String   @id @default(uuid()) @db.Uuid
+  planId       String   @map("plan_id") @db.Uuid
+  version      Int
+  snapshotJson Json     @map("snapshot_json")
+  changedBy    String?  @map("changed_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([planId, version])
+  @@map("plan_entitlement_versions")
 }

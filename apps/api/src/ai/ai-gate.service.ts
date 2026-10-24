@@ -8,7 +8,7 @@ import { ProviderBudgetService } from '../commerce/provider-budget.service';
 
 export const AI_USAGE_FEATURE = 'ai.action';
 /** Published credit price keys per AI operation (`credits.costs`; Hybrid guide §3). */
-export type AiOperation = 'ai.suggestion' | 'ai.content_ideas' | 'ai.content_brief';
+export type AiOperation = 'ai.suggestion' | 'ai.seo_optimization' | 'ai.content_ideas' | 'ai.content_brief' | 'ai.action_plan';
 
 /**
  * Gate for AI-assisted actions: module switch, plan feature (`ai.suggest`),

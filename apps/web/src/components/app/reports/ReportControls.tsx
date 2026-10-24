@@ -15,6 +15,8 @@ const SECTIONS = [
   ['tasks', 'Optimization tasks'],
   ['geo', 'AI search visibility'],
   ['geo_citations', 'Sources cited by AI'],
+  ['search_console', 'Search performance (Search Console)'],
+  ['analytics', 'Traffic (Google Analytics 4)'],
   ['keywords', 'Tracked keywords'],
   ['content', 'Content plan'],
 ] as const;

@@ -44,8 +44,27 @@ export class RetentionService implements OnModuleInit {
     const projects = await this.purgeDeletedProjects(now);
     const aged = await this.applyWorkspaceRetention(now);
     const exports = await this.purgeExpiredExports(now);
-    if (projects || aged || exports) this.logger.log(`Retention: ${projects} projects purged, ${aged} aged records removed, ${exports} exports expired.`);
-    return { projects, aged, exports };
+    const google = await this.purgeDisconnectedGoogleData(now);
+    if (projects || aged || exports || google) this.logger.log(`Retention: ${projects} projects purged, ${aged} aged records removed, ${exports} exports expired, ${google} Google metric rows deleted.`);
+    return { projects, aged, exports, google };
+  }
+
+  /**
+   * Google data retention (Google manual §9, OAuth guide §4): credentials are
+   * deleted at disconnect; synced metrics from a disconnected or unlinked
+   * Google source are deleted after GOOGLE_DATA_RETENTION_DAYS (default 30).
+   * Expired OAuth transactions are removed after a day.
+   */
+  async purgeDisconnectedGoogleData(now = new Date()) {
+    const days = Number(this.config.get('GOOGLE_DATA_RETENTION_DAYS') ?? 30);
+    const cutoff = new Date(now.getTime() - (Number.isFinite(days) && days >= 0 ? days : 30) * DAY);
+    const stale = await this.prisma.projectDataSource.findMany({
+      where: { sourceType: { in: ['GOOGLE_SEARCH_CONSOLE', 'GOOGLE_ANALYTICS'] }, OR: [{ status: 'DISCONNECTED' }, { workspaceIntegration: { status: 'DISCONNECTED' } }], workspaceIntegration: { updatedAt: { lt: cutoff } } },
+      select: { id: true },
+    });
+    const deleted = stale.length ? (await this.prisma.googleMetric.deleteMany({ where: { dataSourceId: { in: stale.map((s) => s.id) } } })).count : 0;
+    await this.prisma.oAuthTransaction.deleteMany({ where: { expiresAt: { lt: new Date(now.getTime() - DAY) } } });
+    return deleted;
   }
 
   private graceDays() {

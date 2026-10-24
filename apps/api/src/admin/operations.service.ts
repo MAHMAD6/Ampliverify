@@ -20,6 +20,7 @@ const EDITABLE_SETTINGS: Record<string, (v: unknown) => boolean> = {
   [SETTING.notifications]: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
   [SETTING.security]: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
   [SETTING.appearance]: (v) => !!v && typeof v === 'object' && !Array.isArray(v),
+  [SETTING.graceDays]: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 60,
   [SETTING.creditPolicy]: (v) => !!v && typeof v === 'object' && !Array.isArray(v) && (v as { rollover?: unknown }).rollover !== undefined && typeof (v as { rollover?: unknown }).rollover === 'boolean',
   [SETTING.providerBudgets]: (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v as object).every((n) => n === null || (typeof n === 'number' && n >= 0)),
 };

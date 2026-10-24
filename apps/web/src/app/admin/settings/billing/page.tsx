@@ -11,7 +11,9 @@ export const metadata = { title: 'Credits & Billing · Settings' };
  * are not here: they use the plan's audit allowance (`limit.audit_runs`).
  */
 const METERED = [
-  { key: 'ai.suggestion', label: 'AI content suggestion (editor)', unit: 'request' },
+  { key: 'ai.suggestion', label: 'AI content suggestion (editor request)', unit: 'request' },
+  { key: 'ai.seo_optimization', label: 'AI SEO optimization (full editor pass)', unit: 'request' },
+  { key: 'ai.action_plan', label: 'AI-generated action plan', unit: 'plan' },
   { key: 'ai.content_ideas', label: 'AI content ideas', unit: 'request' },
   { key: 'ai.content_brief', label: 'AI content brief', unit: 'brief' },
   { key: 'geo.check', label: 'GEO visibility check', unit: 'search surface observed' },

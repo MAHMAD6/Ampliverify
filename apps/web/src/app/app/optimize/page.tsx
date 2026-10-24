@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { ActionPlan, type Plan } from '@/components/app/optimize/ActionPlan';
+import { getQuote, quoteText } from '@/lib/credits';
 import { BarChart3, CalendarDays, CircleAlert, CircleCheck, ExternalLink, FileSearch, ListChecks, RefreshCw, Search, TriangleAlert } from 'lucide-react';
 import { Button, ButtonLink, Card, DataTable, EmptyState, Grid, IconCircle, Input, PageHeader, Panel, Select } from '@/components/ui';
 import { ActionButton, AutoRefresh } from '@/components/ui/actions';
@@ -42,10 +44,12 @@ export default async function OptimizationCenterPage({ searchParams }: { searchP
   }
 
   const pid = selectedProject.id;
-  const [recs, tasks, members] = await Promise.all([
+  const [recs, tasks, members, planRes, quote] = await Promise.all([
     apiGet<Recommendations>(`/user/projects/${pid}/recommendations${qs({ category: category === 'All' ? undefined : category, q: sp.q, priority: sp.priority, status: sp.status, page: sp.page })}`, { auth: true }),
     apiGet<TaskView[]>(`/user/projects/${pid}/tasks`, { auth: true }),
     apiGet<Member[]>(`/user/workspaces/${selectedProject.workspaceId}/members`, { auth: true }),
+    apiGet<Plan>(`/user/projects/${pid}/action-plan`, { auth: true }),
+    getQuote(selectedProject.workspaceId, 'ai.action_plan'),
   ]);
   const data = recs.ok ? recs.data : null;
   const summary = data?.summary;
@@ -73,6 +77,10 @@ export default async function OptimizationCenterPage({ searchParams }: { searchP
           </div>
         }
       />
+
+      <div style={{ marginBottom: 18 }}>
+        <ActionPlan projectId={pid} plan={planRes.ok ? planRes.data : null} costNote={quoteText(quote)} blocked={quote ? !quote.sufficient : false} />
+      </div>
 
       <Grid cols={4} style={{ marginBottom: 18 }}>
         {[

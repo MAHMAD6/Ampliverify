@@ -78,7 +78,8 @@ Every external provider is optional; the dependent feature is disabled with an e
 | CMS (WordPress, Webflow, Shopify, custom webhook) and Google credentials encryption | `INTEGRATION_ENCRYPTION_KEY` (32+ characters) |
 | Google Search Console / GA4 (Google manual V1.1) | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (register `https://<host>/app/integrations/google/callback`), optional `GOOGLE_TOKEN_ENCRYPTION_KEY`. OAuth uses PKCE and single-use state; GSC syncs daily and GA4 every 6 hours into `google_metrics` |
 | PageSpeed Insights (audits, valuation) | `GOOGLE_PAGESPEED_API_KEY` (restricted to the PageSpeed API) |
-| Pricing model | Hybrid: SEO audits use the plan allowance (`limit.audit_runs`, `limit.audit_max_pages`); AI/GEO actions use credits priced in `credits.costs`; plan credits (`credits.monthly_grant`) are granted per period and spent before purchased credits; provider ceilings in `providers.budgets` |
+| Pricing model | Hybrid: SEO audits use the plan allowance (`limit.audit_runs`, `limit.audit_max_pages`); AI/GEO actions use credits priced in `credits.costs`; plan credits (`credits.monthly_grant`) are granted per period and spent before purchased credits; provider ceilings in `providers.budgets`; failed payments keep paid access for `billing.grace_days` (default 7); every plan entitlement change is kept as an immutable version |
+| Google data retention | Credentials are revoked and deleted at disconnect; synced metrics from disconnected sources are deleted after `GOOGLE_DATA_RETENTION_DAYS` (default 30) |
 | File storage | Private S3-compatible bucket: `STORAGE_DRIVER=s3` + `S3_*`; report downloads use short-lived signed URLs (`S3_SIGNED_URL_SECONDS`). Local `STORAGE_DIR` for development only |
 | Applicant file malware scanning | `CLAMAV_HOST`, `CLAMAV_PORT` (files stay undownloadable until scanned clean) |
 
