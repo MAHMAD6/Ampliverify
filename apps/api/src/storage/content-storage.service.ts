@@ -10,7 +10,8 @@ import { isAbsolute, join, normalize, resolve, sep } from 'path';
  * (guide §2: the database keeps metadata and keys, not large payloads).
  *
  * Drivers: local filesystem (STORAGE_DIR, default) for development and tests,
- * or any S3-compatible bucket with STORAGE_DRIVER=s3 (S3_BUCKET, S3_REGION,
+ * or any S3-compatible bucket — AWS S3, Cloudflare R2 (S3_REGION=auto,
+ * S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com) — with STORAGE_DRIVER=s3 (S3_BUCKET, S3_REGION,
  * optional S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY). Objects are
  * private; after its own authorization checks the API streams them (local) or
  * hands out a short-lived signed URL (S3, S3_SIGNED_URL_SECONDS, default 300).
@@ -35,6 +36,10 @@ export class ContentStorageService {
       this.s3 = new S3Client({
         region: config.get<string>('S3_REGION') ?? 'us-east-1',
         ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
+        // S3-compatible stores (Cloudflare R2, MinIO…) reject the SDK's default
+        // flexible checksums on some operations; send them only when required.
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
         ...(accessKeyId && secretAccessKey ? { credentials: { accessKeyId, secretAccessKey } } : {}),
       });
     }

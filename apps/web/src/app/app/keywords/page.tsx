@@ -27,7 +27,7 @@ export default async function KeywordOverviewPage() {
   const { selectedProject } = await getAppContext();
   const recent = selectedProject ? await apiGet<Recent[]>(`/user/projects/${selectedProject.id}/keywords/research`, { auth: true }) : null;
   const rows = recent?.ok ? recent.data : [];
-  type Perf = { connected: boolean; configured?: boolean; source?: string; note?: string; syncedAt?: string; startDate?: string; endDate?: string; siteUrl?: string; rows: { key: string; clicks: number; impressions: number; ctr: number; position: number | null }[] };
+  type Perf = { connected: boolean; configured?: boolean; error?: string; source?: string; note?: string; syncedAt?: string; startDate?: string; endDate?: string; siteUrl?: string; rows: { key: string; clicks: number; impressions: number; ctr: number; position: number | null }[] };
   const perf = selectedProject ? await apiGet<Perf>(`/user/projects/${selectedProject.id}/search-performance?dimension=query&days=28`, { auth: true }) : null;
   const gsc = perf?.ok ? perf.data : null;
   return (
@@ -54,6 +54,8 @@ export default async function KeywordOverviewPage() {
           <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)' }}>
             Connect Google Search Console and choose this project’s property in <Link href="/app/settings/integrations" style={{ color: 'var(--blue)' }}>Settings → Integrations</Link> to see the queries you already rank for.
           </p>
+        ) : gsc.error ? (
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--amber)' }}>{gsc.error}</p>
         ) : gsc.rows.length === 0 ? (
           <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)' }}>No data available for this period.</p>
         ) : (

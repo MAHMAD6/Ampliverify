@@ -542,11 +542,17 @@ export class IntegrationsService {
     }
     const end = new Date(Date.now() - 2 * 86_400_000);
     const start = new Date(end.getTime() - Math.min(Math.max(input.days, 7), 480) * 86_400_000);
-    const r = await this.googleGet<{ rows?: { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[] }>(
+    let r: { rows?: { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[] };
+    try {
+      r = await this.googleGet<{ rows?: { keys: string[]; clicks: number; impressions: number; ctr: number; position: number }[] }>(
       ds.workspaceIntegrationId,
       `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`,
       { method: 'POST', body: { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10), dimensions: [input.dimension], rowLimit: 250 } },
     );
+    } catch (err) {
+      const message = (err as { response?: { message?: string } }).response?.message ?? 'Google data temporarily unavailable.';
+      return { connected: true, configured: true, siteUrl, ...attribution, error: message, rows: [] };
+    }
     await this.prisma.projectDataSource.update({ where: { id: ds.id }, data: { lastSyncAt: new Date() } });
     return {
       connected: true,

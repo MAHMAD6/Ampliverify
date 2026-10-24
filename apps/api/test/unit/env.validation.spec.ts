@@ -36,4 +36,13 @@ describe('validateEnv production guards', () => {
   it('requires a long integration encryption key when set', () => {
     expect(() => validateEnv({ ...base, INTEGRATION_ENCRYPTION_KEY: 'short' })).toThrow(/INTEGRATION_ENCRYPTION_KEY/);
   });
+
+  it('validates Google, Redis and S3 settings', () => {
+    expect(() => validateEnv({ ...base, GOOGLE_TOKEN_ENCRYPTION_KEY: 'short' })).toThrow(/GOOGLE_TOKEN_ENCRYPTION_KEY/);
+    expect(() => validateEnv({ ...base, NODE_ENV: 'production', GOOGLE_REDIRECT_URI: 'http://ampliverify.com/cb' })).toThrow(/https/);
+    expect(() => validateEnv({ ...base, GOOGLE_REDIRECT_URI: 'not a url' })).toThrow(/absolute URL/);
+    expect(() => validateEnv({ ...base, REDIS_URL: 'localhost:6379' })).toThrow(/REDIS_URL/);
+    expect(() => validateEnv({ ...base, STORAGE_DRIVER: 's3' })).toThrow(/S3_BUCKET/);
+    expect(validateEnv({ ...base, NODE_ENV: 'production', GOOGLE_REDIRECT_URI: 'https://ampliverify.com/app/integrations/google/callback', REDIS_URL: 'redis://127.0.0.1:6379/5', STORAGE_DRIVER: 's3', S3_BUCKET: 'b', S3_REGION: 'auto', S3_ENDPOINT: 'https://acc.r2.cloudflarestorage.com' })).toBeTruthy();
+  });
 });
