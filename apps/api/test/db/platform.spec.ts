@@ -155,7 +155,7 @@ describe('Platform modules', () => {
     const share = await h.api().post(`/api/v1/user/reports/${report.body.data.id}/shares`).set(as(user.bearer)).expect(201);
     const token = share.body.data.url.split('/r/')[1];
     const pub = await h.api().get(`/api/v1/public/reports/${token}`).expect(200);
-    expect(pub.body.data.sections.length).toBe(5);
+    expect(pub.body.data.sections.length).toBe(7);
     await h.api().post(`/api/v1/user/report-shares/${share.body.data.id}/revoke`).set(as(user.bearer)).expect(201);
     await h.api().get(`/api/v1/public/reports/${token}`).expect(404);
   });
