@@ -48,7 +48,7 @@ jobs:
       - name: Unit tests
         run: npm test
       - name: Database integration tests
-        run: npm run test:db
+        run: npm run test:db --workspace apps/api -- --reporters=default --reporters=github-actions
       - name: Build
         env:
           API_URL: http://localhost:4000
