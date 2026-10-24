@@ -148,7 +148,7 @@ describe('Platform modules', () => {
     const done = await h.api().get(`/api/v1/user/reports/${report.body.data.id}`).set(as(user.bearer)).expect(200);
     expect(done.body.data.status).toBe('SUCCEEDED');
     expect(done.body.data.files.map((f: { format: string }) => f.format).sort()).toEqual(['csv', 'html', 'pdf']);
-    expect(done.body.data.sections.map((s: { sectionKey: string }) => s.sectionKey)).toEqual(['overview', 'audit', 'geo', 'tasks', 'content']);
+    expect(done.body.data.sections.map((s: { sectionKey: string }) => s.sectionKey)).toEqual(['overview', 'search_console', 'analytics', 'audit', 'geo', 'tasks', 'content']);
     const pdf = await h.api().get(`/api/v1/user/reports/${report.body.data.id}/download/pdf`).set(as(user.bearer)).expect(200);
     expect(pdf.headers['content-type']).toContain('application/pdf');
 

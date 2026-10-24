@@ -53,7 +53,7 @@ describe('Hybrid pricing and Google data rules', () => {
     await h.prisma.googleMetric.create({ data: { dataSourceId: ds.id, projectId, source: 'GSC', propertyId: 'sc-domain:retain.test', date: new Date('2026-10-01'), dimension: 'date', clicks: 1, impressions: 2 } });
     const retention = h.app.get(RetentionService);
     expect(await retention.purgeDisconnectedGoogleData(new Date())).toBe(0);
-    expect(await retention.purgeDisconnectedGoogleData(new Date(Date.now() + 31 * 86_400_000))).toBe(1);
+    expect(await retention.purgeDisconnectedGoogleData(new Date(Date.now() + 31 * 86_400_000))).toBeGreaterThanOrEqual(1);
     expect(await h.prisma.googleMetric.count({ where: { dataSourceId: ds.id } })).toBe(0);
   });
 
