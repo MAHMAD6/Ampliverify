@@ -43,6 +43,7 @@ export function PromptDetail({
   defaultPlatforms,
   creditPerPlatform,
   available = null,
+  recommendations,
 }: {
   prompt: GeoPromptDetail;
   tab: PromptTab;
@@ -52,6 +53,8 @@ export function PromptDetail({
   creditPerPlatform: number | null;
   /** AI/GEO credits available now, for the pre-run quote. */
   available?: number | null;
+  /** AI recommendations panel (client), shown on Overview and Opportunities. */
+  recommendations?: React.ReactNode;
 }) {
   const base = `/app/geo/prompts/${encodeURIComponent(prompt.id)}`;
   const running = !!prompt.runs[0] && RUNNING.has(prompt.runs[0].status);
@@ -481,6 +484,7 @@ export function PromptDetail({
             {citations}
             {opportunities}
           </div>
+          {recommendations}
         </>
       )}
       {tab === 'platforms' && (
@@ -492,7 +496,12 @@ export function PromptDetail({
       {tab === 'citations' && citations}
       {tab === 'history' && trend}
       {tab === 'competitors' && competitors}
-      {tab === 'opportunities' && opportunities}
+      {tab === 'opportunities' && (
+        <>
+          {opportunities}
+          {recommendations}
+        </>
+      )}
       {(tab === 'citations' || tab === 'competitors' || tab === 'opportunities') && <div style={{ marginTop: 4 }}>{runButton}</div>}
     </>
   );

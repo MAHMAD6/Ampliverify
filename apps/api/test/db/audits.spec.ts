@@ -87,6 +87,16 @@ describe('SEO audits and Optimization Center', () => {
     // In-app notifications were created for the requester.
     const notes = await h.api().get('/api/v1/user/notifications').set(auth).expect(200);
     expect(notes.body.data.some((n: { eventKey: string }) => n.eventKey === 'audit.completed')).toBe(true);
+
+    // Content Audit over the crawled pages (deterministic; the AI assessment is separate).
+    const ca = await h.api().post(`/api/v1/user/projects/${projectId}/content/audits`).set(auth).send({}).expect(201);
+    expect(ca.body.data.summary.pages).toBeGreaterThanOrEqual(1);
+    expect(ca.body.data.pages[0]).toMatchObject({ url: expect.stringContaining(site.origin), issues: expect.any(Array) });
+    const list = await h.api().get(`/api/v1/user/projects/${projectId}/content/audits`).set(auth).expect(200);
+    expect(list.body.data[0].id).toBe(ca.body.data.id);
+    await h.api().get(`/api/v1/user/content/audits/${ca.body.data.id}`).set(auth).expect(200);
+    const outsider = await h.provision('content-audit-outsider');
+    await h.api().get(`/api/v1/user/content/audits/${ca.body.data.id}`).set({ authorization: outsider.bearer }).expect(404);
   });
 
   it('crawls a site within scope and respects robots.txt', async () => {

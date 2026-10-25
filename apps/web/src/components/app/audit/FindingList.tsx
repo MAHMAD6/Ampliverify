@@ -1,5 +1,6 @@
 import { CircleAlert, Info, TriangleAlert } from 'lucide-react';
 import type { Finding, Severity } from '@/lib/app-types';
+import { ExplainFinding } from '@/components/app/AiAssist';
 import { FindingActions } from './AuditControls';
 
 export const SEVERITY_STYLE: Record<Severity, { color: string; bg: string; label: string }> = {
@@ -58,6 +59,7 @@ export function FindingList({ projectId, findings, empty }: { projectId: string;
             {f.pageUrl}
             {describe(f.details) && ` · ${describe(f.details)}`}
           </p>
+          {f.status === 'OPEN' && <ExplainFinding findingId={f.id} />}
         </li>
       ))}
     </ul>

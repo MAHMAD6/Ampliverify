@@ -12,6 +12,8 @@ import {
   IsInt,
   IsNumber,
   IsOptional,
+  Matches,
+  ValidateIf,
   IsString,
   IsUUID,
   Length,
@@ -70,6 +72,15 @@ class PriceDto {
   @IsInt()
   @Min(0)
   amountMinor: number;
+
+  @ValidateIf((_, v) => v !== undefined && v !== null && v !== '')
+  @Matches(/^price_[A-Za-z0-9]+$/, { message: 'Stripe price IDs start with price_.' })
+  stripePriceId?: string;
+}
+
+class LinkStripePriceDto {
+  @Matches(/^price_[A-Za-z0-9]+$/, { message: 'Stripe price IDs start with price_.' })
+  stripePriceId: string;
 }
 
 class EntitlementDto {
@@ -203,6 +214,11 @@ export class CommerceAdminController {
   @Post('plans/:code/prices')
   addPrice(@CurrentActor() actor: AuthenticatedActor, @Param('code') code: string, @Body() dto: PriceDto, @Req() req: Request) {
     return this.commerce.addPrice(actor.userId, code, dto, requestMeta(req));
+  }
+
+  @Put('plans/:code/prices/:id/stripe-price')
+  linkStripePrice(@CurrentActor() actor: AuthenticatedActor, @Param('code') code: string, @Param('id', ParseUUIDPipe) id: string, @Body() dto: LinkStripePriceDto, @Req() req: Request) {
+    return this.commerce.linkStripePrice(actor.userId, code, id, dto.stripePriceId, requestMeta(req));
   }
 
   @Put('plans/:code/entitlements')

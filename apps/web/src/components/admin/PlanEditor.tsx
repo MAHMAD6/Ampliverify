@@ -72,7 +72,15 @@ export function PlanEditor({ plan }: { plan: AdminPlan | null }) {
               rows={plan.prices.map((p) => [
                 p.billingInterval === 'MONTHLY' ? 'Monthly' : 'Annual',
                 formatMoney(p.amountMinor, p.currency),
-                p.providerPriceId ? <code key="c">{p.providerPriceId}</code> : 'Not synced',
+                p.providerPriceId ? (
+                  <code key="c">{p.providerPriceId}</code>
+                ) : p.active ? (
+                  <ApiForm key="l" method="PUT" path={`/admin/plans/${encodeURIComponent(plan.code)}/prices/${p.id}/stripe-price`} submitLabel="Link" successMessage="Stripe price linked.">
+                    <Input name="stripePriceId" required pattern="price_[A-Za-z0-9]+" placeholder="price_…" aria-label="Stripe price ID" />
+                  </ApiForm>
+                ) : (
+                  'Not synced'
+                ),
                 p.active ? 'Active' : 'Replaced',
                 formatDateTime(p.createdAt),
               ])}
@@ -92,6 +100,9 @@ export function PlanEditor({ plan }: { plan: AdminPlan | null }) {
                   </Field>
                   <Field label="Amount (minor units)" htmlFor="pr-amt" hint="e.g. 4900 = $49.00">
                     <Input id="pr-amt" name="amountMinor" type="number" data-type="number" min={0} step={1} required />
+                  </Field>
+                  <Field label="Stripe price ID (optional)" htmlFor="pr-sp" hint="Existing recurring price from the Stripe dashboard; checked against amount and interval.">
+                    <Input id="pr-sp" name="stripePriceId" pattern="price_[A-Za-z0-9]+" placeholder="price_…" />
                   </Field>
                 </div>
               </ApiForm>

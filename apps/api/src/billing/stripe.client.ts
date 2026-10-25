@@ -62,6 +62,13 @@ export class StripeClient {
     });
     const json = (await res.json().catch(() => ({}))) as T & { error?: { message?: string } };
     if (!res.ok) {
+      if (res.status === 403) {
+        // Restricted keys (Stripe guide §3) only allow the resources they were granted.
+        throw new ServiceUnavailableException({ code: 'STRIPE_PERMISSION', message: 'The Stripe key does not have permission for this action. Grant the permission to the restricted key in the Stripe dashboard.' });
+      }
+      if (res.status === 404 && method === 'GET' && path.startsWith('/prices/')) {
+        throw new ServiceUnavailableException({ code: 'STRIPE_PRICE_NOT_FOUND', message: 'That Stripe price ID was not found in this Stripe account (check test vs live mode).' });
+      }
       throw new ServiceUnavailableException({ code: 'PAYMENT_PROVIDER_ERROR', message: json.error?.message ?? `Payment provider error (${res.status}).` });
     }
     return json;

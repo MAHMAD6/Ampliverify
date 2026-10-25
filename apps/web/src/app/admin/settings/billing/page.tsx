@@ -16,6 +16,10 @@ const METERED = [
   { key: 'ai.action_plan', label: 'AI-generated action plan', unit: 'plan' },
   { key: 'ai.content_ideas', label: 'AI content ideas', unit: 'request' },
   { key: 'ai.content_brief', label: 'AI content brief', unit: 'brief' },
+  { key: 'ai.article_draft', label: 'AI article draft from a brief', unit: 'draft' },
+  { key: 'ai.content_audit', label: 'AI content audit assessment', unit: 'assessment' },
+  { key: 'ai.finding_explanation', label: 'AI explanation of an audit finding', unit: 'finding' },
+  { key: 'ai.geo_recommendations', label: 'AI GEO recommendations', unit: 'prompt' },
   { key: 'geo.check', label: 'GEO visibility check', unit: 'search surface observed' },
   { key: 'keywords.lookup', label: 'Keyword research', unit: 'lookup' },
 ];

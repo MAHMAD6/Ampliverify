@@ -87,6 +87,22 @@ describe('Platform modules', () => {
     expect(Number((await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } })).balanceCache)).toBe(500);
   });
 
+  it('grants credits for delayed payments only on async success, and reconciles refund events', async () => {
+    const { workspaceId } = await h.onboard('async-payer');
+    const object = { id: 'cs_async', payment_intent: `pi_async_${workspaceId}`, amount_total: 900, currency: 'usd', metadata: { workspaceId, kind: 'credits', credits: '200', packCode: 'p200' } };
+    const send = async (event: object) => {
+      const { body, header } = signed(event);
+      await h.api().post('/api/v1/webhooks/stripe').set('stripe-signature', header).set('content-type', 'application/json').send(body).expect(200);
+      await h.jobs.drain(['billing.webhook']);
+    };
+    await send({ id: `evt_pending_${workspaceId}`, type: 'checkout.session.completed', data: { object: { ...object, payment_status: 'unpaid' } } });
+    expect(await h.prisma.creditPurchase.count({ where: { workspaceId } })).toBe(0);
+    await send({ id: `evt_async_${workspaceId}`, type: 'checkout.session.async_payment_succeeded', data: { object: { ...object, payment_status: 'paid' } } });
+    expect(Number((await h.prisma.creditWallet.findUniqueOrThrow({ where: { workspaceId } })).balanceCache)).toBe(200);
+    await send({ id: `evt_rf_${workspaceId}`, type: 'refund.created', data: { object: { id: 're_1', status: 'succeeded', payment_intent: `pi_async_${workspaceId}`, metadata: {} } } });
+    expect((await h.prisma.creditPurchase.findFirstOrThrow({ where: { workspaceId } })).status).toBe('REFUNDED');
+  });
+
   it('enforces the Professional plan price rule ($199/month)', async () => {
     const admin = await h.provision('admin-price');
     await grantGlobal(h.prisma, admin.id, 'SUPER_ADMIN');

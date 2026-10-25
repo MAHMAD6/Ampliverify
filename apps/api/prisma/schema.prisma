@@ -3056,3 +3056,21 @@ model PlanEntitlementVersion {
   @@unique([planId, version])
   @@map("plan_entitlement_versions")
 }
+
+/// Content Audit (V1 manual §2): content inventory and heading/text analysis
+/// from the latest site audit, with an optional AI quality assessment that is
+/// stored separately and labelled as recommendations.
+model ContentAudit {
+  id          String    @id @default(uuid()) @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  sourceRunId String?   @map("source_run_id") @db.Uuid
+  createdBy   String    @map("created_by") @db.Uuid
+  summaryJson Json      @map("summary_json")
+  pagesJson   Json      @map("pages_json")
+  aiJson      Json?     @map("ai_json")
+  aiAt        DateTime? @map("ai_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("content_audits")
+}

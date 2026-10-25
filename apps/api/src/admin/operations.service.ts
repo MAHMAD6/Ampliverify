@@ -13,7 +13,7 @@ const EDITABLE_SETTINGS: Record<string, (v: unknown) => boolean> = {
   [SETTING.creditCosts]: (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v as object).every((n) => typeof n === 'number' && n >= 0),
   [SETTING.creditPacks]: (v) =>
     Array.isArray(v) &&
-    v.every((p) => p && typeof p.code === 'string' && Number.isFinite(p.credits) && p.credits > 0 && Number.isInteger(p.amountMinor) && p.amountMinor > 0 && typeof p.currency === 'string'),
+    v.every((p) => p && typeof p.code === 'string' && Number.isFinite(p.credits) && p.credits > 0 && Number.isInteger(p.amountMinor) && p.amountMinor > 0 && typeof p.currency === 'string' && (p.stripePriceId == null || (typeof p.stripePriceId === 'string' && /^price_[A-Za-z0-9]+$/.test(p.stripePriceId)))),
   [SETTING.defaultPlanCode]: (v) => v === null || typeof v === 'string',
   [SETTING.signupCredits]: (v) => typeof v === 'number' && v >= 0,
   [SETTING.general]: (v) => !!v && typeof v === 'object' && !Array.isArray(v),

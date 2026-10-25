@@ -5,7 +5,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button, Field, Input, Select } from '../ui';
 import { ApiForm } from '../ui/actions';
 
-type Pack = { code: string; name?: string; credits: number; amountMinor: number; currency: string };
+type Pack = { code: string; name?: string; credits: number; amountMinor: number; currency: string; stripePriceId?: string | null };
 
 /** What each metered action costs, in credits per unit (`credits.costs`). Unlisted or 0 = free. */
 export function CreditCostsForm({ features, costs }: { features: { key: string; label: string; unit: string }[]; costs: Record<string, number> }) {
@@ -34,11 +34,11 @@ export function CreditPacksForm({ packs: initial }: { packs: Pack[] }) {
   const [packs, setPacks] = useState<Pack[]>(initial);
   const set = (i: number, patch: Partial<Pack>) => setPacks((p) => p.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
-    <ApiForm method="PUT" path="/admin/settings/credits.packs" submitLabel="Save Credit Packs" successMessage="Credit packs saved." transform={() => ({ value: packs.map((p) => ({ ...p, code: p.code.trim(), currency: p.currency.trim().toUpperCase(), ...(p.name?.trim() ? { name: p.name.trim() } : { name: undefined }) })) })}>
+    <ApiForm method="PUT" path="/admin/settings/credits.packs" submitLabel="Save Credit Packs" successMessage="Credit packs saved." transform={() => ({ value: packs.map((p) => ({ ...p, code: p.code.trim(), currency: p.currency.trim().toUpperCase(), ...(p.name?.trim() ? { name: p.name.trim() } : { name: undefined }), stripePriceId: p.stripePriceId?.trim() || undefined })) })}>
       <div style={{ display: 'grid', gap: 8 }}>
         {packs.length === 0 && <p style={{ fontSize: 13, color: 'var(--muted)' }}>No packs: customers cannot buy credits.</p>}
         {packs.map((p, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 1fr) minmax(120px, 1.4fr) 100px 120px 80px auto', gap: 8, alignItems: 'end' }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(90px, 1fr) minmax(120px, 1.4fr) 100px 120px 80px minmax(140px, 1.2fr) auto', gap: 8, alignItems: 'end' }}>
             <Field label="Code" htmlFor={`pk-c-${i}`}>
               <Input id={`pk-c-${i}`} value={p.code} onChange={(e) => set(i, { code: e.target.value })} required pattern="[a-z0-9_-]+" placeholder="starter" />
             </Field>
@@ -53,6 +53,9 @@ export function CreditPacksForm({ packs: initial }: { packs: Pack[] }) {
             </Field>
             <Field label="Currency" htmlFor={`pk-cu-${i}`}>
               <Input id={`pk-cu-${i}`} value={p.currency} maxLength={3} onChange={(e) => set(i, { currency: e.target.value })} required />
+            </Field>
+            <Field label="Stripe price (optional)" htmlFor={`pk-sp-${i}`}>
+              <Input id={`pk-sp-${i}`} value={p.stripePriceId ?? ''} pattern="price_[A-Za-z0-9]+" onChange={(e) => set(i, { stripePriceId: e.target.value })} placeholder="price_…" />
             </Field>
             <Button type="button" variant="ghost" aria-label="Remove pack" onClick={() => setPacks((x) => x.filter((_, j) => j !== i))}>
               <Trash2 size={16} />

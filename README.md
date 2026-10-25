@@ -69,7 +69,7 @@ Every external provider is optional; the dependent feature is disabled with an e
 
 | Feature | Variables |
 |---|---|
-| Payments, credit packs | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (webhook: `POST /api/v1/webhooks/stripe`) |
+| Payments, credit packs | `STRIPE_SECRET_KEY` (secret or restricted key), `STRIPE_WEBHOOK_SECRET` (webhook: `POST /api/v1/webhooks/stripe`; events listed in `apps/api/.env.example`). Plan and pack Stripe price IDs are linked in Super Admin, not env vars |
 | Email (transactional, scheduled reports, staff alerts) | Amazon SES v2: `SES_REGION`, `EMAIL_FROM` (verified identity), optional `SES_ACCESS_KEY_ID` / `SES_SECRET_ACCESS_KEY` / `SES_CONFIGURATION_SET` |
 | AI ideas, briefs, editor suggestions | OpenAI Responses API with Structured Outputs: `OPENAI_API_KEY`, optional `OPENAI_MODEL` |
 | GEO / AI Search observations | DataForSEO Google AI Mode and Google organic (AI Overview), Standard queued mode: `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD`. Results are saved provider evidence; no LLM answer is presented as an AI platform's ranking |

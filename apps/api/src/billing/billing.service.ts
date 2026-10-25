@@ -13,7 +13,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { StripeClient } from './stripe.client';
 
-export type CreditPack = { code: string; name?: string; credits: number; amountMinor: number; currency: string };
+/** `stripePriceId` (optional): an existing one-time Stripe price used at checkout instead of an inline amount. */
+export type CreditPack = { code: string; name?: string; credits: number; amountMinor: number; currency: string; stripePriceId?: string | null };
 
 type StripeObject = Record<string, unknown> & { id: string };
 type StripeEvent = { id: string; type: string; data: { object: StripeObject } };
@@ -221,14 +222,14 @@ export class BillingService implements OnModuleInit {
     if (!pack) throw new NotFoundException({ code: 'PACK_NOT_FOUND', message: 'This credit pack is not available.' });
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     const customer = await this.customerFor(workspaceId, user.email);
+    if (pack.stripePriceId) await this.verifyStripePrice(pack.stripePriceId, { currency: pack.currency, amountMinor: pack.amountMinor, interval: null });
     const session = await this.stripe.request<{ id: string; url: string }>('POST', '/checkout/sessions', {
       mode: 'payment',
       customer,
       line_items: [
-        {
-          quantity: 1,
-          price_data: { currency: pack.currency.toLowerCase(), unit_amount: pack.amountMinor, product_data: { name: pack.name ?? `${pack.credits} AmpliVerify credits` } },
-        },
+        pack.stripePriceId
+          ? { quantity: 1, price: pack.stripePriceId }
+          : { quantity: 1, price_data: { currency: pack.currency.toLowerCase(), unit_amount: pack.amountMinor, product_data: { name: pack.name ?? `${pack.credits} AmpliVerify credits` } } },
       ],
       success_url: `${this.webUrl}/app/usage?purchase=success`,
       cancel_url: `${this.webUrl}/app/usage?purchase=canceled`,
@@ -304,6 +305,8 @@ export class BillingService implements OnModuleInit {
 
     switch (event.type) {
       case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded':
+        // Delayed payment methods complete with payment_status "unpaid"; credits follow async_payment_succeeded.
         if (metadata.kind === 'credits' && obj.payment_status === 'paid' && workspaceId) {
           await this.grantPurchase(workspaceId, String(obj.payment_intent ?? obj.id), Number(metadata.credits), Number(obj.amount_total ?? 0), String(obj.currency ?? 'usd'));
         }
@@ -324,9 +327,18 @@ export class BillingService implements OnModuleInit {
       case 'invoice.marked_uncollectible':
         await this.upsertInvoice(obj, event.type);
         return true;
+      case 'checkout.session.async_payment_failed':
+        if (workspaceId) {
+          await this.auditLog.record({ workspaceId, action: 'billing.checkout.payment_failed', targetType: 'checkout_session', targetId: null, afterState: { session: obj.id, kind: metadata.kind ?? null } });
+        }
+        return true;
       case 'charge.refunded':
       case 'charge.dispute.created':
         await this.reconcileRefund(obj, event.type);
+        return true;
+      case 'refund.created':
+      case 'refund.updated':
+        if (obj.status === 'succeeded') await this.reconcileRefund(obj, 'charge.refunded');
         return true;
       default:
         return false;
@@ -505,6 +517,43 @@ See Super Admin → Billing & Invoices.`);
   async syncPriceToStripe(priceId: string) {
     const price = await this.prisma.planPrice.findUniqueOrThrow({ where: { id: priceId }, include: { plan: true } });
     if (price.providerPriceId || !this.stripe.configured) return price;
+    try {
+      return await this.createStripePrice(price);
+    } catch (err) {
+      // A restricted key without product/price write access: the admin links an existing Stripe price instead.
+      if ((err as { response?: { code?: string } }).response?.code === 'STRIPE_PERMISSION') return price;
+      throw err;
+    }
+  }
+
+  /**
+   * Links an existing Stripe price (created in the Stripe dashboard) to a plan
+   * price after checking it matches: active, recurring, same currency, amount
+   * and interval. Stripe guide §5: price IDs live in the database, not env vars.
+   */
+  async linkStripePrice(priceId: string, stripePriceId: string) {
+    const price = await this.prisma.planPrice.findUniqueOrThrow({ where: { id: priceId } });
+    const other = await this.prisma.planPrice.findUnique({ where: { providerPriceId: stripePriceId } });
+    if (other && other.id !== price.id) throw new BadRequestException({ code: 'STRIPE_PRICE_IN_USE', message: 'That Stripe price is already linked to another plan price.' });
+    await this.verifyStripePrice(stripePriceId, { currency: price.currency, amountMinor: Number(price.amountMinor), interval: price.billingInterval === 'ANNUAL' ? 'year' : 'month' });
+    return this.prisma.planPrice.update({ where: { id: price.id }, data: { providerPriceId: stripePriceId } });
+  }
+
+  /** Checks a Stripe price matches what AmpliVerify will charge (interval null = one-time). */
+  async verifyStripePrice(stripePriceId: string, expected: { currency: string; amountMinor: number; interval: 'month' | 'year' | null }) {
+    const p = await this.stripe.request<StripeObject>('GET', `/prices/${encodeURIComponent(stripePriceId)}`);
+    const recurring = p.recurring as { interval?: string; interval_count?: number } | null | undefined;
+    const problems: string[] = [];
+    if (p.active !== true) problems.push('it is archived');
+    if (String(p.currency ?? '').toUpperCase() !== expected.currency.toUpperCase()) problems.push(`currency is ${String(p.currency ?? '?').toUpperCase()}, expected ${expected.currency.toUpperCase()}`);
+    if (Number(p.unit_amount) !== expected.amountMinor) problems.push(`amount is ${String(p.unit_amount)}, expected ${expected.amountMinor}`);
+    if (expected.interval === null && recurring) problems.push('it is recurring, expected one-time');
+    if (expected.interval !== null && (!recurring || recurring.interval !== expected.interval || (recurring.interval_count ?? 1) !== 1)) problems.push(`it is not billed every ${expected.interval}`);
+    if (problems.length) throw new BadRequestException({ code: 'STRIPE_PRICE_MISMATCH', message: `Stripe price ${stripePriceId} does not match: ${problems.join('; ')}.` });
+    return p;
+  }
+
+  private async createStripePrice(price: Prisma.PlanPriceGetPayload<{ include: { plan: true } }>) {
     const product = await this.stripe.request<StripeObject>('POST', '/products', { name: `AmpliVerify ${price.plan.name}`, metadata: { planId: price.planId, planCode: price.plan.code } }, `product:${price.planId}`);
     const stripePrice = await this.stripe.request<StripeObject>(
       'POST',

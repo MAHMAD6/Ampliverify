@@ -9,7 +9,7 @@ import { BillingService } from '../billing/billing.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 
 export type PlanInput = { code?: string; name?: string; description?: string | null; status?: PlanStatus; isPublic?: boolean; isFeatured?: boolean; displayOrder?: number };
-export type PriceInput = { billingInterval: BillingInterval; currency: string; amountMinor: number };
+export type PriceInput = { billingInterval: BillingInterval; currency: string; amountMinor: number; stripePriceId?: string };
 
 export const PROFESSIONAL_PLAN = 'professional';
 export const PROFESSIONAL_MONTHLY_USD_MINOR = 19_900;
@@ -179,7 +179,17 @@ export class CommerceAdminService {
       await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', action: 'plan.price.create', targetType: 'plan_price', targetId: created.id, afterState: { planCode: code, ...input }, requestMeta: meta }, tx);
       return created;
     });
-    return this.billing.syncPriceToStripe(price.id);
+    return input.stripePriceId ? this.billing.linkStripePrice(price.id, input.stripePriceId) : this.billing.syncPriceToStripe(price.id);
+  }
+
+  /** Links an existing Stripe price to a plan price (restricted keys cannot create products). */
+  async linkStripePrice(userId: string, code: string, priceId: string, stripePriceId: string, meta?: RequestMeta) {
+    await this.guard(userId);
+    const price = await this.prisma.planPrice.findUnique({ where: { id: priceId }, include: { plan: true } });
+    if (!price || price.plan.code !== code) throw new NotFoundException({ code: 'PRICE_NOT_FOUND', message: 'Price not found.' });
+    const saved = await this.billing.linkStripePrice(price.id, stripePriceId);
+    await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', action: 'plan.price.link_stripe', targetType: 'plan_price', targetId: price.id, beforeState: { providerPriceId: price.providerPriceId }, afterState: { providerPriceId: stripePriceId }, requestMeta: meta });
+    return saved;
   }
 
   async setEntitlements(userId: string, code: string, entitlements: EntitlementInput[], meta?: RequestMeta) {

@@ -9,9 +9,11 @@ import { apiGet, qs } from '@/lib/api';
 import { formatDate, formatDateTime, humanize } from '@/lib/format';
 import { getAppContext } from '@/lib/project';
 import { getQuote, quoteText } from '@/lib/credits';
+import { DraftArticleButton } from '@/components/app/AiAssist';
+import { ContentAudit } from './ContentAudit';
 import s from './content.module.css';
 
-export type ContentTab = 'ideas' | 'clusters' | 'plan' | 'briefs' | 'optimized';
+export type ContentTab = 'ideas' | 'clusters' | 'plan' | 'briefs' | 'optimized' | 'audit';
 
 type Summary = { ideas: number; briefs: number; planned: number; published: number; optimized: number; clusters: number; aiAvailable: boolean };
 type Idea = { id: string; title: string; status: string; source: string; createdAt: string; metadata: { targetKeyword?: string; intent?: string; format?: string; rationale?: string; priority?: string } | null };
@@ -32,6 +34,7 @@ const TABS: { key: ContentTab; label: string; href: string }[] = [
   { key: 'plan', label: 'Content Plan', href: '/app/content/plan' },
   { key: 'briefs', label: 'Drafts', href: '/app/content/briefs' },
   { key: 'optimized', label: 'Optimized Content', href: '/app/content/optimized' },
+  { key: 'audit', label: 'Content Audit', href: '/app/content/audit' },
 ];
 
 const FEATURES = [
@@ -60,7 +63,7 @@ export async function ContentStrategy({ tab, status }: { tab: ContentTab; status
         {TABS.map((t) => (
           <Link key={t.key} href={t.href} className={`${s.tab} ${t.key === tab ? s.tabActive : ''}`} aria-current={t.key === tab ? 'page' : undefined}>
             {t.label}
-            {sum && <small className={s.count}>{{ ideas: sum.ideas, clusters: sum.clusters, plan: sum.planned, briefs: sum.briefs, optimized: sum.optimized }[t.key]}</small>}
+            {sum && <small className={s.count}>{{ ideas: sum.ideas, clusters: sum.clusters, plan: sum.planned, briefs: sum.briefs, optimized: sum.optimized, audit: undefined }[t.key]}</small>}
           </Link>
         ))}
       </nav>
@@ -102,6 +105,7 @@ export async function ContentStrategy({ tab, status }: { tab: ContentTab; status
           {tab === 'plan' && <Plans projectId={project.id} />}
           {tab === 'briefs' && <Briefs projectId={project.id} aiAvailable={!!sum?.aiAvailable} />}
           {tab === 'optimized' && <Optimized projectId={project.id} />}
+          {tab === 'audit' && <ContentAudit projectId={project.id} aiAvailable={!!sum?.aiAvailable} />}
         </div>
       )}
 
@@ -218,7 +222,8 @@ async function Ideas({ projectId, aiAvailable, status }: { projectId: string; ai
 async function Briefs({ projectId, aiAvailable }: { projectId: string; aiAvailable: boolean }) {
   const res = await apiGet<Brief[]>(`/user/projects/${projectId}/content/briefs`, { auth: true });
   const briefs = res.ok ? res.data : [];
-  const quote = aiAvailable ? await getAppContext().then((c) => getQuote(c.workspaceId, 'ai.content_brief')) : null;
+  const ctx = aiAvailable ? await getAppContext() : null;
+  const [quote, draftQuote] = ctx ? await Promise.all([getQuote(ctx.workspaceId, 'ai.content_brief'), getQuote(ctx.workspaceId, 'ai.article_draft')]) : [null, null];
   return (
     <>
       <Panel title="New Content Brief" description={`A brief gives the writer the outline, questions to answer and keywords to cover.${quote ? ` AI draft: ${quoteText(quote)}` : ''}`}>
@@ -253,6 +258,7 @@ async function Briefs({ projectId, aiAvailable }: { projectId: string; aiAvailab
               <ButtonLink size="sm" variant="outline" href={`/app/content/briefs/${b.id}`}>
                 Open
               </ButtonLink>
+              {aiAvailable && b.briefJson?.generatedAt && <DraftArticleButton briefId={b.id} quote={(draftQuote && quoteText(draftQuote)) || undefined} />}
               <ActionButton size="sm" variant="ghost" method="PATCH" path={`/user/content/briefs/${b.id}`} body={{ status: 'ARCHIVED' }} confirm={`Archive “${b.title}”?`}>
                 Archive
               </ActionButton>

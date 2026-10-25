@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { FileText, PenLine, Sparkles } from 'lucide-react';
 import { Badge, EmptyState, Field, Input, KeyValue, PageHeader, Panel, Select } from '@/components/ui';
 import { ActionButton, ApiForm } from '@/components/ui/actions';
+import { DraftArticleButton } from '@/components/app/AiAssist';
 import { apiGet } from '@/lib/api';
 import { formatDateTime, humanize } from '@/lib/format';
 import { appCrumbs } from '@/lib/nav';
@@ -94,6 +95,7 @@ export default async function BriefPage({ params }: { params: Promise<{ id: stri
             >
               Write in Editor
             </ActionButton>
+            {aiAvailable && (j.outline?.length ?? 0) > 0 && <DraftArticleButton briefId={b.id} size="md" />}
           </>
         }
       />
