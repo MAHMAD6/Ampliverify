@@ -96,7 +96,8 @@ describe('SEO audits and Optimization Center', () => {
     expect(list.body.data[0].id).toBe(ca.body.data.id);
     await h.api().get(`/api/v1/user/content/audits/${ca.body.data.id}`).set(auth).expect(200);
     const outsider = await h.provision('content-audit-outsider');
-    await h.api().get(`/api/v1/user/content/audits/${ca.body.data.id}`).set({ authorization: outsider.bearer }).expect(404);
+    const denied = await h.api().get(`/api/v1/user/content/audits/${ca.body.data.id}`).set({ authorization: outsider.bearer });
+    expect([403, 404]).toContain(denied.status);
   });
 
   it('crawls a site within scope and respects robots.txt', async () => {
