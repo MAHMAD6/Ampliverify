@@ -46,6 +46,7 @@ import { ActionMessage } from '@/components/ui/actions';
 import { apiAction, apiQuery } from '@/lib/actions';
 import { documentToHtml, htmlToSections, newId, sectionHint, sectionLabel, starterOutline, type Section } from './model';
 import e from './editor.module.css';
+import { toast } from 'sonner';
 
 export type EditorAnalysis = {
   scores: { TECHNICAL: number; SEO: number; CONTENT: number; GEO: number; overall: number };
@@ -287,9 +288,13 @@ export function SeoEditor({
     start(async () => {
       try {
         const msg = await fn();
-        if (msg) setNotice(msg);
+        if (msg) {
+          setNotice(msg);
+          toast.success(msg);
+        }
       } catch (err) {
         setError((err as Error).message);
+        toast.error((err as Error).message);
       } finally {
         setBusy(null);
       }

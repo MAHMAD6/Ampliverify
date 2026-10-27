@@ -9,6 +9,7 @@ import { apiAction } from '@/lib/actions';
 import { ButtonLink, Button } from '@/components/ui';
 import type { Project } from '@/lib/types';
 import s from './projects.module.css';
+import { toast } from 'sonner';
 
 /** What deleting removes (shown in the confirmation). */
 const DELETE_SCOPE = [
@@ -30,7 +31,10 @@ export function ProjectRowActions({ project, openLabel = 'Open Project' }: { pro
   const remove = () =>
     start(async () => {
       const result = await apiAction('DELETE', `/user/projects/${project.id}`, undefined, ['/app/projects', '/app/dashboard']);
-      if (!result.ok) return setError(result.message);
+      if (!result.ok) {
+          toast.error(result.message);
+          return setError(result.message);
+        }
       dialog.current?.close();
       router.refresh();
     });
@@ -44,7 +48,10 @@ export function ProjectRowActions({ project, openLabel = 'Open Project' }: { pro
   const change = (status: Project['status']) =>
     start(async () => {
       const result = await setProjectStatus(project.id, status);
-      if (!result.ok) setError(result.message);
+      if (!result.ok) {
+          toast.error(result.message);
+          setError(result.message);
+        }
       setOpen(false);
     });
 

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
-import { ChevronRight, Home, Info } from 'lucide-react';
+import { ChevronRight, Home, Info, Loader2 } from 'lucide-react';
 import s from './ui.module.css';
 
 const cx = (...names: (string | false | null | undefined)[]) => names.filter(Boolean).join(' ');
@@ -11,19 +11,25 @@ export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'gre
 
 type ButtonBase = { variant?: ButtonVariant; size?: 'sm' | 'md' | 'lg'; block?: boolean; icon?: ReactNode };
 
+function Spinner() {
+  return <Loader2 size={16} className={s.spinner} aria-hidden />;
+}
+
 export function Button({
   variant = 'primary',
   size = 'md',
   block,
   icon,
+  loading,
   className,
   children,
   type = 'button',
+  disabled,
   ...rest
-}: ButtonBase & ComponentProps<'button'>) {
+}: ButtonBase & { loading?: boolean } & ComponentProps<'button'>) {
   return (
-    <button type={type} className={cx(s.btn, s[variant], size !== 'md' && s[size], block && s.block, className)} {...rest}>
-      {icon}
+    <button type={type} className={cx(s.btn, s[variant], size !== 'md' && s[size], block && s.block, className)} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
+      {loading ? <Spinner /> : icon}
       {children}
     </button>
   );

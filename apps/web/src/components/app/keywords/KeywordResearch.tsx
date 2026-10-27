@@ -10,6 +10,7 @@ import { LANGUAGES, LOCATIONS, type FilterDef, type MetricIcon, type TabConfig }
 import { KeywordDetailsPanel, KeywordResultsTable } from './KeywordResults';
 import { applyFilters, detailFor, runResearch, saveKeywords, type Filters, type SearchResult } from './source';
 import type { KeywordIdea } from './types';
+import { toast } from 'sonner';
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -152,7 +153,10 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
       const r = await runResearch(projectId, tab.key, value.trim(), location, language);
       if (r && 'error' in r) {
         setData(null);
-        return setError(r.error);
+        {
+          toast.error(r.error);
+          return setError(r.error);
+        }
       }
       setData(r);
       if (r?.seed) setSelected(r.seed.keyword);
@@ -164,7 +168,10 @@ export function KeywordResearch({ tab, projectId }: { tab: TabConfig; projectId:
     start(async () => {
       const r = await saveKeywords(projectId, keywords, location, language);
       setNote(r.ok ? `Saved ${keywords.length} keyword${keywords.length === 1 ? '' : 's'}.` : null);
-      if (!r.ok) setError(r.message);
+      if (!r.ok) {
+          toast.error(r.message);
+          setError(r.message);
+        }
     });
 
   const exportCsv = () => {

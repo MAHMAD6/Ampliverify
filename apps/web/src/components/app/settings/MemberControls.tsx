@@ -6,6 +6,7 @@ import { Copy, UserPlus } from 'lucide-react';
 import { apiAction } from '@/lib/actions';
 import { Button, Field, Input, Select } from '@/components/ui';
 import { ActionMessage } from '@/components/ui/actions';
+import { toast } from 'sonner';
 
 /** Invite by email; shows the accept link in case email delivery is not configured. */
 export function InviteMemberForm({ workspaceId }: { workspaceId: string }) {
@@ -23,7 +24,10 @@ export function InviteMemberForm({ workspaceId }: { workspaceId: string }) {
         setResult(null);
         start(async () => {
           const r = await apiAction<{ acceptUrl: string; emailed: boolean; email: string }>('POST', `/user/workspaces/${workspaceId}/invitations`, { email: String(f.get('email')), roleKey: String(f.get('roleKey')) });
-          if (!r.ok) return setError(r.message);
+          if (!r.ok) {
+          toast.error(r.message);
+          return setError(r.message);
+        }
           setResult(r.data);
           form.reset();
           router.refresh();
@@ -78,7 +82,10 @@ export function MemberRoleSelect({ workspaceId, userId, role, disabled }: { work
           start(async () => {
             setError(null);
             const r = await apiAction('PUT', `/user/workspaces/${workspaceId}/members/${userId}/role`, { roleKey: e.target.value });
-            if (!r.ok) setError(r.message);
+            if (!r.ok) {
+          toast.error(r.message);
+          setError(r.message);
+        }
             router.refresh();
           })
         }

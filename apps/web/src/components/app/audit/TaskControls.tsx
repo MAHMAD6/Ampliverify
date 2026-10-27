@@ -7,6 +7,7 @@ import { apiAction } from '@/lib/actions';
 import { Button, Select } from '@/components/ui';
 import { ActionMessage } from '@/components/ui/actions';
 import type { Member, TaskView } from '@/lib/app-types';
+import { toast } from 'sonner';
 
 const STATUSES: TaskView['status'][] = ['OPEN', 'IN_PROGRESS', 'BLOCKED', 'DONE', 'DISMISSED'];
 
@@ -21,7 +22,10 @@ export function TaskControls({ task, members }: { task: TaskView; members: Membe
       setError(null);
       setNote(null);
       const r = await apiAction(method, path, body, ['/app/optimize']);
-      if (!r.ok) return setError(r.message);
+      if (!r.ok) {
+          toast.error(r.message);
+          return setError(r.message);
+        }
       if (message) setNote(message);
       router.refresh();
     });

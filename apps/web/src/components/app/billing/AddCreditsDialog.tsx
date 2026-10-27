@@ -5,6 +5,7 @@ import { CreditCard, Database, Lock, Plus, X } from 'lucide-react';
 import { apiAction } from '@/lib/actions';
 import { Badge, Button, EmptyState } from '@/components/ui';
 import b from './billing.module.css';
+import { toast } from 'sonner';
 
 /** A purchasable pack as configured in billing (credits + price in minor units). */
 export type CreditPack = { id: string; credits: number; amountMinor: number; currency: string; bestValue?: boolean };
@@ -59,7 +60,10 @@ export function AddCreditsButton({
       if (!pack || !workspaceId) return;
       setError(null);
       const r = await apiAction<{ url: string }>('POST', `/user/workspaces/${workspaceId}/credits/checkout`, { packCode: pack.id });
-      if (!r.ok) return setError(r.message);
+      if (!r.ok) {
+          toast.error(r.message);
+          return setError(r.message);
+        }
       window.location.assign(r.data.url);
     });
 

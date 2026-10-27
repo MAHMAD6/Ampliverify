@@ -7,6 +7,7 @@ import { apiAction } from '@/lib/actions';
 import { Button, Field, Input, Select } from '@/components/ui';
 import { ActionMessage } from '@/components/ui/actions';
 import { REPORT_TYPES } from './meta';
+import { toast } from 'sonner';
 
 const SECTIONS = [
   ['overview', 'Overview'],
@@ -45,7 +46,10 @@ export function GenerateReportForm({ projects, defaultProjectId }: { projects: {
             periodEnd: new Date(String(f.get('to'))).toISOString(),
             ...(type === 'CUSTOM' ? { sections } : {}),
           });
-          if (!r.ok) return setError(r.message);
+          if (!r.ok) {
+          toast.error(r.message);
+          return setError(r.message);
+        }
           router.push(`/app/reports/${r.data.id}`);
         });
       }}
@@ -118,7 +122,10 @@ export function ShareReportButton({ reportId }: { reportId: string }) {
           start(async () => {
             setError(null);
             const r = await apiAction<{ url: string }>('POST', `/user/reports/${reportId}/shares`, {});
-            if (!r.ok) return setError(r.message);
+            if (!r.ok) {
+          toast.error(r.message);
+          return setError(r.message);
+        }
             setUrl(r.data.url);
             router.refresh();
           })

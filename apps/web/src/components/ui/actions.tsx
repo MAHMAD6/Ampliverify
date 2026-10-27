@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState, useTransition } from 'react';
+import { toast } from 'sonner';
 import { apiAction, uploadAction } from '@/lib/actions';
 import { Button, type ButtonVariant } from './index';
 import s from './ui.module.css';
@@ -68,33 +69,35 @@ export function ActionButton({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
   return (
     <span className={s.actionWrap}>
       <Button
         variant={variant}
         size={size}
         icon={icon}
-        disabled={disabled || pending}
+        disabled={disabled}
+        loading={pending}
         title={title}
-        aria-busy={pending}
         onClick={() => {
           if (confirm && !window.confirm(confirm)) return;
           setError(null);
-          setDone(null);
           start(async () => {
             const result = await apiAction(method, path, body, revalidate);
-            if (!result.ok) return setError(result.message);
+            if (!result.ok) {
+              setError(result.message);
+              toast.error(result.message);
+              return;
+            }
             onDone?.(result.data);
-            if (successMessage) setDone(successMessage);
+            if (successMessage) toast.success(successMessage);
             if (redirectTo) router.push(target(redirectTo, result.data));
             else router.refresh();
           });
         }}
       >
-        {pending ? 'Working…' : children}
+        {children}
       </Button>
-      <ActionMessage error={error} success={done} />
+      <ActionMessage error={error} />
     </span>
   );
 }
@@ -191,12 +194,10 @@ export function ApiForm({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     setError(null);
-    setDone(null);
     let values: Record<string, unknown>;
     try {
       values = readForm(form);
@@ -208,11 +209,15 @@ export function ApiForm({
       if (wrap) body = wrap.split('.').reduceRight<unknown>((inner, key) => ({ [key]: inner }), body);
       if (extra) body = { ...extra, ...(body as Record<string, unknown>) };
       const result = await apiAction(method, path, body, revalidate);
-      if (!result.ok) return setError(result.message);
+      if (!result.ok) {
+        setError(result.message);
+        toast.error(result.message);
+        return;
+      }
       onDone?.(result.data);
       if (resetOnSuccess) form.reset();
+      if (successMessage) toast.success(successMessage);
       if (redirectTo) return router.push(target(redirectTo, result.data));
-      if (successMessage) setDone(successMessage);
       router.refresh();
     });
   };
@@ -221,11 +226,11 @@ export function ApiForm({
       {children}
       <div className={s.formActions}>
         {!hideSubmit && (
-          <Button type="submit" variant={submitVariant} disabled={pending}>
-            {pending ? 'Saving…' : submitLabel}
+          <Button type="submit" variant={submitVariant} loading={pending}>
+            {submitLabel}
           </Button>
         )}
-        <ActionMessage error={error} success={done} />
+        <ActionMessage error={error} />
       </div>
     </form>
   );
@@ -245,15 +250,20 @@ export function UploadForm({ path, children, submitLabel = 'Upload', revalidate 
         setError(null);
         start(async () => {
           const result = await uploadAction(path, data, revalidate);
-          if (!result.ok) return setError(result.message);
+          if (!result.ok) {
+            setError(result.message);
+            toast.error(result.message);
+            return;
+          }
           form.reset();
+          toast.success('Uploaded.');
           router.refresh();
         });
       }}
     >
       {children}
       <div className={s.formActions}>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" loading={pending}>
           {pending ? 'Uploading…' : submitLabel}
         </Button>
         <ActionMessage error={error} />
@@ -286,12 +296,17 @@ export function RedirectButton({ path, body, children, variant = 'primary', size
         variant={variant}
         size={size}
         icon={icon}
-        disabled={disabled || pending}
+        disabled={disabled}
+        loading={pending}
         onClick={() =>
           start(async () => {
             setError(null);
             const result = await apiAction<{ url: string }>('POST', path, body ?? {});
-            if (!result.ok) return setError(result.message);
+            if (!result.ok) {
+              setError(result.message);
+              toast.error(result.message);
+              return;
+            }
             window.location.assign(result.data.url);
           })
         }

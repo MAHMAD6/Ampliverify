@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Lightbulb, PenLine, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiAction } from '@/lib/actions';
 import { Button } from '@/components/ui';
 
@@ -22,12 +23,15 @@ export function ExplainFinding({ findingId }: { findingId: string }) {
       setError(null);
       const r = await apiAction<Explanation>('POST', `/user/audit-findings/${findingId}/explain`);
       if (r.ok) setData(r.data);
-      else setError(r.message ?? 'Could not explain this finding.');
+      else {
+        setError(r.message ?? 'Could not explain this finding.');
+        toast.error(r.message ?? 'Could not explain this finding.');
+      }
     });
   return (
     <div>
       {!data && (
-        <Button size="sm" variant="ghost" icon={<Lightbulb size={14} />} onClick={run} disabled={pending}>
+        <Button size="sm" variant="ghost" icon={<Lightbulb size={14} />} onClick={run} loading={pending}>
           {pending ? 'Explaining…' : 'Explain with AI'}
         </Button>
       )}
@@ -69,13 +73,18 @@ export function DraftArticleButton({ briefId, size = 'sm', quote }: { briefId: s
     start(async () => {
       setError(null);
       const r = await apiAction<{ documentId: string }>('POST', `/user/content/briefs/${briefId}/draft`, undefined, ['/app/content']);
-      if (r.ok) router.push(`/app/editor/${r.data.documentId}`);
-      else setError(r.message ?? 'Could not write the draft.');
+      if (r.ok) {
+        toast.success('Draft written. Opening the editor…');
+        router.push(`/app/editor/${r.data.documentId}`);
+      } else {
+        setError(r.message ?? 'Could not write the draft.');
+        toast.error(r.message ?? 'Could not write the draft.');
+      }
     });
   };
   return (
     <span>
-      <Button size={size} variant="outline" icon={<PenLine size={14} />} onClick={run} disabled={pending}>
+      <Button size={size} variant="outline" icon={<PenLine size={14} />} onClick={run} loading={pending}>
         {pending ? 'Writing draft…' : 'Write draft with AI'}
       </Button>
       {error && <small style={{ display: 'block', color: 'var(--red, #b91c1c)' }}>{error}</small>}
@@ -92,8 +101,13 @@ export function GeoRecommendations({ promptId, initial, quote }: { promptId: str
     start(async () => {
       setError(null);
       const r = await apiAction<GeoRecs>('POST', `/user/geo/prompts/${promptId}/recommendations`);
-      if (r.ok) setData(r.data);
-      else setError(r.message ?? 'Could not generate recommendations.');
+      if (r.ok) {
+        setData(r.data);
+        toast.success('Recommendations ready.');
+      } else {
+        setError(r.message ?? 'Could not generate recommendations.');
+        toast.error(r.message ?? 'Could not generate recommendations.');
+      }
     });
   return (
     <section style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 18, background: 'var(--surface, #fff)' }}>
@@ -102,7 +116,7 @@ export function GeoRecommendations({ promptId, initial, quote }: { promptId: str
           <h2 style={{ margin: 0, fontSize: 17 }}>AI Recommendations</h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--muted)' }}>Inferred from the latest observed results — suggestions, not measurements.{quote ? ` ${quote}` : ''}</p>
         </div>
-        <Button size="sm" variant={data ? 'outline' : 'primary'} icon={<Sparkles size={14} />} onClick={run} disabled={pending}>
+        <Button size="sm" variant={data ? 'outline' : 'primary'} icon={<Sparkles size={14} />} onClick={run} loading={pending}>
           {pending ? 'Generating…' : data ? 'Regenerate' : 'Get recommendations'}
         </Button>
       </div>

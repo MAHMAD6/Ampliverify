@@ -7,6 +7,7 @@ import { Button } from '@/components/ui';
 import { humanize } from '@/lib/format';
 import type { Project } from '@/lib/types';
 import s from './projects.module.css';
+import { toast } from 'sonner';
 
 function useMenu() {
   const [open, setOpen] = useState(false);
@@ -27,7 +28,10 @@ export function StatusMenu({ project }: { project: Project }) {
   const change = (status: Project['status']) =>
     start(async () => {
       const r = await setProjectStatus(project.id, status);
-      if (!r.ok) setError(r.message);
+      if (!r.ok) {
+          toast.error(r.message);
+          setError(r.message);
+        }
       setOpen(false);
     });
   return (

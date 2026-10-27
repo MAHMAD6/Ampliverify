@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react';
 import { Button, Input } from '../ui';
 import { ActionMessage } from '../ui/actions';
 import { revokeUserSessions, setUserStatus } from '@/lib/admin-actions';
+import { toast } from 'sonner';
 
 type Kind = { type: 'revoke'; sessionId?: string } | { type: 'suspend' } | { type: 'reactivate' };
 
@@ -36,10 +37,15 @@ export function ReasonAction({ userId, kind, label, variant = 'outline' }: { use
             setError(null);
             const r =
               kind.type === 'revoke' ? await revokeUserSessions(userId, reason.trim(), kind.sessionId) : await setUserStatus(userId, kind.type === 'suspend' ? 'SUSPENDED' : 'ACTIVE', reason.trim());
-            if (!r.ok) return setError(r.message);
+            if (!r.ok) {
+          toast.error(r.message);
+          return setError(r.message);
+        }
             setOpen(false);
             setReason('');
-            setDone(kind.type === 'revoke' ? 'Signed out.' : kind.type === 'suspend' ? 'Suspended and signed out.' : 'Reactivated.');
+            const msg = kind.type === 'revoke' ? 'Signed out.' : kind.type === 'suspend' ? 'Suspended and signed out.' : 'Reactivated.';
+            setDone(msg);
+            toast.success(msg);
             router.refresh();
           })
         }

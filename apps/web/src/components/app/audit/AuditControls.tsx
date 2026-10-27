@@ -8,6 +8,7 @@ import { Button } from '@/components/ui';
 import { ActionMessage } from '@/components/ui/actions';
 import type { Finding } from '@/lib/app-types';
 import s from '../audit.module.css';
+import { toast } from 'sonner';
 
 /** URL bar + "Analyze for" mode; starts a real audit run. */
 export function RunAuditForm({ projectId, defaultUrl, mode, scope = 'PAGE', allowanceLeft = null }: { projectId: string; defaultUrl: string; mode: string; scope?: 'PAGE' | 'SITE'; allowanceLeft?: number | null }) {
@@ -27,7 +28,10 @@ export function RunAuditForm({ projectId, defaultUrl, mode, scope = 'PAGE', allo
         start(async () => {
           const apiMode = mode === 'geo' ? 'GEO' : mode === 'both' ? 'BOTH' : 'SEO';
           const result = await apiAction<{ id: string }>('POST', `/user/projects/${projectId}/audits`, { ...(url ? { url } : {}), mode: apiMode, scope, ...(psi ? { includePageSpeed: true, strategies: ['mobile', 'desktop'] } : {}), ...(onPage ? { includeOnPageApi: true } : {}) });
-          if (!result.ok) return setError(result.message);
+          if (!result.ok) {
+          toast.error(result.message);
+          return setError(result.message);
+        }
           router.push(`/app/audit?${new URLSearchParams({ ...(url && { url }), mode, run: result.data.id })}`);
         });
       }}
@@ -65,7 +69,10 @@ export function FindingActions({ projectId, finding, compact }: { projectId: str
     start(async () => {
       setError(null);
       const r = await fn();
-      if (!r.ok) return setError(r.message ?? 'Something went wrong.');
+      if (!r.ok) {
+          toast.error(r.message ?? 'Something went wrong.');
+          return setError(r.message ?? 'Something went wrong.');
+        }
       after?.(r.data);
       router.refresh();
     });

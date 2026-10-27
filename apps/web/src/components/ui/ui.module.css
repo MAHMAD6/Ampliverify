@@ -307,3 +307,8 @@
 .actionError { color: var(--red, #dc2626); font-size: 13px; margin: 4px 0 0; }
 .actionSuccess { color: var(--green, #16a34a); font-size: 13px; margin: 4px 0 0; }
 .formActions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+
+/* Button loading spinner */
+.spinner { animation: btn-spin 0.9s linear infinite; flex: none; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
