@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { apiGet, apiSend } from '@/lib/api';
 import { syncUserToApi } from '@/lib/auth-sync';
 import { normalizeHost } from '@/lib/domain';
+import { publicOrigin } from '@/lib/public-origin';
 import { safeNext } from '@/lib/safe-next';
 import { getSession } from '@/lib/session';
 
@@ -17,14 +18,15 @@ import { getSession } from '@/lib/session';
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
+  const origin = publicOrigin(url);
   const next = safeNext(url.searchParams.get('next'));
   const session = await getSession();
-  if (!session) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(next)}`, url));
+  if (!session) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent(next)}`, origin));
 
   try {
     await syncUserToApi(session.user);
   } catch {
-    return NextResponse.redirect(new URL('/login?error=provisioning', url));
+    return NextResponse.redirect(new URL('/login?error=provisioning', origin));
   }
 
   const orgs = await apiGet<{ id: string }[]>('/user/organizations', { auth: true });
@@ -32,7 +34,7 @@ export async function GET(request: NextRequest) {
     const host = normalizeHost(url.searchParams.get('website') ?? '');
     const name = (host ?? `${session.user.name || session.user.email.split('@')[0]}'s Workspace`).slice(0, 160);
     const created = await apiSend('POST', '/user/organizations', { name, workspaceName: name });
-    if (created.ok && host) return NextResponse.redirect(new URL(`/app/projects/new?domain=${encodeURIComponent(host)}`, url));
+    if (created.ok && host) return NextResponse.redirect(new URL(`/app/projects/new?domain=${encodeURIComponent(host)}`, origin));
   }
-  return NextResponse.redirect(new URL(next, url));
+  return NextResponse.redirect(new URL(next, origin));
 }

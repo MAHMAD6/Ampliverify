@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { publicOrigin } from '@/lib/public-origin';
 import { apiSend } from '@/lib/api';
 import { safeNext } from '@/lib/safe-next';
 
@@ -10,7 +11,7 @@ import { safeNext } from '@/lib/safe-next';
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const back = new URL('/app/settings/integrations', url.origin);
+  const back = new URL('/app/settings/integrations', publicOrigin(url));
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const error = url.searchParams.get('error');
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
   }
   const result = await apiSend<{ returnTo?: string | null }>('POST', '/user/integrations/google/callback', { code, state });
   if (result.ok && result.data.returnTo) {
-    const to = new URL(safeNext(result.data.returnTo, '/app/settings/integrations'), url.origin);
+    const to = new URL(safeNext(result.data.returnTo, '/app/settings/integrations'), publicOrigin(url));
     to.searchParams.set('connected', '1');
     return NextResponse.redirect(to);
   }
