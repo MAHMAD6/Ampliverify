@@ -136,7 +136,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
           LIMIT 100)
       RETURNING "id", "queue", "attempts"`;
     if (!rows.length) return;
-    await this.queue!.addBulk(rows.map((r) => ({ name: r.queue, data: { id: r.id }, opts: { jobId: `${r.id}:${r.attempts}` } })));
+    // BullMQ 5 rejects custom job IDs containing ':' (its key separator).
+    await this.queue!.addBulk(rows.map((r) => ({ name: r.queue, data: { id: r.id }, opts: { jobId: `${r.id}-${r.attempts}` } })));
   }
 
   /** Claims and runs one due job (PostgreSQL mode and tests). Returns false when nothing was due. */
