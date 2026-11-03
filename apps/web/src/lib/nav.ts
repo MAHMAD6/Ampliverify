@@ -115,6 +115,11 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
+    key: 'marketplace-group',
+    label: 'Marketplace',
+    items: [{ key: 'marketplace-review', label: 'Listing Review', href: '/admin/marketplace' }],
+  },
+  {
     key: 'support-group',
     label: 'Support',
     items: [

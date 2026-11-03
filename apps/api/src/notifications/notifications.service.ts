@@ -17,6 +17,9 @@ export const NOTIFICATION_EVENTS = [
   { key: 'workspace.member_joined', label: 'Member joined', description: 'Someone joined your workspace.', defaultEmail: false },
   { key: 'support.reply', label: 'Support reply', description: 'Our team replied to your support request.', defaultEmail: true },
   { key: 'task.assigned', label: 'Task assigned', description: 'An optimization task was assigned to you.', defaultEmail: true },
+  { key: 'marketplace.inquiry', label: 'Marketplace inquiry', description: 'A buyer asked about one of your listings.', defaultEmail: true },
+  { key: 'marketplace.inquiry_reply', label: 'Marketplace reply', description: 'A seller replied to your inquiry.', defaultEmail: true },
+  { key: 'marketplace.listing_reviewed', label: 'Listing reviewed', description: 'Your marketplace listing was approved or needs changes.', defaultEmail: true },
 ] as const;
 
 export type NotifyInput = { workspaceId: string; userId: string; eventKey: string; title: string; body: string };

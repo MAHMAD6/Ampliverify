@@ -476,43 +476,48 @@ model User {
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt   DateTime?  @map("deleted_at") @db.Timestamptz(6)
 
-  authAccounts      AuthAccount[]
-  authSessions      AuthSession[]
-  mfaFactors        MfaFactor[]
-  passkeys          Passkey[]
-  orgMemberships    OrganizationMembership[]
-  memberships       WorkspaceMembership[]
-  roleAssignments   RoleAssignment[]               @relation("AssignmentUser")
-  assignmentsMade   RoleAssignment[]               @relation("AssignmentCreator")
-  organizationsMade Organization[]                 @relation("OrganizationCreator")
-  workspacesCreated Workspace[]                    @relation("WorkspaceCreator")
-  projectsCreated   Project[]                      @relation("ProjectCreator")
-  tasksAssigned     OptimizationTask[]             @relation("TaskAssignee")
-  editorDocuments   EditorDocument[]
-  editorVersions    EditorVersion[]
-  editorEvents      EditorChangeEvent[]
-  keywordQueries    KeywordQuery[]
-  keywordLists      KeywordList[]
-  geoPrompts        GeoPrompt[]
-  reports           Report[]
-  integrations      WorkspaceIntegration[]
-  notificationPrefs NotificationPreference[]
-  notifications     Notification[]
-  cmsAuthor         CmsAuthor?
-  mediaAssets       MediaAsset[]
-  hiringNotes       HiringNote[]
-  moduleControls    ModuleControl[]
-  systemSettings    SystemSetting[]
-  securitySettings  SecuritySetting[]
-  adminActivity     AdminActivity[]
-  adjustmentsAsked  CreditAdjustment[]             @relation("AdjustmentRequester")
-  adjustmentsSigned CreditAdjustment[]             @relation("AdjustmentApprover")
-  overridesCreated  WorkspaceEntitlementOverride[]
-  invitationsSent   WorkspaceInvitation[]          @relation("InvitationSender")
-  dataExports       DataExportRequest[]
-  supportTickets    SupportTicket[]
-  supportMessages   SupportTicketMessage[]
-  websiteValuations WebsiteValuation[]
+  authAccounts         AuthAccount[]
+  authSessions         AuthSession[]
+  mfaFactors           MfaFactor[]
+  passkeys             Passkey[]
+  orgMemberships       OrganizationMembership[]
+  memberships          WorkspaceMembership[]
+  roleAssignments      RoleAssignment[]               @relation("AssignmentUser")
+  assignmentsMade      RoleAssignment[]               @relation("AssignmentCreator")
+  organizationsMade    Organization[]                 @relation("OrganizationCreator")
+  workspacesCreated    Workspace[]                    @relation("WorkspaceCreator")
+  projectsCreated      Project[]                      @relation("ProjectCreator")
+  tasksAssigned        OptimizationTask[]             @relation("TaskAssignee")
+  editorDocuments      EditorDocument[]
+  editorVersions       EditorVersion[]
+  editorEvents         EditorChangeEvent[]
+  keywordQueries       KeywordQuery[]
+  keywordLists         KeywordList[]
+  geoPrompts           GeoPrompt[]
+  reports              Report[]
+  integrations         WorkspaceIntegration[]
+  notificationPrefs    NotificationPreference[]
+  notifications        Notification[]
+  cmsAuthor            CmsAuthor?
+  mediaAssets          MediaAsset[]
+  hiringNotes          HiringNote[]
+  moduleControls       ModuleControl[]
+  systemSettings       SystemSetting[]
+  securitySettings     SecuritySetting[]
+  marketplaceListings  MarketplaceListing[]           @relation("ListingSeller")
+  marketplaceReviews   MarketplaceListing[]           @relation("ListingReviewer")
+  marketplaceInquiries MarketplaceInquiry[]           @relation("InquiryBuyer")
+  marketplacePurchases MarketplaceTransaction[]       @relation("TransactionBuyer")
+  marketplaceSales     MarketplaceTransaction[]       @relation("TransactionSeller")
+  adminActivity        AdminActivity[]
+  adjustmentsAsked     CreditAdjustment[]             @relation("AdjustmentRequester")
+  adjustmentsSigned    CreditAdjustment[]             @relation("AdjustmentApprover")
+  overridesCreated     WorkspaceEntitlementOverride[]
+  invitationsSent      WorkspaceInvitation[]          @relation("InvitationSender")
+  dataExports          DataExportRequest[]
+  supportTickets       SupportTicket[]
+  supportMessages      SupportTicketMessage[]
+  websiteValuations    WebsiteValuation[]
 
   @@index([status])
   @@map("users")
@@ -657,6 +662,8 @@ model Workspace {
   dataExports          DataExportRequest[]
   supportTickets       SupportTicket[]
   websiteValuations    WebsiteValuation[]
+  marketplaceListings  MarketplaceListing[]
+  marketplaceInquiries MarketplaceInquiry[]
 
   @@unique([organizationId, slug])
   /// Target of the projects composite FK (project org must match workspace org).
@@ -3073,4 +3080,124 @@ model ContentAudit {
 
   @@index([projectId, createdAt(sort: Desc)])
   @@map("content_audits")
+}
+
+// ── Marketplace (Marketplace launcher notes, Nov 2026) ────────────────────
+// Listings are reviewed before they are public. Transactions are recorded only
+// by the verified payment workflow; nothing here creates sales or payouts.
+
+enum MarketplaceAssetType {
+  WEBSITE
+  DOMAIN
+  CONTENT_SITE
+  ECOMMERCE
+  SAAS
+  APP
+  OTHER
+
+  @@map("marketplace_asset_type")
+}
+
+enum MarketplaceListingStatus {
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  WITHDRAWN
+  SOLD
+
+  @@map("marketplace_listing_status")
+}
+
+enum MarketplaceInquiryStatus {
+  OPEN
+  REPLIED
+  CLOSED
+
+  @@map("marketplace_inquiry_status")
+}
+
+enum MarketplaceTransactionStatus {
+  PENDING
+  IN_ESCROW
+  COMPLETED
+  CANCELED
+  REFUNDED
+
+  @@map("marketplace_transaction_status")
+}
+
+model MarketplaceListing {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  sellerId            String                   @map("seller_id") @db.Uuid
+  workspaceId         String                   @map("workspace_id") @db.Uuid
+  title               String
+  assetType           MarketplaceAssetType     @map("asset_type")
+  url                 String?
+  summary             String
+  description         String
+  askingPriceMinor    BigInt                   @map("asking_price_minor")
+  currency            String                   @default("USD") @db.Char(3)
+  monthlyRevenueMinor BigInt?                  @map("monthly_revenue_minor")
+  monthlyVisitors     Int?                     @map("monthly_visitors")
+  status              MarketplaceListingStatus @default(PENDING_REVIEW)
+  reviewNote          String?                  @map("review_note")
+  reviewedBy          String?                  @map("reviewed_by") @db.Uuid
+  reviewedAt          DateTime?                @map("reviewed_at") @db.Timestamptz(6)
+  publishedAt         DateTime?                @map("published_at") @db.Timestamptz(6)
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  seller       User                     @relation("ListingSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  reviewer     User?                    @relation("ListingReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  workspace    Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  inquiries    MarketplaceInquiry[]
+  transactions MarketplaceTransaction[]
+
+  @@index([status, publishedAt])
+  @@index([sellerId, createdAt])
+  @@map("marketplace_listings")
+}
+
+model MarketplaceInquiry {
+  id          String                   @id @default(uuid()) @db.Uuid
+  listingId   String                   @map("listing_id") @db.Uuid
+  buyerId     String                   @map("buyer_id") @db.Uuid
+  workspaceId String                   @map("workspace_id") @db.Uuid
+  message     String
+  reply       String?
+  repliedAt   DateTime?                @map("replied_at") @db.Timestamptz(6)
+  status      MarketplaceInquiryStatus @default(OPEN)
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer     User               @relation("InquiryBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  @@index([listingId, createdAt])
+  @@index([buyerId, createdAt])
+  @@map("marketplace_inquiries")
+}
+
+model MarketplaceTransaction {
+  id                String                       @id @default(uuid()) @db.Uuid
+  listingId         String                       @map("listing_id") @db.Uuid
+  buyerId           String                       @map("buyer_id") @db.Uuid
+  sellerId          String                       @map("seller_id") @db.Uuid
+  amountMinor       BigInt                       @map("amount_minor")
+  currency          String                       @db.Char(3)
+  status            MarketplaceTransactionStatus @default(PENDING)
+  provider          String?
+  providerPaymentId String?                      @unique @map("provider_payment_id")
+  completedAt       DateTime?                    @map("completed_at") @db.Timestamptz(6)
+  createdAt         DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  buyer   User               @relation("TransactionBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller  User               @relation("TransactionSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@map("marketplace_transactions")
 }

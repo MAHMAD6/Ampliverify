@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   BarChart3,
   ChevronDown,
@@ -47,10 +47,12 @@ function isActive(pathname: string, href: string) {
   return href === '/app' ? pathname === '/app' : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function Sidebar({ items }: { items: NavItem[] }) {
+export function Sidebar({ items, launcher }: { items: NavItem[]; launcher?: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // A route change from outside the nav (e.g. the Marketplace launcher) closes the mobile drawer too.
+  useEffect(() => setMobileOpen(false), [pathname]);
 
   return (
     <>
@@ -122,6 +124,7 @@ export function Sidebar({ items }: { items: NavItem[] }) {
             );
           })}
         </nav>
+        {launcher}
         <div className={s.promo} style={{ marginTop: 24 }}>
           <div className={s.promoHead}>
             <span className={s.promoIcon}>

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { Calculator, ChevronDown, CreditCard, FileText, Home, Settings2, SlidersHorizontal, Users } from 'lucide-react';
+import { Calculator, ChevronDown, CreditCard, FileText, Home, Settings2, SlidersHorizontal, Store, Users } from 'lucide-react';
 import { ADMIN_NAV } from '@/lib/nav';
 import { Logo } from '../brand/Logo';
 import s from './admin.module.css';
@@ -14,6 +14,7 @@ const ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   'content-group': FileText,
   'billing-group': CreditCard,
   'valuation-group': Calculator,
+  'marketplace-group': Store,
   'ops-group': Settings2,
   'settings-group': SlidersHorizontal,
 };
