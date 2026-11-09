@@ -71,6 +71,7 @@ export type Me = {
   displayName: string | null;
   status: string;
   createdAt: string;
+  seller?: { status: 'ONBOARDING' | 'ACTIVE' | 'SUSPENDED' } | null;
 };
 
 export type Project = {

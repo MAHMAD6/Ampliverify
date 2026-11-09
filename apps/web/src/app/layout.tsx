@@ -5,10 +5,14 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
+const SITE = (process.env.SITE_URL ?? process.env.BETTER_AUTH_URL ?? 'https://ampliverify.com').replace(/\/$/, '');
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE),
   title: { default: 'AmpliVerify — SEO Engineering', template: '%s · AmpliVerify' },
   description: 'Audit, optimize and verify your SEO and AI search visibility in one structured workflow.',
   icons: { icon: '/brand/mark-transparent.png' },
+  openGraph: { siteName: 'AmpliVerify', type: 'website' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

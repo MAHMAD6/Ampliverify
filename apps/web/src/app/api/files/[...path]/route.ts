@@ -6,6 +6,8 @@ const ALLOWED = [
   /^user\/reports\/[0-9a-f-]{36}\/download\/(html|pdf|csv)$/,
   /^user\/exports\/[0-9a-f-]{36}\/download$/,
   /^admin\/applicant-files\/[0-9a-f-]{36}$/,
+  /^user\/marketplace\/downloads\/[0-9a-f-]{36}\/file$/,
+  /^admin\/marketplace\/verifications\/[0-9a-f-]{36}\/files\/[0-4]$/,
 ];
 
 /**

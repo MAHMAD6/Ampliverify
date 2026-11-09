@@ -32,7 +32,7 @@
 .popover {
   position: fixed;
   z-index: 60;
-  width: min(560px, calc(100vw - 300px));
+  width: min(760px, calc(100vw - 300px));
   max-height: calc(100vh - 24px);
   overflow-y: auto;
   background: var(--surface, #fff);

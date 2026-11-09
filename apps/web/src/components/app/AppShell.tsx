@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { APP_NAV } from '@/lib/nav';
+import { APP_NAV_GROUPS } from '@/lib/nav';
 import type { Me, Project } from '@/lib/types';
 import { Notice } from '../ui';
 import { MarketplaceLauncher } from './marketplace/MarketplaceLauncher';
@@ -10,7 +10,7 @@ import s from './shell.module.css';
 export function AppShell({ me, projects, selectedId, unread = 0, children }: { me: Me | null; projects: Project[]; selectedId?: string; unread?: number; children: ReactNode }) {
   return (
     <div className={s.app}>
-      <Sidebar items={APP_NAV} launcher={<MarketplaceLauncher />} />
+      <Sidebar groups={APP_NAV_GROUPS} seller={!!me?.seller} launcher={<MarketplaceLauncher seller={!!me?.seller} />} />
       <div className={s.main}>
         <Topbar me={me} projects={projects} selectedId={selectedId} unread={unread} />
         <main className={s.content}>

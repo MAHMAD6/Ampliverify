@@ -8,6 +8,18 @@ const RENAMED: [string, string][] = [
   ['/app/settings/data-privacy', '/app/settings/privacy'],
 ];
 
+const MARKET_MOVED: [string, string][] = [
+  ['/app/marketplace', '/buyer'],
+  ['/app/marketplace/browse', '/buyer/browse'],
+  ['/app/marketplace/browse/:id', '/buyer/listings/:id'],
+  ['/app/marketplace/sell', '/seller/listings/new'],
+  ['/app/marketplace/listings', '/seller/listings'],
+  ['/app/marketplace/listings/:id', '/seller/listings/:id'],
+  ['/app/marketplace/inquiries', '/buyer/inquiries'],
+  ['/app/marketplace/purchases', '/buyer/purchases'],
+  ['/app/marketplace/transactions', '/buyer/transactions'],
+];
+
 const dev = process.env.NODE_ENV !== 'production';
 
 /**
@@ -70,6 +82,12 @@ const nextConfig: NextConfig = {
       { source: '/legal/privacy', destination: '/legal#privacy', permanent: true },
       { source: '/legal/terms', destination: '/legal#terms', permanent: true },
       { source: '/legal/cookies', destination: '/legal#cookies', permanent: true },
+      // Marketplace V1 routes moved to the dedicated Buyer / Seller dashboards (V2 guide §3, §1).
+      ...MARKET_MOVED.map(([source, destination]) => ({ source, destination, permanent: true })),
+      { source: '/website-value-calculator', destination: '/website-value', permanent: false },
+      { source: '/checkout/:id', destination: '/buyer/checkout/:id', permanent: false },
+      { source: '/purchase/success', destination: '/buyer/purchases', permanent: false },
+      { source: '/faq', destination: '/marketplace/faq', permanent: false },
     ];
   },
 };

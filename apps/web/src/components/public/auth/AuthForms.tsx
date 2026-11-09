@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
+import { passwordProblems } from '@/lib/password-policy';
 import { safeNext } from '@/lib/safe-next';
 import s from '../site.module.css';
 
@@ -235,9 +236,12 @@ export function ResetPasswordForm({ token, error: linkError }: { token?: string;
     const f = new FormData(e.currentTarget);
     const newPassword = String(f.get('password'));
     if (newPassword !== String(f.get('confirm'))) return setError('The passwords do not match.');
+    const problems = passwordProblems(newPassword);
+    if (problems.length) return setError(`Password needs ${problems.join(', ')}.`);
     run(async () => {
       const { error: err } = await authClient.resetPassword({ newPassword, token });
       if (!err) return router.push('/login?reset=1');
+      if (err.code === 'PASSWORD_TOO_WEAK') return setError(err.message ?? 'Choose a stronger password.');
       setError(err.code === 'INVALID_TOKEN' ? 'This reset link is invalid or has expired.' : 'Your password could not be updated. Please try again.');
     });
   };
@@ -246,7 +250,7 @@ export function ResetPasswordForm({ token, error: linkError }: { token?: string;
       <Messages error={error} notice={null} />
       <label>
         New password
-        <input className={s.input} type="password" name="password" autoComplete="new-password" minLength={8} maxLength={128} placeholder="At least 8 characters" required />
+        <input className={s.input} type="password" name="password" autoComplete="new-password" minLength={8} maxLength={128} placeholder="8+ characters with upper and lower case, a number and a symbol" required />
       </label>
       <label>
         Confirm new password

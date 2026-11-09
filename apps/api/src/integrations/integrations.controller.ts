@@ -59,6 +59,11 @@ export class IntegrationsController {
   list(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
     return this.integrations.list(a.userId, id);
   }
+  @Get('workspaces/:id/integrations/activity')
+  activity(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.integrations.activity(a.userId, id);
+  }
+
   @Post('workspaces/:id/integrations/wordpress')
   wordpress(@CurrentActor() a: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Body() dto: WordPressDto, @Req() req: Request) {
     return this.integrations.connectWordPress(a.userId, id, dto, requestMeta(req));

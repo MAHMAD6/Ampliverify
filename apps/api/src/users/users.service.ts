@@ -32,6 +32,12 @@ export class UsersService {
     return user;
   }
 
+  /** The signed-in user plus whether they have started selling (drives the Finances and Seller navigation). */
+  async me(id: string) {
+    const [user, seller] = await Promise.all([this.findByIdOrThrow(id), this.prisma.sellerProfile.findUnique({ where: { userId: id }, select: { status: true } })]);
+    return { ...user, seller: seller ? { status: seller.status } : null };
+  }
+
   /** Provision or update the API user from the trusted auth service. */
   async syncAuthUser(dto: SyncUserDto) {
     const email = dto.email.trim();

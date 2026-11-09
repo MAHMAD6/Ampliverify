@@ -4,29 +4,41 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRight, ArrowRightLeft, ChevronRight, LayoutDashboard, MessageSquare, PackagePlus, Search, ShoppingBag, Store, Tags, X } from 'lucide-react';
+import { ArrowRight, ArrowRightLeft, Banknote, Briefcase, ChevronRight, ClipboardCheck, FileText, FolderOpen, LayoutDashboard, MessageSquare, PackagePlus, Search, ShoppingBag, Store, Tags, Wallet, X } from 'lucide-react';
 import s from './launcher.module.css';
 
-/** Marketplace menu destinations (Marketplace launcher notes §3). */
+/** Launcher destinations (launcher notes §3, V2 guide §2.1): Digital Assets, Marketplace and, for sellers, Finances. */
 export const MARKETPLACE_GROUPS = [
   {
-    title: 'Explore Marketplace',
+    title: 'Digital Assets',
     items: [
-      { label: 'Marketplace Dashboard', href: '/app/marketplace', icon: LayoutDashboard },
-      { label: 'Browse Digital Assets', href: '/app/marketplace/browse', icon: Search },
-      { label: 'Sell a Digital Asset', href: '/app/marketplace/sell', icon: PackagePlus },
+      { label: 'Digital Assets Dashboard', href: '/app/assets', icon: Briefcase, exact: true },
+      { label: 'My Portfolio', href: '/app/assets/portfolio', icon: FolderOpen },
+      { label: 'Acquisition Analyzer', href: '/app/assets/acquisitions', icon: ClipboardCheck },
     ],
   },
   {
-    title: 'My Marketplace',
+    title: 'Marketplace',
     items: [
-      { label: 'My Listings', href: '/app/marketplace/listings', icon: Tags },
-      { label: 'My Inquiries', href: '/app/marketplace/inquiries', icon: MessageSquare },
-      { label: 'My Purchases', href: '/app/marketplace/purchases', icon: ShoppingBag },
-      { label: 'Transactions', href: '/app/marketplace/transactions', icon: ArrowRightLeft },
+      { label: 'Marketplace Dashboard', href: '/buyer', icon: LayoutDashboard, exact: true },
+      { label: 'Browse Digital Assets', href: '/buyer/browse', icon: Search },
+      { label: 'Sell a Digital Asset', href: '/seller/listings/new', icon: PackagePlus },
+      { label: 'My Listings', href: '/seller/listings', icon: Tags, exact: true },
+      { label: 'My Inquiries', href: '/buyer/inquiries', icon: MessageSquare },
+      { label: 'My Purchases', href: '/buyer/purchases', icon: ShoppingBag },
+      { label: 'Transactions', href: '/buyer/transactions', icon: ArrowRightLeft },
     ],
   },
-] as const;
+  {
+    title: 'Finances',
+    sellerOnly: true,
+    items: [
+      { label: 'Financial Overview', href: '/seller/payouts', icon: Wallet, exact: true },
+      { label: 'Payouts', href: '/seller/payouts/history', icon: Banknote },
+      { label: 'Tax & Statements', href: '/seller/payouts/statements', icon: FileText },
+    ],
+  },
+];
 
 const MOBILE = '(max-width: 1080px)';
 const FOCUSABLE = 'a[href], button:not([disabled])';
@@ -37,7 +49,7 @@ const FOCUSABLE = 'a[href], button:not([disabled])';
  * Closes on Escape, outside click, route selection or the Close button, and
  * returns focus to the launcher.
  */
-export function MarketplaceLauncher() {
+export function MarketplaceLauncher({ seller = false }: { seller?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
@@ -126,7 +138,8 @@ export function MarketplaceLauncher() {
     };
   }, [open, mobile, close]);
 
-  const isActive = (href: string) => (href === '/app/marketplace' ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
+  const isActive = (href: string, exact?: boolean) => pathname === href || (!exact && pathname.startsWith(`${href}/`));
+  const groups = MARKETPLACE_GROUPS.filter((g) => !g.sellerOnly || seller);
 
   const menu = open
     ? createPortal(
@@ -146,21 +159,21 @@ export function MarketplaceLauncher() {
                 <Store size={22} />
               </span>
               <div className={s.headText}>
-                <h2 id={titleId}>AmpliVerify Marketplace</h2>
-                <p>Buy and sell websites and other digital assets.</p>
+                <h2 id={titleId}>Explore AmpliVerify</h2>
+                <p>Manage, value, buy and sell websites and other digital assets.</p>
               </div>
-              <button type="button" className={s.close} onClick={() => close()} aria-label="Close Marketplace menu">
+              <button type="button" className={s.close} onClick={() => close()} aria-label="Close menu">
                 <X size={20} />
               </button>
             </div>
             <div className={s.groups}>
-              {MARKETPLACE_GROUPS.map((g) => (
+              {groups.map((g) => (
                 <nav key={g.title} className={s.group} aria-label={g.title}>
                   <h3>{g.title}</h3>
                   <ul>
                     {g.items.map((item) => (
                       <li key={item.href}>
-                        <Link href={item.href} className={`${s.item} ${isActive(item.href) ? s.itemActive : ''}`} aria-current={isActive(item.href) ? 'page' : undefined} onClick={() => close(false)}>
+                        <Link href={item.href} className={`${s.item} ${isActive(item.href, item.exact) ? s.itemActive : ''}`} aria-current={isActive(item.href, item.exact) ? 'page' : undefined} onClick={() => close(false)}>
                           <item.icon size={18} aria-hidden />
                           <span>{item.label}</span>
                           <ChevronRight size={16} className={s.itemArrow} aria-hidden />
@@ -171,7 +184,7 @@ export function MarketplaceLauncher() {
                 </nav>
               ))}
             </div>
-            <Link href="/app/marketplace" className={s.primary} onClick={() => close(false)}>
+            <Link href="/buyer" className={s.primary} onClick={() => close(false)}>
               Open Marketplace <ArrowRight size={18} aria-hidden />
             </Link>
           </div>
@@ -185,7 +198,7 @@ export function MarketplaceLauncher() {
       <button
         ref={button}
         type="button"
-        className={`${s.launcher} ${open ? s.launcherOpen : ''} ${pathname.startsWith('/app/marketplace') ? s.launcherCurrent : ''}`}
+        className={`${s.launcher} ${open ? s.launcherOpen : ''} ${pathname.startsWith('/app/assets') ? s.launcherCurrent : ''}`}
         aria-expanded={open}
         aria-controls={panelId}
         aria-haspopup="dialog"

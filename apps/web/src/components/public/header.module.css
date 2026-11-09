@@ -17,7 +17,7 @@
   transition: box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
 }
 .scrolled { border-bottom-color: var(--line); box-shadow: 0 8px 24px -18px rgba(11, 27, 53, 0.35); background: rgba(255, 255, 255, 0.97); }
-.inner { width: min(1264px, calc(100% - 40px)); margin: 0 auto; height: 76px; display: flex; align-items: center; gap: 20px; }
+.inner { width: min(1400px, calc(100% - 40px)); margin: 0 auto; height: 76px; display: flex; align-items: center; gap: 20px; }
 
 /* Desktop nav */
 .nav { display: flex; align-items: center; gap: 4px; margin: 0 auto; }

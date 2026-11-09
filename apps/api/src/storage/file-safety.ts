@@ -9,6 +9,8 @@ const SIGNATURES: { mime: string; ext: string; test: (b: Buffer) => boolean }[] 
   { mime: 'image/webp', ext: 'webp', test: (b) => b.subarray(0, 4).toString('latin1') === 'RIFF' && b.subarray(8, 12).toString('latin1') === 'WEBP' },
   // DOCX is a ZIP container; accepted only where the caller allows it.
   { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', ext: 'docx', test: (b) => b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04 },
+  // Any other ZIP container (archives of digital products).
+  { mime: 'application/zip', ext: 'zip', test: (b) => b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04 },
   // ISO base media (MP4 / QuickTime): "ftyp" box at offset 4.
   { mime: 'video/quicktime', ext: 'mov', test: (b) => b.subarray(4, 8).toString('latin1') === 'ftyp' && b.subarray(8, 10).toString('latin1') === 'qt' },
   { mime: 'video/mp4', ext: 'mp4', test: (b) => b.subarray(4, 8).toString('latin1') === 'ftyp' },

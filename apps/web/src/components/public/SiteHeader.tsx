@@ -3,28 +3,59 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowRight, BookOpen, Briefcase, Building2, Calculator, ChevronDown, HelpCircle, Mail, Menu, Newspaper, Search, X } from 'lucide-react';
+import { ArrowRight, BookOpen, Briefcase, Building2, Calculator, ChevronDown, ClipboardCheck, FileSearch, HelpCircle, LayoutGrid, LineChart, Mail, Menu as MenuIcon, Newspaper, PackagePlus, PenSquare, Search, ShoppingBag, Sparkles, Store, TrendingUp, Workflow, X } from 'lucide-react';
 import { Brand } from './Brand';
 import h from './header.module.css';
 
 type Item = { label: string; href: string; icon: React.ReactNode; text: string };
+type Menu = { key: string; label: string; items: Item[] };
+type Entry = { label: string; href: string } | Menu;
 
-const MAIN = [
-  ['Home', '/'],
-  ['Features', '/features'],
-  ['How It Works', '/how-it-works'],
-  ['Pricing', '/pricing'],
-] as const;
-
-const MENUS: { key: string; label: string; items: Item[] }[] = [
+/** Header order (V2 guide §4.2): Home | Features | Asset Tools | Marketplace | Pricing | Resources | Company. */
+const NAV: Entry[] = [
+  { label: 'Home', href: '/' },
+  {
+    key: 'features',
+    label: 'Features',
+    items: [
+      { label: 'All Features', href: '/features', icon: <LayoutGrid size={18} />, text: 'Everything in the SEO workspace' },
+      { label: 'On-Page SEO Audit', href: '/seo-audit', icon: <Search size={18} />, text: 'Find technical and on-page issues' },
+      { label: 'SEO Editor', href: '/seo-editor', icon: <PenSquare size={18} />, text: 'Optimize pages with live guidance' },
+      { label: 'GEO / AI Search', href: '/geo-ai-search', icon: <Sparkles size={18} />, text: 'Visibility in AI answers' },
+      { label: 'Content Audit', href: '/content-audit', icon: <FileSearch size={18} />, text: 'Review content quality at scale' },
+    ],
+  },
+  {
+    key: 'asset-tools',
+    label: 'Asset Tools',
+    items: [
+      { label: 'Asset Tools Overview', href: '/asset-tools', icon: <Briefcase size={18} />, text: 'Manage websites as digital assets' },
+      { label: 'Website Value Calculator', href: '/website-value', icon: <Calculator size={18} />, text: 'Free estimate of a site’s value' },
+      { label: 'Acquisition Analysis', href: '/asset-tools/acquisition-analysis', icon: <ClipboardCheck size={18} />, text: 'Check a site before you buy' },
+      { label: 'Asset Optimization', href: '/asset-tools/asset-optimization', icon: <TrendingUp size={18} />, text: 'Plan improvements that add value' },
+      { label: 'Valuation & Performance', href: '/asset-tools/valuation-performance', icon: <LineChart size={18} />, text: 'Track value and earnings over time' },
+    ],
+  },
+  {
+    key: 'marketplace',
+    label: 'Marketplace',
+    items: [
+      { label: 'Marketplace Overview', href: '/marketplace', icon: <Store size={18} />, text: 'Buy and sell digital assets' },
+      { label: 'Browse Listings', href: '/marketplace/listings', icon: <ShoppingBag size={18} />, text: 'Reviewed websites and products' },
+      { label: 'Sell a Digital Asset', href: '/sell', icon: <PackagePlus size={18} />, text: 'List a website or digital product' },
+      { label: 'How the Marketplace Works', href: '/marketplace/how-it-works', icon: <Workflow size={18} />, text: 'Verification, offers and delivery' },
+      { label: 'Marketplace FAQ', href: '/marketplace/faq', icon: <HelpCircle size={18} />, text: 'Common buyer and seller questions' },
+    ],
+  },
+  { label: 'Pricing', href: '/pricing' },
   {
     key: 'resources',
     label: 'Resources',
     items: [
+      { label: 'How It Works', href: '/how-it-works', icon: <Workflow size={18} />, text: 'From audit to verified results' },
       { label: 'Blog', href: '/blog', icon: <Newspaper size={18} />, text: 'SEO insights and product updates' },
       { label: 'Guides', href: '/guides', icon: <BookOpen size={18} />, text: 'Practical, step-by-step playbooks' },
       { label: 'Help Center', href: '/help', icon: <HelpCircle size={18} />, text: 'Answers and how-tos' },
-      { label: 'Website Value Calculator', href: '/website-value', icon: <Calculator size={18} />, text: 'Free estimate of your site’s value' },
     ],
   },
   {
@@ -37,6 +68,7 @@ const MENUS: { key: string; label: string; items: Item[] }[] = [
     ],
   },
 ];
+const isMenu = (e: Entry): e is Menu => 'items' in e;
 
 /**
  * Public header: sticky with a shadow once scrolled; desktop dropdowns open on
@@ -107,12 +139,13 @@ export function SiteHeader() {
       <div className={h.inner}>
         <Brand />
         <nav ref={navRef} className={h.nav} aria-label="Main">
-          {MAIN.map(([l, href]) => (
-            <Link key={href} href={href} className={`${h.link} ${on(href) ? h.active : ''}`} aria-current={on(href) ? 'page' : undefined}>
-              {l}
-            </Link>
-          ))}
-          {MENUS.map((m) => {
+          {NAV.map((m) => {
+            if (!isMenu(m))
+              return (
+                <Link key={m.href} href={m.href} className={`${h.link} ${on(m.href) ? h.active : ''}`} aria-current={on(m.href) ? 'page' : undefined}>
+                  {m.label}
+                </Link>
+              );
             const isOpen = open === m.key;
             const activeGroup = m.items.some((i) => on(i.href));
             return (
@@ -167,19 +200,20 @@ export function SiteHeader() {
             Get Started Free <ArrowRight size={18} />
           </Link>
           <button type="button" className={h.burger} aria-label={mobile ? 'Close menu' : 'Open menu'} aria-expanded={mobile} aria-controls="mobile-menu" onClick={() => setMobile(!mobile)}>
-            {mobile ? <X size={24} /> : <Menu size={24} />}
+            {mobile ? <X size={24} /> : <MenuIcon size={24} />}
           </button>
         </div>
       </div>
 
       <div id="mobile-menu" className={h.mobile} data-open={mobile} aria-hidden={!mobile}>
         <div className={h.mobileInner}>
-          {MAIN.map(([l, href]) => (
-            <Link key={href} href={href} className={`${h.mLink} ${on(href) ? h.mOn : ''}`} tabIndex={mobile ? 0 : -1}>
-              {l}
-            </Link>
-          ))}
-          {MENUS.map((m) => {
+          {NAV.map((m) => {
+            if (!isMenu(m))
+              return (
+                <Link key={m.href} href={m.href} className={`${h.mLink} ${on(m.href) ? h.mOn : ''}`} tabIndex={mobile ? 0 : -1}>
+                  {m.label}
+                </Link>
+              );
             const isOpen = section === m.key;
             return (
               <div key={m.key} className={h.mGroup}>

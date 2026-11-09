@@ -12,6 +12,7 @@ import { JobsService } from '../jobs/jobs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 import { StripeClient } from './stripe.client';
+import { StripeEventHooks } from './stripe-event-hooks';
 
 /** `stripePriceId` (optional): an existing one-time Stripe price used at checkout instead of an inline amount. */
 export type CreditPack = { code: string; name?: string; credits: number; amountMinor: number; currency: string; stripePriceId?: string | null };
@@ -63,6 +64,7 @@ export class BillingService implements OnModuleInit {
     private readonly stripe: StripeClient,
     private readonly config: ConfigService,
     private readonly platform: PlatformService,
+    private readonly hooks: StripeEventHooks,
   ) {}
 
   onModuleInit() {
@@ -294,6 +296,12 @@ export class BillingService implements OnModuleInit {
 
   /** Exposed for tests: applies one verified event. Returns false for ignored types. */
   async handleEvent(event: StripeEvent): Promise<boolean> {
+    const own = await this.handleBillingEvent(event);
+    const hooked = await this.hooks.dispatch(event);
+    return own || hooked;
+  }
+
+  private async handleBillingEvent(event: StripeEvent): Promise<boolean> {
     const obj = event.data.object;
     const metadata = (obj.metadata ?? {}) as Record<string, string>;
     const workspaceId = metadata.workspaceId ?? (await this.workspaceForCustomer(obj.customer as string | undefined));

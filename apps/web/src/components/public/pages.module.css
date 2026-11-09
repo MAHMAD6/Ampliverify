@@ -1,5 +1,5 @@
 /* Company / Resources / Legal pages from Public_Frontend (2): Careers, Contact, Help Center, Privacy Policy. */
-.wrap { width: min(1264px, calc(100% - 40px)); margin: 0 auto; }
+.wrap { width: min(1400px, calc(100% - 40px)); margin: 0 auto; }
 
 /* Hero with illustration */
 .artHero { position: relative; overflow: hidden; background: linear-gradient(180deg, #f3faf5 0%, #e8f5ec 100%); }

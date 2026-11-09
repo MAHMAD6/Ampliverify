@@ -6,11 +6,20 @@ import { Brand } from './Brand';
 import { FooterNav } from './FooterNav';
 import s from './site.module.css';
 
+/** Five columns (V2 guide §4.2); legal links sit in the bottom bar. */
 const COLUMNS = [
-  { title: 'Product', links: [['Features', '/features'], ['Pricing', '/pricing'], ['How It Works', '/how-it-works']] },
-  { title: 'Resources', links: [['Blog', '/blog'], ['Guides', '/guides'], ['Help Center', '/help'], ['Website Value Calculator', '/website-value']] },
-  { title: 'Company', links: [['About Us', '/about'], ['Careers', '/careers'], ['Contact', '/contact']] },
-  { title: 'Legal', links: [['Privacy Policy', '/legal'], ['Terms of Service', '/legal?doc=terms'], ['Cookie Policy', '/legal?doc=cookies'], ['DPA', '/legal?doc=dpa']] },
+  { title: 'Platform', links: [['SEO Audit', '/seo-audit'], ['SEO Editor', '/seo-editor'], ['GEO / AI Search', '/geo-ai-search'], ['Content Audit', '/content-audit'], ['Pricing', '/pricing']] },
+  { title: 'Asset Tools', links: [['Asset Overview', '/asset-tools/asset-overview'], ['Website Value Calculator', '/website-value'], ['Acquisition Analysis', '/asset-tools/acquisition-analysis'], ['Asset Optimization', '/asset-tools/asset-optimization'], ['Valuation & Performance', '/asset-tools/valuation-performance']] },
+  { title: 'Marketplace', links: [['Digital Assets for Sale', '/marketplace/listings'], ['Sell a Digital Asset', '/sell'], ['How the Marketplace Works', '/marketplace/how-it-works'], ['Seller Guidelines', '/seller-guidelines'], ['Refund Policy', '/digital-product-refund-policy']] },
+  { title: 'Resources', links: [['How It Works', '/how-it-works'], ['Blog', '/blog'], ['Guides', '/guides'], ['Help Center', '/help'], ['FAQ', '/marketplace/faq']] },
+  { title: 'Company', links: [['About Us', '/about'], ['Contact Us', '/contact'], ['Careers', '/careers']] },
+] as const;
+const LEGAL = [
+  ['Privacy Policy', '/privacy'],
+  ['Terms of Service', '/terms'],
+  ['Cookie Policy', '/cookies'],
+  ['Data Processing Addendum', '/dpa'],
+  ['Digital Product Refund Policy', '/digital-product-refund-policy'],
 ] as const;
 
 /** Brand glyphs drawn inline (lucide has no brand icons). */
@@ -35,7 +44,7 @@ export async function SiteFooter() {
       <div className={`${s.container} ${s.footerGrid}`}>
         <div>
           <Brand dark />
-          <p className={s.footerAbout}>AmpliVerify helps businesses improve search visibility through a structured, engineering-led approach to SEO.</p>
+          <p className={s.footerAbout}>SEO engineering and digital asset intelligence to help you evaluate, optimize and grow your online assets.</p>
           {social.length > 0 && (
             <div className={s.social}>
               {social.map(([k, url]) => (
@@ -47,6 +56,9 @@ export async function SiteFooter() {
               ))}
             </div>
           )}
+          <Link href="/signup" className={`${s.btn} ${s.footerCta}`} style={{ marginTop: 18 }}>
+            Get Started Free <ArrowRight size={18} />
+          </Link>
         </div>
         {COLUMNS.map((c) => (
           <Suspense
@@ -65,15 +77,16 @@ export async function SiteFooter() {
             <FooterNav title={c.title} links={c.links} />
           </Suspense>
         ))}
-        <div>
-          <Link href="/signup" className={`${s.btn} ${s.footerCta}`}>
-            Get Started Free <ArrowRight size={18} />
-          </Link>
-        </div>
       </div>
       <div className={`${s.container} ${s.copy}`}>
         <span>© {new Date().getFullYear()} AmpliVerify. All rights reserved.</span>
-        <span className={s.motto}>Audit · Optimize · Verify</span>
+        <nav aria-label="Legal" className={s.legalLinks}>
+          {LEGAL.map(([l, h]) => (
+            <Link key={h} href={h}>
+              {l}
+            </Link>
+          ))}
+        </nav>
       </div>
     </footer>
   );

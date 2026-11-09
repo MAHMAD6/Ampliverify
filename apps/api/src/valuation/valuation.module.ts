@@ -8,5 +8,6 @@ import { ValuationService } from './valuation.service';
   imports: [KeywordsModule, IntegrationsModule],
   controllers: [ValuationController],
   providers: [ValuationService],
+  exports: [ValuationService],
 })
 export class ValuationModule {}

@@ -1,67 +1,59 @@
 import Link from 'next/link';
-import { Store } from 'lucide-react';
-import { Badge, DataTable, Field, Input, PageHeader, Panel } from '@/components/ui';
-import { ActionButton, ApiForm } from '@/components/ui/actions';
+import { AlertTriangle, ArrowRightLeft, Banknote, ClipboardCheck, Store, Users } from 'lucide-react';
+import { DataTable, Grid, Metric, PageHeader, Panel } from '@/components/ui';
 import { StateView } from '@/components/ui/StateView';
+import { AdminMarketNav } from '@/components/admin/market/AdminMarketNav';
+import { StatusBadge } from '@/components/market/parts';
 import { adminGet } from '@/lib/admin-data';
 import { formatDateTime } from '@/lib/format';
-import { assetLabel, LISTING_STATUS, type ListingStatus, money, type OwnListing } from '@/lib/marketplace';
+import { CHECK_KIND, CHECK_STATUS, kindLabel, money, ORDER_STATUS, PAYOUT_STATUS } from '@/lib/marketplace';
 
-export const metadata = { title: 'Marketplace Listing Review · Admin' };
+export const metadata = { title: 'Marketplace Overview · Admin' };
 
-type AdminListing = OwnListing & { description: string; seller: { email: string; displayName: string | null } };
-const FILTERS: (ListingStatus | 'ALL')[] = ['PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'WITHDRAWN', 'SOLD', 'ALL'];
+type Overview = {
+  totals: { sellers: number; activeListings: number; pendingReview: number; completedTransactions: number; payoutsProcessed: number; payoutsMinor: number; openCases: number };
+  recentChecks: { id: string; kind: string; seller: string; status: string; createdAt: string }[];
+  recentListings: { id: string; title: string; kind: string; category: string | null; seller: string; submittedAt: string | null }[];
+  recentOrders: { id: string; listing: string; buyer: string | null; seller: string | null; amountMinor: number; currency: string; status: string; createdAt: string }[];
+  recentPayouts: { id: string; seller: string; amountMinor: number; currency: string; status: string; createdAt: string }[];
+};
 
-export default async function AdminMarketplacePage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const sp = await searchParams;
-  const status = (FILTERS as string[]).includes(sp.status ?? '') ? (sp.status as ListingStatus | 'ALL') : 'PENDING_REVIEW';
-  const rows = (await adminGet<AdminListing[]>(`/admin/marketplace/listings${status === 'ALL' ? '' : `?status=${status}`}`)) ?? null;
+/** Marketplace Overview (V2 guide §1): live totals and the work waiting for staff. */
+export default async function AdminMarketplaceOverview() {
+  const o = await adminGet<Overview>('/admin/marketplace/overview');
   return (
     <>
-      <PageHeader title="Marketplace Listing Review" description="Approve listings before buyers can see them. Rejections need a reason, which the seller sees." />
-      <nav aria-label="Status" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-        {FILTERS.map((f) => (
-          <Link key={f} href={`/admin/marketplace?status=${f}`} aria-current={status === f ? 'page' : undefined} style={{ padding: '6px 12px', borderRadius: 999, fontSize: 13, fontWeight: 600, textDecoration: 'none', border: '1px solid var(--line)', background: status === f ? 'var(--navy-950, #0b1f44)' : 'var(--surface)', color: status === f ? '#fff' : 'var(--text)' }}>
-            {f === 'ALL' ? 'All' : LISTING_STATUS[f].label}
-          </Link>
-        ))}
-      </nav>
-      {!rows ? (
+      <PageHeader title="Marketplace Overview" description="Sellers, listings, transactions and payouts across the Marketplace." />
+      <AdminMarketNav active="overview" />
+      {!o ? (
         <Panel>
-          <StateView kind="error" title="Listings could not be loaded with your permissions." />
-        </Panel>
-      ) : rows.length === 0 ? (
-        <Panel>
-          <StateView kind="empty" icon={<Store size={36} />} title="Nothing here" description={status === 'PENDING_REVIEW' ? 'No listings are waiting for review.' : 'No listings with this status.'} />
+          <StateView kind="error" title="The Marketplace overview could not be loaded with your permissions." />
         </Panel>
       ) : (
-        <div style={{ display: 'grid', gap: 14 }}>
-          {rows.map((l) => (
-            <Panel key={l.id} title={l.title} description={`${assetLabel(l.assetType)} · ${money(l.askingPriceMinor, l.currency)} · ${l.seller.displayName ?? ''} <${l.seller.email}> · submitted ${formatDateTime(l.updatedAt)}`} actions={<Badge tone={LISTING_STATUS[l.status].tone}>{LISTING_STATUS[l.status].label}</Badge>}>
-              <p style={{ margin: '0 0 6px', fontWeight: 600 }}>{l.summary}</p>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 14 }}>{l.description}</p>
-              <DataTable
-                columns={['Website', 'Monthly revenue', 'Monthly visitors']}
-                rows={[[l.url ?? '—', money(l.monthlyRevenueMinor, l.currency), l.monthlyVisitors?.toLocaleString('en-US') ?? '—']]}
-              />
-              {l.reviewNote && <p style={{ margin: '8px 0 0', fontSize: 13, color: 'var(--muted)' }}>Review note: {l.reviewNote}</p>}
-              {l.status === 'PENDING_REVIEW' && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', marginTop: 12 }}>
-                  <ActionButton path={`/admin/marketplace/listings/${l.id}/review`} body={{ decision: 'APPROVE' }} confirm={`Publish “${l.title}”?`} successMessage="Listing approved and published.">
-                    Approve & Publish
-                  </ActionButton>
-                  <div style={{ flex: '1 1 320px' }}>
-                    <ApiForm path={`/admin/marketplace/listings/${l.id}/review`} extra={{ decision: 'REJECT' }} submitLabel="Reject" submitVariant="outline" successMessage="Listing rejected; the seller was notified.">
-                      <Field label="Reason for rejection (shown to the seller)" htmlFor={`rj-${l.id}`}>
-                        <Input id={`rj-${l.id}`} name="note" required maxLength={1000} />
-                      </Field>
-                    </ApiForm>
-                  </div>
-                </div>
-              )}
+        <>
+          <Grid cols={4}>
+            <Metric label="Sellers" value={o.totals.sellers} icon={<Users size={22} />} tone="blue" />
+            <Metric label="Active listings" value={o.totals.activeListings} icon={<Store size={22} />} tone="green" />
+            <Metric label="Waiting for review" value={o.totals.pendingReview} note="Listings and seller checks" icon={<ClipboardCheck size={22} />} tone="amber" />
+            <Metric label="Open cases" value={o.totals.openCases} note="Refunds and disputes" icon={<AlertTriangle size={22} />} tone={o.totals.openCases ? 'red' : 'slate'} />
+            <Metric label="Completed transactions" value={o.totals.completedTransactions} icon={<ArrowRightLeft size={22} />} tone="purple" />
+            <Metric label="Payouts processed" value={o.totals.payoutsProcessed} note={money(o.totals.payoutsMinor, 'USD')} icon={<Banknote size={22} />} tone="green" />
+          </Grid>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16, marginTop: 16 }}>
+            <Panel title="Listings waiting for review" actions={<Link href="/admin/marketplace/listings">Review</Link>} bodyless>
+              <DataTable columns={['Listing', 'Type', 'Seller', 'Submitted']} rows={o.recentListings.map((l) => [l.title, kindLabel(l.kind), l.seller, formatDateTime(l.submittedAt)])} empty="No listings are waiting." />
             </Panel>
-          ))}
-        </div>
+            <Panel title="Seller checks waiting" actions={<Link href="/admin/marketplace/verification">Review</Link>} bodyless>
+              <DataTable columns={['Check', 'Seller', 'Status', 'Submitted']} rows={o.recentChecks.map((c) => [CHECK_KIND[c.kind] ?? c.kind, c.seller, <StatusBadge key="s" map={CHECK_STATUS} value={c.status} />, formatDateTime(c.createdAt)])} empty="No checks are waiting." />
+            </Panel>
+            <Panel title="Recent orders" actions={<Link href="/admin/marketplace/transactions">All transactions</Link>} bodyless>
+              <DataTable columns={['Listing', 'Buyer', 'Amount', 'Status', 'Date']} rows={o.recentOrders.map((r) => [r.listing, r.buyer ?? '—', money(r.amountMinor, r.currency), <StatusBadge key="s" map={ORDER_STATUS} value={r.status} />, formatDateTime(r.createdAt)])} empty="No orders yet." />
+            </Panel>
+            <Panel title="Recent payouts" actions={<Link href="/admin/marketplace/payouts">All payouts</Link>} bodyless>
+              <DataTable columns={['Seller', 'Amount', 'Status', 'Requested']} rows={o.recentPayouts.map((p) => [p.seller, money(p.amountMinor, p.currency), <StatusBadge key="s" map={PAYOUT_STATUS} value={p.status} />, formatDateTime(p.createdAt)])} empty="No payouts yet." />
+            </Panel>
+          </div>
+        </>
       )}
     </>
   );

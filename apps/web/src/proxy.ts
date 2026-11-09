@@ -13,4 +13,4 @@ export function proxy(request: NextRequest) {
   return NextResponse.redirect(login);
 }
 
-export const config = { matcher: ['/app/:path*', '/admin/:path*'] };
+export const config = { matcher: ['/app/:path*', '/admin/:path*', '/buyer/:path*', '/seller/:path*', '/buyer', '/seller'] };

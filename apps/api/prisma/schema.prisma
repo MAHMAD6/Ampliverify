@@ -509,6 +509,16 @@ model User {
   marketplaceInquiries MarketplaceInquiry[]           @relation("InquiryBuyer")
   marketplacePurchases MarketplaceTransaction[]       @relation("TransactionBuyer")
   marketplaceSales     MarketplaceTransaction[]       @relation("TransactionSeller")
+  sellerProfile        SellerProfile?                 @relation("SellerProfileUser")
+  savedListings        MarketplaceSavedListing[]      @relation("SavedListingUser")
+  marketplaceMessages  MarketplaceMessage[]           @relation("MessageSender")
+  offersMade           MarketplaceOffer[]             @relation("OfferBuyer")
+  offersReceived       MarketplaceOffer[]             @relation("OfferSeller")
+  ordersPlaced         MarketplaceOrder[]             @relation("OrderBuyer")
+  ordersSold           MarketplaceOrder[]             @relation("OrderSeller")
+  sellerLedger         SellerLedgerEntry[]            @relation("LedgerSeller")
+  sellerPayouts        SellerPayout[]                 @relation("PayoutSeller")
+  marketplaceCases     MarketplaceCase[]              @relation("CaseBuyer")
   adminActivity        AdminActivity[]
   adjustmentsAsked     CreditAdjustment[]             @relation("AdjustmentRequester")
   adjustmentsSigned    CreditAdjustment[]             @relation("AdjustmentApprover")
@@ -664,6 +674,8 @@ model Workspace {
   websiteValuations    WebsiteValuation[]
   marketplaceListings  MarketplaceListing[]
   marketplaceInquiries MarketplaceInquiry[]
+  digitalAssets        DigitalAsset[]
+  acquisitionAnalyses  AcquisitionAnalysis[]
 
   @@unique([organizationId, slug])
   /// Target of the projects composite FK (project org must match workspace org).
@@ -805,6 +817,7 @@ model Project {
   roleAssignments   RoleAssignment[]
 
   googleMetrics GoogleMetric[]
+  digitalAssets DigitalAsset[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId, status, createdAt(sort: Desc)])
@@ -3099,7 +3112,9 @@ enum MarketplaceAssetType {
 }
 
 enum MarketplaceListingStatus {
+  DRAFT
   PENDING_REVIEW
+  CHANGES_REQUESTED
   PUBLISHED
   REJECTED
   WITHDRAWN
@@ -3118,6 +3133,9 @@ enum MarketplaceInquiryStatus {
 
 enum MarketplaceTransactionStatus {
   PENDING
+  AGREEMENT_PENDING
+  DUE_DILIGENCE
+  TRANSFER_IN_PROGRESS
   IN_ESCROW
   COMPLETED
   CANCELED
@@ -3144,14 +3162,32 @@ model MarketplaceListing {
   reviewedBy          String?                  @map("reviewed_by") @db.Uuid
   reviewedAt          DateTime?                @map("reviewed_at") @db.Timestamptz(6)
   publishedAt         DateTime?                @map("published_at") @db.Timestamptz(6)
+  kind                MarketplaceListingKind   @default(BUSINESS)
+  slug                String?                  @unique
+  category            String?
+  stage               String?
+  location            String?
+  language            String?
+  urlVisibility       MarketplaceUrlVisibility @default(PUBLIC) @map("url_visibility")
+  aiGenerated         Boolean                  @default(false) @map("ai_generated")
+  aiDisclosure        String?                  @map("ai_disclosure")
+  licenseTerms        String?                  @map("license_terms")
+  highlights          Json?
+  viewCount           Int                      @default(0) @map("view_count")
+  submittedAt         DateTime?                @map("submitted_at") @db.Timestamptz(6)
   createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  seller       User                     @relation("ListingSeller", fields: [sellerId], references: [id], onDelete: Restrict)
-  reviewer     User?                    @relation("ListingReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  workspace    Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  inquiries    MarketplaceInquiry[]
-  transactions MarketplaceTransaction[]
+  files         MarketplaceListingFile[]
+  saves         MarketplaceSavedListing[]
+  offers        MarketplaceOffer[]
+  orders        MarketplaceOrder[]
+  verifications SellerVerificationCase[]
+  seller        User                      @relation("ListingSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  reviewer      User?                     @relation("ListingReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  workspace     Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  inquiries     MarketplaceInquiry[]
+  transactions  MarketplaceTransaction[]
 
   @@index([status, publishedAt])
   @@index([sellerId, createdAt])
@@ -3167,12 +3203,18 @@ model MarketplaceInquiry {
   reply       String?
   repliedAt   DateTime?                @map("replied_at") @db.Timestamptz(6)
   status      MarketplaceInquiryStatus @default(OPEN)
+  /// Business listings: messaging unlocks only after the seller approves the introduction.
+  introStatus MarketplaceIntroStatus   @default(PENDING) @map("intro_status")
+  buyerRole   String?                  @map("buyer_role")
+  budget      String?
   createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  buyer     User               @relation("InquiryBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
-  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  messages  MarketplaceMessage[]
+  offers    MarketplaceOffer[]
+  listing   MarketplaceListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer     User                 @relation("InquiryBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  workspace Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
 
   @@index([listingId, createdAt])
   @@index([buyerId, createdAt])
@@ -3190,9 +3232,17 @@ model MarketplaceTransaction {
   provider          String?
   providerPaymentId String?                      @unique @map("provider_payment_id")
   completedAt       DateTime?                    @map("completed_at") @db.Timestamptz(6)
+  offerId           String?                      @unique @map("offer_id") @db.Uuid
+  buyerAgreedAt     DateTime?                    @map("buyer_agreed_at") @db.Timestamptz(6)
+  sellerAgreedAt    DateTime?                    @map("seller_agreed_at") @db.Timestamptz(6)
+  transferStartedAt DateTime?                    @map("transfer_started_at") @db.Timestamptz(6)
+  buyerConfirmedAt  DateTime?                    @map("buyer_confirmed_at") @db.Timestamptz(6)
+  notes             Json?
   createdAt         DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  offer   MarketplaceOffer?  @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  cases   MarketplaceCase[]
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
   buyer   User               @relation("TransactionBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
   seller  User               @relation("TransactionSeller", fields: [sellerId], references: [id], onDelete: Restrict)
@@ -3200,4 +3250,517 @@ model MarketplaceTransaction {
   @@index([buyerId, createdAt])
   @@index([sellerId, createdAt])
   @@map("marketplace_transactions")
+}
+
+// ── Marketplace V2 (V2 Implementation Guide §1–§4, Nov 2026) ───────────────
+// Digital products: Stripe checkout → verified webhook → order → entitlement
+// → seller ledger → payout (eligible from $50). Business acquisitions:
+// introduction → messages → offers → agreement/due diligence/transfer
+// tracking. Payment alone never marks an asset as owned.
+
+enum MarketplaceListingKind {
+  BUSINESS
+  DIGITAL_PRODUCT
+
+  @@map("marketplace_listing_kind")
+}
+
+enum MarketplaceUrlVisibility {
+  PUBLIC
+  AFTER_INTRODUCTION
+  AFTER_DILIGENCE
+
+  @@map("marketplace_url_visibility")
+}
+
+enum MarketplaceIntroStatus {
+  PENDING
+  APPROVED
+  DECLINED
+
+  @@map("marketplace_intro_status")
+}
+
+enum SellerStatus {
+  ONBOARDING
+  ACTIVE
+  SUSPENDED
+
+  @@map("seller_status")
+}
+
+enum SellerCheckStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("seller_check_status")
+}
+
+enum VerificationKind {
+  IDENTITY
+  BUSINESS
+  PAYOUT
+  OWNERSHIP
+  TRAFFIC
+  FINANCIAL
+  AI_SCREENING
+
+  @@map("verification_kind")
+}
+
+enum MarketplaceOfferStatus {
+  SUBMITTED
+  COUNTERED
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+
+  @@map("marketplace_offer_status")
+}
+
+enum MarketplaceOrderStatus {
+  PENDING_PAYMENT
+  PAID
+  FAILED
+  CANCELED
+  REFUNDED
+  PARTIALLY_REFUNDED
+
+  @@map("marketplace_order_status")
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  REVOKED
+
+  @@map("entitlement_status")
+}
+
+enum SellerLedgerType {
+  SALE
+  PLATFORM_FEE
+  REFUND
+  PAYOUT
+  PAYOUT_REVERSAL
+  ADJUSTMENT
+
+  @@map("seller_ledger_type")
+}
+
+enum SellerPayoutStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  PAID
+  FAILED
+  CANCELED
+
+  @@map("seller_payout_status")
+}
+
+enum MarketplaceCaseKind {
+  REFUND
+  ISSUE
+  DISPUTE
+
+  @@map("marketplace_case_kind")
+}
+
+enum MarketplaceCaseStatus {
+  OPEN
+  UNDER_REVIEW
+  APPROVED
+  DENIED
+  REFUNDED
+  CLOSED
+
+  @@map("marketplace_case_status")
+}
+
+model SellerProfile {
+  id              String            @id @default(uuid()) @db.Uuid
+  userId          String            @unique @map("user_id") @db.Uuid
+  displayName     String            @map("display_name")
+  headline        String?
+  bio             String?
+  website         String?
+  location        String?
+  status          SellerStatus      @default(ONBOARDING)
+  identityStatus  SellerCheckStatus @default(NOT_STARTED) @map("identity_status")
+  businessStatus  SellerCheckStatus @default(NOT_STARTED) @map("business_status")
+  payoutStatus    SellerCheckStatus @default(NOT_STARTED) @map("payout_status")
+  stripeAccountId String?           @unique @map("stripe_account_id")
+  payoutsEnabled  Boolean           @default(false) @map("payouts_enabled")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          User                     @relation("SellerProfileUser", fields: [userId], references: [id], onDelete: Cascade)
+  verifications SellerVerificationCase[]
+
+  @@map("seller_profiles")
+}
+
+model SellerVerificationCase {
+  id              String            @id @default(uuid()) @db.Uuid
+  sellerProfileId String            @map("seller_profile_id") @db.Uuid
+  kind            VerificationKind
+  listingId       String?           @map("listing_id") @db.Uuid
+  status          SellerCheckStatus @default(PENDING)
+  details         Json?
+  evidence        Json?
+  decisionNote    String?           @map("decision_note")
+  reviewedBy      String?           @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime?         @map("reviewed_at") @db.Timestamptz(6)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  seller  SellerProfile       @relation(fields: [sellerProfileId], references: [id], onDelete: Cascade)
+  listing MarketplaceListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([sellerProfileId, kind])
+  @@map("seller_verification_cases")
+}
+
+model MarketplaceListingFile {
+  id          String   @id @default(uuid()) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  /// DELIVERABLE (private, entitlement-gated) or MEDIA (public preview).
+  role        String
+  storageKey  String   @unique @map("storage_key")
+  filename    String
+  contentType String   @map("content_type")
+  sizeBytes   Int      @map("size_bytes")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  listing      MarketplaceListing               @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  entitlements MarketplaceDownloadEntitlement[]
+
+  @@index([listingId, role])
+  @@map("marketplace_listing_files")
+}
+
+model MarketplaceSavedListing {
+  userId    String   @map("user_id") @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    User               @relation("SavedListingUser", fields: [userId], references: [id], onDelete: Cascade)
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@id([userId, listingId])
+  @@index([userId, createdAt])
+  @@map("marketplace_saved_listings")
+}
+
+model MarketplaceMessage {
+  id        String    @id @default(uuid()) @db.Uuid
+  inquiryId String    @map("inquiry_id") @db.Uuid
+  senderId  String    @map("sender_id") @db.Uuid
+  body      String
+  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  inquiry MarketplaceInquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  sender  User               @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([inquiryId, createdAt])
+  @@map("marketplace_messages")
+}
+
+model MarketplaceOffer {
+  id          String                 @id @default(uuid()) @db.Uuid
+  listingId   String                 @map("listing_id") @db.Uuid
+  inquiryId   String?                @map("inquiry_id") @db.Uuid
+  buyerId     String                 @map("buyer_id") @db.Uuid
+  sellerId    String                 @map("seller_id") @db.Uuid
+  status      MarketplaceOfferStatus @default(SUBMITTED)
+  version     Int                    @default(1)
+  amountMinor BigInt                 @map("amount_minor")
+  currency    String                 @db.Char(3)
+  terms       String?
+  lastActorId String                 @map("last_actor_id") @db.Uuid
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  listing     MarketplaceListing         @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  inquiry     MarketplaceInquiry?        @relation(fields: [inquiryId], references: [id], onDelete: SetNull)
+  buyer       User                       @relation("OfferBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller      User                       @relation("OfferSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  revisions   MarketplaceOfferRevision[]
+  transaction MarketplaceTransaction?
+
+  @@index([buyerId, updatedAt])
+  @@index([sellerId, updatedAt])
+  @@index([listingId])
+  @@map("marketplace_offers")
+}
+
+model MarketplaceOfferRevision {
+  id          String   @id @default(uuid()) @db.Uuid
+  offerId     String   @map("offer_id") @db.Uuid
+  version     Int
+  action      String
+  amountMinor BigInt   @map("amount_minor")
+  terms       String?
+  actorId     String   @map("actor_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  offer MarketplaceOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, version, action])
+  @@map("marketplace_offer_revisions")
+}
+
+model MarketplaceOrder {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  buyerId             String                 @map("buyer_id") @db.Uuid
+  sellerId            String                 @map("seller_id") @db.Uuid
+  listingId           String                 @map("listing_id") @db.Uuid
+  amountMinor         BigInt                 @map("amount_minor")
+  platformFeeMinor    BigInt                 @default(0) @map("platform_fee_minor")
+  refundedMinor       BigInt                 @default(0) @map("refunded_minor")
+  currency            String                 @db.Char(3)
+  status              MarketplaceOrderStatus @default(PENDING_PAYMENT)
+  checkoutSessionId   String?                @unique @map("checkout_session_id")
+  paymentIntentId     String?                @unique @map("payment_intent_id")
+  licenseAcceptedAt   DateTime               @map("license_accepted_at") @db.Timestamptz(6)
+  withdrawalConsentAt DateTime?              @map("withdrawal_consent_at") @db.Timestamptz(6)
+  paidAt              DateTime?              @map("paid_at") @db.Timestamptz(6)
+  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  buyer        User                             @relation("OrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller       User                             @relation("OrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  listing      MarketplaceListing               @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  entitlements MarketplaceDownloadEntitlement[]
+  cases        MarketplaceCase[]
+  ledger       SellerLedgerEntry[]
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@map("marketplace_orders")
+}
+
+model MarketplaceDownloadEntitlement {
+  id        String            @id @default(uuid()) @db.Uuid
+  orderId   String            @map("order_id") @db.Uuid
+  fileId    String            @map("file_id") @db.Uuid
+  buyerId   String            @map("buyer_id") @db.Uuid
+  status    EntitlementStatus @default(ACTIVE)
+  revokedAt DateTime?         @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order  MarketplaceOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  file   MarketplaceListingFile     @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  events MarketplaceDownloadEvent[]
+
+  @@unique([orderId, fileId])
+  @@index([buyerId, createdAt])
+  @@map("marketplace_download_entitlements")
+}
+
+model MarketplaceDownloadEvent {
+  id            String   @id @default(uuid()) @db.Uuid
+  entitlementId String   @map("entitlement_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  ip            String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  entitlement MarketplaceDownloadEntitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([entitlementId, createdAt])
+  @@map("marketplace_download_events")
+}
+
+/// Append-only seller balance. Signed amounts; one row per idempotency key.
+model SellerLedgerEntry {
+  id             String           @id @default(uuid()) @db.Uuid
+  sellerId       String           @map("seller_id") @db.Uuid
+  type           SellerLedgerType
+  amountMinor    BigInt           @map("amount_minor")
+  currency       String           @db.Char(3)
+  orderId        String?          @map("order_id") @db.Uuid
+  payoutId       String?          @map("payout_id") @db.Uuid
+  caseId         String?          @map("case_id") @db.Uuid
+  idempotencyKey String           @unique @map("idempotency_key")
+  memo           String?
+  createdBy      String?          @map("created_by") @db.Uuid
+  availableAt    DateTime         @default(now()) @map("available_at") @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  seller User              @relation("LedgerSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  order  MarketplaceOrder? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payout SellerPayout?     @relation(fields: [payoutId], references: [id], onDelete: Restrict)
+
+  @@index([sellerId, createdAt])
+  @@map("seller_ledger_entries")
+}
+
+model SellerPayout {
+  id                 String             @id @default(uuid()) @db.Uuid
+  sellerId           String             @map("seller_id") @db.Uuid
+  amountMinor        BigInt             @map("amount_minor")
+  currency           String             @db.Char(3)
+  status             SellerPayoutStatus @default(REQUESTED)
+  idempotencyKey     String             @unique @map("idempotency_key")
+  providerTransferId String?            @unique @map("provider_transfer_id")
+  failureReason      String?            @map("failure_reason")
+  approvedBy         String?            @map("approved_by") @db.Uuid
+  approvedAt         DateTime?          @map("approved_at") @db.Timestamptz(6)
+  processedBy        String?            @map("processed_by") @db.Uuid
+  paidAt             DateTime?          @map("paid_at") @db.Timestamptz(6)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  seller User                @relation("PayoutSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  ledger SellerLedgerEntry[]
+
+  @@index([sellerId, createdAt])
+  @@index([status, createdAt])
+  @@map("seller_payouts")
+}
+
+model MarketplaceCase {
+  id                   String                @id @default(uuid()) @db.Uuid
+  kind                 MarketplaceCaseKind
+  orderId              String?               @map("order_id") @db.Uuid
+  transactionId        String?               @map("transaction_id") @db.Uuid
+  buyerId              String                @map("buyer_id") @db.Uuid
+  sellerId             String                @map("seller_id") @db.Uuid
+  reason               String
+  details              String
+  status               MarketplaceCaseStatus @default(OPEN)
+  requestedAmountMinor BigInt?               @map("requested_amount_minor")
+  approvedAmountMinor  BigInt?               @map("approved_amount_minor")
+  decisionNote         String?               @map("decision_note")
+  decidedBy            String?               @map("decided_by") @db.Uuid
+  decidedAt            DateTime?             @map("decided_at") @db.Timestamptz(6)
+  providerRefundId     String?               @unique @map("provider_refund_id")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order       MarketplaceOrder?       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  transaction MarketplaceTransaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  buyer       User                    @relation("CaseBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+
+  @@index([buyerId, createdAt])
+  @@index([sellerId, createdAt])
+  @@index([status, createdAt])
+  @@map("marketplace_cases")
+}
+
+// ── Digital Assets (V2 guide §2.1–2.6) ────────────────────────────────────
+// Prospective (analysed) assets are never shown as owned; ownership needs a
+// verified check or reviewed evidence.
+
+enum AssetRelationship {
+  OWNED
+  MANAGED
+  AUTHORIZED
+  PROSPECTIVE
+
+  @@map("asset_relationship")
+}
+
+enum AssetOwnershipStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+
+  @@map("asset_ownership_status")
+}
+
+model DigitalAsset {
+  id                 String               @id @default(uuid()) @db.Uuid
+  workspaceId        String               @map("workspace_id") @db.Uuid
+  createdBy          String               @map("created_by") @db.Uuid
+  name               String
+  url                String?
+  domain             String?              @db.Citext
+  assetType          MarketplaceAssetType @map("asset_type")
+  relationship       AssetRelationship
+  ownershipStatus    AssetOwnershipStatus @default(UNVERIFIED) @map("ownership_status")
+  verificationToken  String               @map("verification_token")
+  verifiedMethod     String?              @map("verified_method")
+  verifiedAt         DateTime?            @map("verified_at") @db.Timestamptz(6)
+  description        String?
+  category           String?
+  acquiredAt         DateTime?            @map("acquired_at") @db.Date
+  purchasePriceMinor BigInt?              @map("purchase_price_minor")
+  currency           String               @default("USD") @db.Char(3)
+  projectId          String?              @map("project_id") @db.Uuid
+  archivedAt         DateTime?            @map("archived_at") @db.Timestamptz(6)
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace  Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project    Project?                 @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  evidence   AssetOwnershipEvidence[]
+  financials AssetFinancialEntry[]
+  analyses   AcquisitionAnalysis[]
+
+  @@index([workspaceId, relationship, createdAt(sort: Desc)])
+  @@map("digital_assets")
+}
+
+model AssetOwnershipEvidence {
+  id         String               @id @default(uuid()) @db.Uuid
+  assetId    String               @map("asset_id") @db.Uuid
+  method     String
+  status     AssetOwnershipStatus
+  detail     String?
+  storageKey String?              @map("storage_key")
+  filename   String?
+  reviewedBy String?              @map("reviewed_by") @db.Uuid
+  createdBy  String               @map("created_by") @db.Uuid
+  createdAt  DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  asset DigitalAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, createdAt])
+  @@map("asset_ownership_evidence")
+}
+
+model AssetFinancialEntry {
+  id           String   @id @default(uuid()) @db.Uuid
+  assetId      String   @map("asset_id") @db.Uuid
+  month        DateTime @db.Date
+  revenueMinor BigInt   @default(0) @map("revenue_minor")
+  costMinor    BigInt   @default(0) @map("cost_minor")
+  /// SELLER_REPORTED (manual) or CONNECTED (from an integration).
+  source       String   @default("SELF_REPORTED")
+  note         String?
+  createdBy    String   @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  asset DigitalAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, month, source])
+  @@map("asset_financial_entries")
+}
+
+model AcquisitionAnalysis {
+  id               String               @id @default(uuid()) @db.Uuid
+  workspaceId      String               @map("workspace_id") @db.Uuid
+  createdBy        String               @map("created_by") @db.Uuid
+  url              String
+  domain           String               @db.Citext
+  assetType        MarketplaceAssetType @map("asset_type")
+  askingPriceMinor BigInt?              @map("asking_price_minor")
+  currency         String               @default("USD") @db.Char(3)
+  checks           Json
+  notes            String?
+  valuationId      String?              @map("valuation_id") @db.Uuid
+  assetId          String?              @map("asset_id") @db.Uuid
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  asset     DigitalAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("acquisition_analyses")
 }

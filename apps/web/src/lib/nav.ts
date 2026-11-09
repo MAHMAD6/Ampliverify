@@ -4,57 +4,191 @@
  * Icons are resolved by key in the Sidebar component.
  */
 export type NavChild = { label: string; href: string };
-export type NavItem = { key: string; label: string; href: string; children?: NavChild[]; divider?: boolean };
+export type NavItem = { key: string; label: string; href: string; children?: NavChild[]; divider?: boolean; exact?: boolean };
 
-export const APP_NAV: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', href: '/app/dashboard' },
-  { key: 'projects', label: 'My Projects', href: '/app/projects' },
-  { key: 'audit', label: 'On-Page SEO Audit', href: '/app/audit' },
-  { key: 'optimization', label: 'Optimization Center', href: '/app/optimize' },
-  { key: 'editor', label: 'On-Page SEO Editor', href: '/app/editor' },
-  { key: 'content', label: 'Content Strategy', href: '/app/content' },
+export type NavGroup = { key: string; label?: string; items: NavItem[]; sellerOnly?: boolean };
+
+/**
+ * User navigation, V2 guide §2.1 (single-column sidebar): Dashboard and
+ * projects, SEO Engineering, Digital Assets, Marketplace (switch into the
+ * buyer / seller dashboards), Integrations, Finances (sellers only) and
+ * Account. Each group collapses; the active group opens by default.
+ */
+export const APP_NAV_GROUPS: NavGroup[] = [
   {
-    key: 'keywords',
-    label: 'Keyword Research',
-    href: '/app/keywords',
-    children: [
-      { label: 'Overview', href: '/app/keywords' },
-      { label: 'Keyword Explorer', href: '/app/keywords/explorer' },
-      { label: 'Keyword Lists', href: '/app/keywords/lists' },
-      { label: 'Keyword Clusters', href: '/app/keywords/clusters' },
-      { label: 'SERP Analysis', href: '/app/keywords/serp' },
+    key: 'home',
+    items: [
+      { key: 'dashboard', label: 'Dashboard', href: '/app/dashboard' },
+      { key: 'projects', label: 'My Projects', href: '/app/projects' },
     ],
   },
   {
-    key: 'geo',
-    label: 'AI Search (GEO)',
-    href: '/app/geo',
-    children: [
-      { label: 'Overview', href: '/app/geo' },
-      { label: 'History', href: '/app/geo/history' },
-      { label: 'Competitors', href: '/app/geo/competitors' },
-      { label: 'Sources & Citations', href: '/app/geo/citations' },
+    key: 'seo',
+    label: 'SEO Engineering',
+    items: [
+      { key: 'audit', label: 'On-Page SEO Audit', href: '/app/audit' },
+      { key: 'optimization', label: 'Optimization Center', href: '/app/optimize' },
+      { key: 'editor', label: 'On-Page SEO Editor', href: '/app/editor' },
+      { key: 'content', label: 'Content Strategy', href: '/app/content' },
+      {
+        key: 'keywords',
+        label: 'Keyword Research',
+        href: '/app/keywords',
+        children: [
+          { label: 'Overview', href: '/app/keywords' },
+          { label: 'Keyword Explorer', href: '/app/keywords/explorer' },
+          { label: 'Keyword Lists', href: '/app/keywords/lists' },
+          { label: 'Keyword Clusters', href: '/app/keywords/clusters' },
+          { label: 'SERP Analysis', href: '/app/keywords/serp' },
+        ],
+      },
+      {
+        key: 'geo',
+        label: 'AI Search (GEO)',
+        href: '/app/geo',
+        children: [
+          { label: 'Overview', href: '/app/geo' },
+          { label: 'History', href: '/app/geo/history' },
+          { label: 'Competitors', href: '/app/geo/competitors' },
+          { label: 'Sources & Citations', href: '/app/geo/citations' },
+        ],
+      },
+      { key: 'content-audit', label: 'Content Audit', href: '/app/content/audit' },
+      { key: 'valuation', label: 'Website Value Calculator', href: '/website-value' },
     ],
   },
-  { key: 'reports', label: 'Reports', href: '/app/reports' },
-  { key: 'usage', label: 'Usage & Credits', href: '/app/usage', divider: true },
-  { key: 'billing', label: 'Billing & Plan', href: '/app/billing' },
   {
-    key: 'settings',
-    label: 'Settings',
-    href: '/app/settings',
-    children: [
-      { label: 'Account', href: '/app/settings/account' },
-      { label: 'Workspace', href: '/app/settings/workspace' },
-      { label: 'Project Defaults', href: '/app/settings/project-defaults' },
-      { label: 'Integrations', href: '/app/settings/integrations' },
-      { label: 'AI & GEO Preferences', href: '/app/settings/ai-geo' },
-      { label: 'Notifications', href: '/app/settings/notifications' },
-      { label: 'Billing & Plan', href: '/app/settings/billing' },
-      { label: 'Data & Privacy', href: '/app/settings/privacy' },
+    key: 'assets',
+    label: 'Digital Assets',
+    items: [
+      { key: 'assets-dashboard', label: 'Digital Assets Dashboard', href: '/app/assets', exact: true },
+      { key: 'portfolio', label: 'My Portfolio', href: '/app/assets/portfolio' },
+      { key: 'asset-new', label: 'Add Digital Asset', href: '/app/assets/new' },
+      { key: 'acquisitions', label: 'Acquisition Analyzer', href: '/app/assets/acquisitions' },
+      { key: 'improvement', label: 'Improvement Workspace', href: '/app/assets/improvement' },
+      { key: 'asset-projects', label: 'Digital Asset Projects', href: '/app/assets/projects' },
+      { key: 'asset-performance', label: 'Performance & Reports', href: '/app/assets/performance' },
+    ],
+  },
+  {
+    key: 'marketplace',
+    label: 'Marketplace',
+    items: [
+      { key: 'market-buyer', label: 'Marketplace Dashboard', href: '/buyer', exact: true },
+      { key: 'market-browse', label: 'Browse Digital Assets', href: '/buyer/browse' },
+      { key: 'market-sell', label: 'Sell a Digital Asset', href: '/seller/listings/new' },
+      { key: 'market-listings', label: 'My Listings', href: '/seller/listings' },
+      { key: 'market-inquiries', label: 'My Inquiries', href: '/buyer/inquiries' },
+      { key: 'market-purchases', label: 'My Purchases', href: '/buyer/purchases' },
+      { key: 'market-transactions', label: 'Orders & Transactions', href: '/buyer/transactions' },
+      { key: 'market-messages', label: 'Messages', href: '/buyer/messages' },
+      { key: 'market-seller', label: 'Seller Tools', href: '/seller', exact: true },
+    ],
+  },
+  {
+    key: 'integrations',
+    label: 'Integrations',
+    items: [
+      { key: 'integrations-dashboard', label: 'Integrations Dashboard', href: '/app/integrations', exact: true },
+      { key: 'connected-accounts', label: 'Connected Accounts', href: '/app/integrations/accounts' },
+      { key: 'data-connections', label: 'Data Connections', href: '/app/integrations/data' },
+      { key: 'connection-activity', label: 'Connection Activity', href: '/app/integrations/activity' },
+    ],
+  },
+  {
+    key: 'finances',
+    label: 'Finances',
+    sellerOnly: true,
+    items: [
+      { key: 'fin-overview', label: 'Financial Overview', href: '/seller/payouts', exact: true },
+      { key: 'fin-earnings', label: 'Earnings Overview', href: '/seller/payouts/earnings' },
+      { key: 'fin-payouts', label: 'Payouts', href: '/seller/payouts/history' },
+      { key: 'fin-methods', label: 'Payout Methods', href: '/seller/payouts/method' },
+      { key: 'fin-refunds', label: 'Refunds & Disputes', href: '/seller/payouts/disputes' },
+      { key: 'fin-tax', label: 'Tax & Statements', href: '/seller/payouts/statements' },
+    ],
+  },
+  {
+    key: 'account',
+    items: [
+      { key: 'reports', label: 'Reports', href: '/app/reports', divider: true },
+      { key: 'usage', label: 'Usage & Credits', href: '/app/usage' },
+      { key: 'billing', label: 'Billing & Plan', href: '/app/billing' },
+      { key: 'guides', label: 'Guides', href: '/guides' },
+      { key: 'support', label: 'Support', href: '/app/help' },
+      {
+        key: 'settings',
+        label: 'Settings',
+        href: '/app/settings',
+        children: [
+          { label: 'Account', href: '/app/settings/account' },
+          { label: 'Workspace', href: '/app/settings/workspace' },
+          { label: 'Project Defaults', href: '/app/settings/project-defaults' },
+          { label: 'Integrations', href: '/app/settings/integrations' },
+          { label: 'AI & GEO Preferences', href: '/app/settings/ai-geo' },
+          { label: 'Notifications', href: '/app/settings/notifications' },
+          { label: 'Billing & Plan', href: '/app/settings/billing' },
+          { label: 'Data & Privacy', href: '/app/settings/privacy' },
+        ],
+      },
     ],
   },
 ];
+
+/** Buyer Dashboard: its own compact navigation, no SEO tools, credits or upsells (V2 guide §3.1). */
+export const BUYER_NAV_GROUPS: NavGroup[] = [
+  {
+    key: 'buyer',
+    label: 'Marketplace',
+    items: [
+      { key: 'buyer-dashboard', label: 'Buyer Dashboard', href: '/buyer', exact: true },
+      { key: 'market-browse', label: 'Browse Digital Assets', href: '/buyer/browse' },
+      { key: 'saved', label: 'Saved Listings', href: '/buyer/saved' },
+      { key: 'market-inquiries', label: 'My Inquiries', href: '/buyer/inquiries' },
+      { key: 'offers', label: 'My Offers', href: '/buyer/offers' },
+      { key: 'market-purchases', label: 'My Purchases', href: '/buyer/purchases' },
+      { key: 'downloads', label: 'My Downloads', href: '/buyer/downloads' },
+      { key: 'market-transactions', label: 'Transactions', href: '/buyer/transactions' },
+      { key: 'market-messages', label: 'Messages', href: '/buyer/messages' },
+    ],
+  },
+  {
+    key: 'seller',
+    label: 'Sell on AmpliVerify',
+    sellerOnly: true,
+    items: [
+      { key: 'seller-dashboard', label: 'Seller Dashboard', href: '/seller', exact: true },
+      { key: 'seller-profile', label: 'Seller Profile', href: '/seller/profile' },
+      { key: 'verification', label: 'Verification', href: '/seller/verification' },
+      { key: 'market-listings', label: 'My Listings', href: '/seller/listings', exact: true },
+      { key: 'market-sell', label: 'Create Listing', href: '/seller/listings/new' },
+      { key: 'seller-inquiries', label: 'Received Inquiries', href: '/seller/inquiries' },
+      { key: 'offers', label: 'Offers & Negotiations', href: '/seller/offers' },
+      { key: 'market-transactions', label: 'Seller Transactions', href: '/seller/transactions' },
+      { key: 'fin-payouts', label: 'Payouts & Earnings', href: '/seller/payouts' },
+    ],
+  },
+  {
+    key: 'buyer-account',
+    label: 'Account',
+    items: [
+      {
+        key: 'settings',
+        label: 'Settings',
+        href: '/buyer/settings',
+        children: [
+          { label: 'My Profile', href: '/buyer/settings/profile' },
+          { label: 'Security & Password', href: '/buyer/settings/security' },
+          { label: 'Notifications', href: '/buyer/settings/notifications' },
+          { label: 'Privacy Preferences', href: '/buyer/settings/privacy' },
+        ],
+      },
+      { key: 'support', label: 'Support', href: '/buyer/support' },
+    ],
+  },
+];
+
+export const APP_NAV: NavItem[] = APP_NAV_GROUPS.flatMap((g) => g.items);
 
 /** Breadcrumb trail for user-app secondary pages: Home › section › page. */
 export function appCrumbs(...trail: { label: string; href?: string }[]) {
@@ -116,8 +250,16 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   },
   {
     key: 'marketplace-group',
-    label: 'Marketplace',
-    items: [{ key: 'marketplace-review', label: 'Listing Review', href: '/admin/marketplace' }],
+    label: 'Marketplace Management',
+    items: [
+      { key: 'marketplace-overview', label: 'Marketplace Overview', href: '/admin/marketplace' },
+      { key: 'marketplace-sellers', label: 'Seller Management', href: '/admin/marketplace/sellers' },
+      { key: 'marketplace-verification', label: 'Seller Verification', href: '/admin/marketplace/verification' },
+      { key: 'marketplace-review', label: 'Listing Review & Moderation', href: '/admin/marketplace/listings' },
+      { key: 'marketplace-transactions', label: 'Transactions & Disputes', href: '/admin/marketplace/transactions' },
+      { key: 'marketplace-payouts', label: 'Commissions & Payouts', href: '/admin/marketplace/payouts' },
+      { key: 'marketplace-settings', label: 'Marketplace Settings', href: '/admin/marketplace/settings' },
+    ],
   },
   {
     key: 'support-group',

@@ -69,6 +69,19 @@ export class IntegrationsService {
     return this.google.configured;
   }
 
+  /** Connection Activity: sync runs and connection changes, newest first (connection status is separate from sync status). */
+  async activity(userId: string, workspaceId: string) {
+    await this.rbac.requireWorkspace(userId, workspaceId, 'workspace.read');
+    const [runs, events] = await Promise.all([
+      this.prisma.syncRun.findMany({ where: { workspaceIntegration: { workspaceId } }, orderBy: { startedAt: 'desc' }, take: 100, include: { workspaceIntegration: { select: { provider: { select: { name: true, key: true } }, externalAccountRef: true } } } }),
+      this.prisma.auditLog.findMany({ where: { workspaceId, eventType: { startsWith: 'workspace.integration.' } }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, eventType: true, createdAt: true, targetId: true } }),
+    ]);
+    return {
+      syncs: runs.map((r) => ({ id: r.id, provider: r.workspaceIntegration.provider.name, account: r.workspaceIntegration.externalAccountRef, syncType: r.syncType, status: r.status, rows: r.rowsUpserted, dataThrough: r.dataThrough, startedAt: r.startedAt, completedAt: r.completedAt, error: r.errorCode })),
+      events: events.map((e) => ({ id: e.id, action: e.eventType, at: e.createdAt })),
+    };
+  }
+
   async list(userId: string, workspaceId: string) {
     await this.rbac.requireWorkspace(userId, workspaceId, 'workspace.read');
     const [providers, connections] = await Promise.all([

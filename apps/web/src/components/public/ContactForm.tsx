@@ -103,7 +103,7 @@ export function ContactForm({ topic }: { topic: string }) {
       )}
       <div className={s.formFoot}>
         <small>
-          Fields marked <span className={s.req}>*</span> are required. By sending this form you agree to our <Link href="/legal">Privacy Policy</Link>.
+          Fields marked <span className={s.req}>*</span> are required. By sending this form you agree to our <Link href="/privacy">Privacy Policy</Link>.
         </small>
         <button type="submit" className={site.btn} disabled={pending}>
           {pending ? 'Sending…' : 'Send Message'} <ArrowRight size={18} />

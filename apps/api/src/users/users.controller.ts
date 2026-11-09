@@ -9,6 +9,6 @@ export class UsersController {
 
   @Get('me')
   me(@CurrentActor() actor: AuthenticatedActor) {
-    return this.users.findByIdOrThrow(actor.userId);
+    return this.users.me(actor.userId);
   }
 }

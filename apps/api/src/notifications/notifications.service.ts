@@ -20,6 +20,12 @@ export const NOTIFICATION_EVENTS = [
   { key: 'marketplace.inquiry', label: 'Marketplace inquiry', description: 'A buyer asked about one of your listings.', defaultEmail: true },
   { key: 'marketplace.inquiry_reply', label: 'Marketplace reply', description: 'A seller replied to your inquiry.', defaultEmail: true },
   { key: 'marketplace.listing_reviewed', label: 'Listing reviewed', description: 'Your marketplace listing was approved or needs changes.', defaultEmail: true },
+  { key: 'marketplace.offer', label: 'Offers & negotiations', description: 'An offer or counteroffer on a marketplace deal.', defaultEmail: true },
+  { key: 'marketplace.transaction', label: 'Transaction updates', description: 'An acquisition moved to a new stage.', defaultEmail: true },
+  { key: 'marketplace.order_paid', label: 'Purchase confirmed', description: 'Payment for a digital product was confirmed.', defaultEmail: true },
+  { key: 'marketplace.sale', label: 'New sale', description: 'One of your digital products was purchased.', defaultEmail: true },
+  { key: 'marketplace.verification', label: 'Seller verification', description: 'A verification check was approved or needs attention.', defaultEmail: true },
+  { key: 'marketplace.case', label: 'Refunds & issues', description: 'An update on a refund request or reported issue.', defaultEmail: true },
 ] as const;
 
 export type NotifyInput = { workspaceId: string; userId: string; eventKey: string; title: string; body: string };

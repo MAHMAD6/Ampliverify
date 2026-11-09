@@ -2,7 +2,7 @@
 .site { --g900: #0e5e2b; --g700: #15803d; --g500: #1e9c45; --g400: #5cc23a; --g50: #e4f5e8; --g25: #f4faf6; --navy: #0b1b35; --ink2: #3c4a5c; --mute: #5d6b7c; --line2: #e3e9e5; --foot: #0d1f2d;
   min-height: 100vh; display: flex; flex-direction: column; background: #fff; color: var(--navy); font-family: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 .main { flex: 1; }
-.container { width: min(1264px, calc(100% - 40px)); margin: 0 auto; }
+.container { width: min(1400px, calc(100% - 40px)); margin: 0 auto; }
 
 /* Header */
 .brand { display: flex; align-items: center; gap: 12px; color: var(--navy); }
@@ -293,7 +293,10 @@ textarea.input { height: auto; min-height: 140px; padding: 14px 16px; resize: ve
 
 /* Footer */
 .footer { background: var(--foot); color: #c3cdd6; padding: 56px 0 28px; }
-.footerGrid { display: grid; grid-template-columns: 1.6fr repeat(4, 0.8fr) auto; gap: 32px; }
+.footerGrid { display: grid; grid-template-columns: 1.5fr repeat(5, minmax(0, 0.8fr)); gap: 28px; }
+.legalLinks { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.legalLinks a { color: #c3cdd6; text-decoration: none; }
+.legalLinks a:hover { color: #fff; text-decoration: underline; }
 .footer .brand { color: #fff; }
 .footerAbout { font-size: 15px; line-height: 1.6; margin-top: 16px; max-width: 330px; }
 .footer h4 { color: #fff; font-size: 16px; margin-bottom: 14px; }
