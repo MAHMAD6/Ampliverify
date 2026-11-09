@@ -47,7 +47,8 @@ describe('Digital assets', () => {
     expect((await h.api().get(`/api/v1/user/assets?workspaceId=${otherWs}`).set(outsider).expect(200)).body.data).toEqual([]);
 
     const s = (await h.api().get(`/api/v1/user/assets/summary?workspaceId=${ws}`).set(owner).expect(200)).body.data;
-    expect(s).toMatchObject({ totalAssets: 2, owned: 1, prospective: 1, estimatedValue: null });
+    // Prospective acquisitions are counted apart from the portfolio total.
+    expect(s).toMatchObject({ totalAssets: 1, owned: 1, prospective: 1, estimatedValue: null });
     expect(s.verification.VERIFIED ?? 0).toBe(0);
   });
 

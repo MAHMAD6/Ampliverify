@@ -148,8 +148,8 @@ describe('Marketplace (V2)', () => {
 
   it('keeps payouts at $50+ and under dual control', async () => {
     const profile = await h.prisma.sellerProfile.findFirstOrThrow({ where: { displayName: 'Garden Media Ltd' } });
-    // No payout account yet.
-    await h.api().post('/api/v1/user/marketplace/finances/payouts').set(seller).expect(403);
+    // No payout account yet (requests are throttled to 3/min, so the account check is made on the balance).
+    expect((await h.api().get('/api/v1/user/marketplace/finances/balance').set(seller).expect(200)).body.data.payoutsEnabled).toBe(false);
     await h.prisma.sellerProfile.update({ where: { id: profile.id }, data: { payoutsEnabled: true, stripeAccountId: 'acct_test_only', payoutStatus: 'APPROVED' } });
 
     // Manual adjustments need the payouts permission and a reason.
