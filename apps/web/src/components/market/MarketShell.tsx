@@ -29,7 +29,7 @@ export function MarketShell({ me, unread = 0, children }: { me: Me | null; unrea
             <Link href="/buyer/support" className={s.iconBtn} aria-label="Support">
               <CircleHelp size={22} />
             </Link>
-            <Link href="/app/notifications" className={s.iconBtn} aria-label={unread ? `Notifications (${unread} unread)` : 'Notifications'} style={{ position: 'relative' }}>
+            <Link href="/buyer/notifications" className={s.iconBtn} aria-label={unread ? `Notifications (${unread} unread)` : 'Notifications'} style={{ position: 'relative' }}>
               <Bell size={22} />
               {unread > 0 && (
                 <span

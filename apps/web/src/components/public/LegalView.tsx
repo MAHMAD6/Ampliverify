@@ -2,6 +2,9 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ArrowRight, ChevronDown, ChevronRight, Cookie, Database, FileText, Globe, HelpCircle, MessageSquare, Settings, ShieldCheck, User, Users } from 'lucide-react';
 import { ArtHero } from '@/components/public/HeroArt';
+import { Markdown } from '@/components/public/Markdown';
+import { apiGet } from '@/lib/api';
+import { formatDate } from '@/lib/format';
 import site from '@/components/public/site.module.css';
 import s from '@/components/public/pages.module.css';
 
@@ -167,12 +170,15 @@ export const legalTitle = (k: LegalKey) => DOCS.find((d) => d.key === k)?.title 
 export const legalLead = (k: LegalKey) => DOCS.find((d) => d.key === k)?.lead;
 
 /** One legal document with the shared legal navigation (V2 guide §4.1 legal routes). */
-export function LegalView({ docKey }: { docKey: LegalKey }) {
+export async function LegalView({ docKey }: { docKey: LegalKey }) {
   const doc = DOCS.find((d) => d.key === docKey) ?? PRIVACY;
+  // Text published in Super Admin > Legal Pages replaces the built-in text.
+  const res = await apiGet<{ body: string; version: number; publishedAt: string } | null>(`/public/legal/${doc.key}`, { revalidate: 60 });
+  const published = res.ok ? res.data : null;
   return (
     <>
       <ArtHero art="legal" eyebrow="Legal" title={doc.title} lead={doc.lead}>
-        {doc.updated && <p style={{ marginTop: 14, fontWeight: 700, fontSize: 15 }}>Last updated: {doc.updated}</p>}
+        {(published || doc.updated) && <p style={{ marginTop: 14, fontWeight: 700, fontSize: 15 }}>Last updated: {published ? `${formatDate(published.publishedAt)} (version ${published.version})` : doc.updated}</p>}
       </ArtHero>
       <section className={s.section} style={{ paddingTop: 24 }}>
         <div className={`${s.wrap} ${s.legalGrid}`}>
@@ -203,6 +209,11 @@ export function LegalView({ docKey }: { docKey: LegalKey }) {
             </div>
           </aside>
           <div>
+            {published ? (
+              <div className={s.policy}>
+                <Markdown source={published.body} />
+              </div>
+            ) : (
             <div className={s.policy}>
               {doc.clauses.map((c, i) => (
                 <div key={c.title} className={s.clause}>
@@ -217,6 +228,7 @@ export function LegalView({ docKey }: { docKey: LegalKey }) {
                 </div>
               ))}
             </div>
+            )}
             {doc.key !== 'regional' && (
               <div className={s.disclosures}>
                 <span className={s.circle} style={{ width: 64, height: 64, background: '#fff' }}>

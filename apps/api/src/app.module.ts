@@ -37,6 +37,7 @@ import { KeywordsModule } from './keywords/keywords.module';
 import { ContentModule } from './content/content.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { AssetsModule } from './assets/assets.module';
+import { LegalModule } from './legal/legal.module';
 import { EditorModule } from './editor/editor.module';
 import { ReportsModule } from './reports/reports.module';
 import { IntegrationsModule } from './integrations/integrations.module';
@@ -80,6 +81,7 @@ import { InsightsModule } from './insights/insights.module';
     EngagementModule,
     MarketplaceModule,
     AssetsModule,
+    LegalModule,
     // Per-user (or per-IP when anonymous) request budget; see RateLimitGuard.
     // Counters live in Redis when REDIS_URL is set, so limits hold across API instances.
     ThrottlerModule.forRoot({
