@@ -397,3 +397,14 @@ textarea.input { height: auto; min-height: 140px; padding: 14px 16px; resize: ve
 }
 .site .footer h4 { color: #fff; }
 .numBadge { width: 36px; height: 36px; border-radius: 50%; background: var(--g900); color: #fff; font-weight: 800; display: inline-grid; place-items: center; }
+
+/* Homepage V2: product pillars and Marketplace band */
+.pillar { display: grid; justify-items: center; text-align: center; gap: 6px; padding: 28px 26px; border-radius: 18px; border: 1px solid #cfe9d6; background: linear-gradient(180deg, #f3fbf5 0%, #e7f6eb 100%); color: var(--navy); text-decoration: none; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.pillar:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -26px rgba(14, 94, 43, 0.55); }
+.pillar .icon { width: 64px; height: 64px; }
+.pillarTitle { font-size: 26px; font-weight: 800; margin: 8px 0 0; letter-spacing: -0.01em; }
+.pillarTag { color: var(--g900); font-size: 17px; }
+.marketBand { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 22px 28px; border-radius: 16px; border: 1px solid #d7eedd; background: #f1faf3; }
+.marketBandIcon { color: var(--g900); display: grid; place-items: center; }
+.marketBandTitle { font-size: 26px; font-weight: 800; margin: 0 0 4px; color: var(--navy); }
+.grow { flex: 1 1 280px; min-width: 0; }

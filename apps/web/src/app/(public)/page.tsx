@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowRight, BarChart3, FileText, Link2, Play, Search, Settings2, ShieldCheck, Target } from 'lucide-react';
+import { ArrowRight, BarChart3, FileText, Layers, Link2, ScanSearch, Play, Search, Settings2, ShieldCheck, Store, Target } from 'lucide-react';
 import { CtaBand, Checks, LearnMore } from '@/components/public/Blocks';
 import { FeatureStrip, LaptopMock, ValueTeaser } from '@/components/public/Showcase';
 import { apiGet } from '@/lib/api';
@@ -9,21 +9,28 @@ import s from '@/components/public/site.module.css';
 export const metadata = { title: { absolute: 'AmpliVerify — Turn Your Website Into a Growth Engine' } };
 
 const STEPS = [
-  { title: 'Connect Your Website', text: 'Add your website and we’ll analyze your site data.', icon: <Link2 size={30} /> },
-  { title: 'Audit & Analyze', text: 'Get a comprehensive SEO audit with clear insights.', icon: <Search size={30} /> },
-  { title: 'Get Recommendations', text: 'See prioritized, actionable fixes tailored to your site.', icon: <FileText size={30} /> },
-  { title: 'Optimize', text: 'Implement recommendations and improve your site.', icon: <Settings2 size={30} /> },
-  { title: 'Monitor & Verify', text: 'Track performance and verify your results over time.', icon: <BarChart3 size={30} /> },
+  { title: 'Discover & Analyze', text: 'Examine websites and identify opportunities.', icon: <Search size={30} /> },
+  { title: 'Evaluate', text: 'Review SEO, traffic, valuation, and key business data.', icon: <FileText size={30} /> },
+  { title: 'Plan & Optimize', text: 'Implement technical, content, and visibility improvements.', icon: <Settings2 size={30} /> },
+  { title: 'Monitor Performance', text: 'Track rankings, traffic, and changes in estimated value.', icon: <BarChart3 size={30} /> },
+  { title: 'Grow or Sell', text: 'Continue building value or list your asset on the Marketplace.', icon: <Link2 size={30} /> },
+];
+
+/** The three product areas (Homepage V2). */
+const PILLARS = [
+  { icon: <ScanSearch size={30} />, title: 'SEO Engineering', tag: 'Audit. Optimize. Verify.', text: 'Analyze your website, identify improvement opportunities, and strengthen search visibility.', cta: 'Explore SEO Tools', href: '/features' },
+  { icon: <Layers size={30} />, title: 'Asset Tools', tag: 'Evaluate. Improve. Grow.', text: 'Access tools and insights to evaluate, optimize, and increase the value of your digital assets.', cta: 'Explore Asset Tools', href: '/asset-tools' },
+  { icon: <Store size={30} />, title: 'Marketplace', tag: 'Discover. Buy. Sell.', text: 'Explore websites, domains, SaaS businesses, e-commerce stores, and other digital assets available for sale.', cta: 'Explore Marketplace', href: '/marketplace' },
 ];
 
 const CARDS = [
-  { icon: <Search size={24} />, title: 'Comprehensive Audits', text: 'Identify technical issues, content gaps, and growth opportunities.', href: '/features#audit' },
-  { icon: <Settings2 size={24} />, title: 'Actionable Optimization', text: 'Get clear, prioritized recommendations to improve your SEO.', href: '/features#optimization' },
-  { icon: <BarChart3 size={24} />, title: 'Track Real Results', text: 'Monitor rankings, traffic, and visibility over time.', href: '/features#reports' },
-  { icon: <Target size={24} />, title: 'Built for Growth', text: 'Turn insights into measurable growth for your business.', href: '/how-it-works' },
+  { icon: <Search size={24} />, title: 'Acquisition Analysis', text: 'Evaluate potential acquisitions, asking prices, risks, and available data.', href: '/asset-tools/acquisition-analysis' },
+  { icon: <Settings2 size={24} />, title: 'Asset Optimization', text: 'Identify and implement SEO and content improvements to increase value and visibility.', href: '/asset-tools/asset-optimization' },
+  { icon: <Layers size={24} />, title: 'Asset Intelligence', text: 'Organize your assets, track improvement plans, and manage projects efficiently.', href: '/asset-tools/asset-overview' },
+  { icon: <BarChart3 size={24} />, title: 'Valuation & Performance', text: 'Monitor traffic, rankings, and estimated value changes over time.', href: '/asset-tools/valuation-performance' },
 ];
 
-/** Home (Public_Frontend/Home_Page). Product imagery is labelled as sample data. */
+/** Home (Frontend_V2/Homepage_V2). Product imagery is labelled as sample data. */
 export default async function HomePage() {
   const cfg = await apiGet<ValuationConfig>('/public/valuations/config', { revalidate: 60 });
   const available = cfg.ok && cfg.data.available;
@@ -36,7 +43,7 @@ export default async function HomePage() {
             <h1 className={s.h1}>
               Turn Your Website Into a <span className={s.green}>Growth Engine</span>
             </h1>
-            <p className={s.lead}>AmpliVerify helps you audit, optimize, and verify your website&apos;s SEO so you can increase search visibility, attract the right visitors, and achieve measurable growth.</p>
+            <p className={s.lead}>AmpliVerify helps you audit, optimize, and grow your website with intelligent SEO tools. Discover opportunities, track improvements, and connect with buyers and sellers through the AmpliVerify Marketplace.</p>
             <div className={s.heroActions}>
               <Link href="/signup" className={s.btn}>
                 Get Started Free <ArrowRight size={18} />
@@ -64,12 +71,30 @@ export default async function HomePage() {
         ]}
       />
 
+      <section className={s.section} style={{ paddingBottom: 0 }}>
+        <div className={`${s.container} ${s.grid3}`}>
+          {PILLARS.map((p) => (
+            <Link key={p.title} href={p.href} className={s.pillar}>
+              <span className={s.icon} aria-hidden>
+                {p.icon}
+              </span>
+              <h2 className={s.pillarTitle}>{p.title}</h2>
+              <b className={s.pillarTag}>{p.tag}</b>
+              <p className={s.cardText}>{p.text}</p>
+              <span className={s.learn}>
+                {p.cta} <ArrowRight size={16} />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section className={s.section}>
         <div className={s.container}>
           <div className={s.center}>
             <div className={s.eyebrowSpaced}>SEO Engineering</div>
             <h2 className={s.h2}>How It Works</h2>
-            <p className={s.lead}>A simple, proven process to audit, optimize, and improve your SEO.</p>
+            <p className={s.lead}>A simple, end-to-end process to analyze, improve, and grow your website or digital asset.</p>
           </div>
           <div className={s.steps} style={{ marginTop: 36 }}>
             {STEPS.map((st, i) => (
@@ -90,8 +115,8 @@ export default async function HomePage() {
       <section className={s.section} style={{ paddingTop: 24 }}>
         <div className={s.container}>
           <div className={s.center}>
-            <h2 className={s.h2}>Find and Fix What Matters for SEO</h2>
-            <p className={s.lead}>Powerful tools and insights to help you identify opportunities, take action, and achieve measurable growth.</p>
+            <h2 className={s.h2}>Make Smarter Digital Asset Decisions</h2>
+            <p className={s.lead}>Evaluate opportunities, improve performance, and unlock the full value of your digital assets.</p>
           </div>
           <div className={s.grid4} style={{ marginTop: 32 }}>
             {CARDS.map((c) => (
@@ -106,7 +131,29 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <CtaBand title="Ready to Turn Your Website Into a Growth Engine?" text="Join AmpliVerify and get the insights you need to improve your SEO and achieve measurable growth." />
+      <section className={s.section} style={{ paddingTop: 0, paddingBottom: 0 }}>
+        <div className={s.container}>
+          <div className={s.marketBand}>
+            <span className={s.marketBandIcon} aria-hidden>
+              <Store size={40} />
+            </span>
+            <div className={s.grow}>
+              <h2 className={s.marketBandTitle}>Explore the Marketplace</h2>
+              <p className={s.cardText} style={{ margin: 0 }}>
+                Discover websites, domains, SaaS businesses, e-commerce stores, and other digital assets.
+              </p>
+            </div>
+            <Link href="/marketplace/listings" className={s.btn}>
+              Browse Assets <ArrowRight size={18} />
+            </Link>
+            <Link href="/sell" className={s.btnOutline}>
+              Sell a Digital Asset <ArrowRight size={18} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <CtaBand title="Ready to Turn Your Website Into a Growth Engine?" text="Join AmpliVerify and get the insights you need to improve your SEO, grow your digital assets, and explore new opportunities." />
     </>
   );
 }
