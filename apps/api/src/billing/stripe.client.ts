@@ -76,8 +76,9 @@ export class StripeClient {
 
   /** Verifies the `Stripe-Signature` header (v1 HMAC-SHA256, 5-minute tolerance). */
   verifyWebhook(rawBody: Buffer, header: string | undefined, toleranceSec = 300) {
-    const secret = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
-    if (!secret || !header) return false;
+    // The platform endpoint and the Connect (connected accounts) endpoint each have their own signing secret.
+    const secrets = [this.config.get<string>('STRIPE_WEBHOOK_SECRET'), this.config.get<string>('STRIPE_CONNECT_WEBHOOK_SECRET')].filter((x): x is string => !!x);
+    if (!secrets.length || !header) return false;
     const parts = Object.fromEntries(
       header.split(',').map((p) => {
         const i = p.indexOf('=');
@@ -90,7 +91,10 @@ export class StripeClient {
       .map((p) => p.slice(3));
     const timestamp = Number(parts.t);
     if (!timestamp || Math.abs(Date.now() / 1000 - timestamp) > toleranceSec) return false;
-    const expected = createHmac('sha256', secret).update(`${timestamp}.${rawBody.toString('utf8')}`).digest('hex');
-    return signatures.some((sig) => sig.length === expected.length && timingSafeEqual(Buffer.from(sig), Buffer.from(expected)));
+    const payload = `${timestamp}.${rawBody.toString('utf8')}`;
+    return secrets.some((secret) => {
+      const expected = createHmac('sha256', secret).update(payload).digest('hex');
+      return signatures.some((sig) => sig.length === expected.length && timingSafeEqual(Buffer.from(sig), Buffer.from(expected)));
+    });
   }
 }

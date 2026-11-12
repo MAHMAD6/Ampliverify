@@ -152,14 +152,22 @@ export class CommerceService implements OnModuleInit {
 
   // ── Payout account (Stripe Connect Express) ─────────────────────────────
 
-  async payoutOnboarding(userId: string) {
+  async payoutOnboarding(userId: string, country = 'US') {
     const p = await this.requireSeller(userId);
     if (!this.stripe.configured) throw new BadRequestException({ code: 'PAYMENTS_NOT_CONFIGURED', message: 'Payouts are not available yet.' });
     if (p.identityStatus !== 'APPROVED') throw new ForbiddenException({ code: 'IDENTITY_VERIFICATION_REQUIRED', message: 'Your identity must be verified before you connect a payout account.' });
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     let accountId = p.stripeAccountId;
     if (!accountId) {
-      const account = await this.stripe.request<StripeObject>('POST', '/accounts', { type: 'express', email: user.email, metadata: { sellerProfileId: p.id }, capabilities: { transfers: { requested: true } } }, `connect-account:${p.id}`);
+      const cc = country.toUpperCase();
+      if (!/^[A-Z]{2}$/.test(cc)) throw new BadRequestException({ code: 'COUNTRY_INVALID', message: 'Choose the country of your bank account.' });
+      // Sellers outside the US use cross-border payouts: transfers only, under the recipient service agreement.
+      const account = await this.stripe.request<StripeObject>(
+        'POST',
+        '/accounts',
+        { type: 'express', country: cc, email: user.email, metadata: { sellerProfileId: p.id }, capabilities: { transfers: { requested: true } }, ...(cc === 'US' ? {} : { tos_acceptance: { service_agreement: 'recipient' } }) },
+        `connect-account:${p.id}:${cc}`,
+      );
       accountId = account.id;
       await this.prisma.sellerProfile.update({ where: { id: p.id }, data: { stripeAccountId: accountId, payoutStatus: 'PENDING' } });
     }
@@ -206,6 +214,17 @@ export class CommerceService implements OnModuleInit {
       {
         mode: 'payment',
         customer_email: user.email,
+        // Stripe Tax: prices exclude tax; the buyer's address decides the tax.
+        automatic_tax: { enabled: true },
+        billing_address_collection: 'required',
+        ...(this.config.get<string>('STRIPE_CHECKOUT_TERMS_CONSENT') === 'true' ? { consent_collection: { terms_of_service: 'required' } } : {}),
+        custom_text: {
+          submit: {
+            message: consents.withdrawalWaiver
+              ? 'You asked for immediate access to this digital content and acknowledged that you lose your right to withdraw once the download is available.'
+              : 'Digital content is delivered to My Downloads as soon as payment is confirmed. Refunds follow the AmpliVerify Digital Product Refund Policy.',
+          },
+        },
         line_items: [{ quantity: 1, price_data: { currency: l.currency.toLowerCase(), unit_amount: Number(l.askingPriceMinor), product_data: { name: l.title.slice(0, 120) } } }],
         success_url: `${this.webUrl}/buyer/purchases/${order.id}?checkout=returned`,
         cancel_url: `${this.webUrl}/marketplace/listings/${l.slug ?? l.id}?checkout=canceled`,
@@ -280,9 +299,12 @@ export class CommerceService implements OnModuleInit {
     const order = await this.prisma.marketplaceOrder.findUnique({ where: { id: orderId }, include: { listing: { include: { files: { where: { role: 'DELIVERABLE' } } } } } });
     if (!order) return;
     if (order.status !== 'PENDING_PAYMENT' && order.status !== 'FAILED' && order.status !== 'CANCELED') return; // already fulfilled
-    const amount = Number(session.amount_total ?? -1);
+    // With Stripe Tax the total includes tax; the item price is the subtotal.
+    const amount = Number(session.amount_subtotal ?? session.amount_total ?? -1);
+    const total = Number(session.amount_total ?? -1);
+    const tax = Math.max(0, total - amount);
     const currency = String(session.currency ?? '').toUpperCase();
-    if (amount !== Number(order.amountMinor) || currency !== order.currency) {
+    if (amount !== Number(order.amountMinor) || total < amount || currency !== order.currency) {
       this.logger.error(`Marketplace order ${order.id}: paid ${amount} ${currency}, expected ${order.amountMinor} ${order.currency}. Not fulfilled.`);
       await this.audit.record({ action: 'marketplace.order.amount_mismatch', targetType: 'marketplace_order', targetId: order.id, afterState: { amount, currency } });
       return;
@@ -291,7 +313,7 @@ export class CommerceService implements OnModuleInit {
     const paidAt = new Date();
     const availableAt = new Date(paidAt.getTime() + terms.holdDays * 86_400_000);
     await this.prisma.$transaction(async (tx) => {
-      const res = await tx.marketplaceOrder.updateMany({ where: { id: order.id, status: { in: ['PENDING_PAYMENT', 'FAILED', 'CANCELED'] } }, data: { status: 'PAID', paidAt, paymentIntentId: (session.payment_intent as string | undefined) ?? null, checkoutSessionId: session.id } });
+      const res = await tx.marketplaceOrder.updateMany({ where: { id: order.id, status: { in: ['PENDING_PAYMENT', 'FAILED', 'CANCELED'] } }, data: { status: 'PAID', paidAt, taxMinor: BigInt(tax), paymentIntentId: (session.payment_intent as string | undefined) ?? null, checkoutSessionId: session.id } });
       if (res.count !== 1) return;
       for (const f of order.listing.files) {
         await tx.marketplaceDownloadEntitlement.upsert({ where: { orderId_fileId: { orderId: order.id, fileId: f.id } }, create: { orderId: order.id, fileId: f.id, buyerId: order.buyerId }, update: {} });
@@ -310,20 +332,31 @@ export class CommerceService implements OnModuleInit {
     this.market.notify(order.listing.workspaceId, order.sellerId, 'marketplace.sale', 'You made a sale', `“${order.listing.title}” was purchased.`);
   }
 
-  /** Idempotent by provider refund ID: updates the order, ledger and (on full refund) download access. */
-  private async applyRefund(orderId: string, refundId: string, amountMinor: number, caseId: string | null) {
-    if (amountMinor <= 0) return;
+  /**
+   * Idempotent by provider refund ID: updates the order, ledger and (on full refund) download access.
+   * `grossMinor` is the amount Stripe returned to the buyer, tax included; only the item-price part
+   * (the same share of the refund as the price is of the total) reverses seller earnings.
+   */
+  private async applyRefund(orderId: string, refundId: string, grossMinor: number, caseId: string | null) {
+    if (grossMinor <= 0) return;
     await this.prisma.$transaction(async (tx) => {
       const key = `refund:${refundId}`;
       const done = await tx.sellerLedgerEntry.findUnique({ where: { idempotencyKey: key } });
       if (done) return;
       const order = await tx.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
-      const refunded = order.refundedMinor + BigInt(amountMinor);
+      const remaining = order.amountMinor - order.refundedMinor;
+      const gross = order.amountMinor + order.taxMinor;
+      let net = gross > 0n ? (BigInt(grossMinor) * order.amountMinor) / gross : 0n;
+      // Rounding across several partial refunds can leave at most one minor unit.
+      if (net >= remaining - 1n) net = remaining;
+      if (net <= 0n) return;
+      const amountMinor = Number(net);
+      const refunded = order.refundedMinor + net;
       const full = refunded >= order.amountMinor;
       await tx.marketplaceOrder.update({ where: { id: orderId }, data: { refundedMinor: refunded, status: full ? 'REFUNDED' : 'PARTIALLY_REFUNDED' } });
       // Proportional reversal of the seller's net; a refund after payout leaves a negative balance (recorded, never silent).
-      const net = order.amountMinor - order.platformFeeMinor;
-      const sellerShare = order.amountMinor > 0n ? (net * BigInt(amountMinor)) / order.amountMinor : 0n;
+      const sellerNet = order.amountMinor - order.platformFeeMinor;
+      const sellerShare = order.amountMinor > 0n ? (sellerNet * BigInt(amountMinor)) / order.amountMinor : 0n;
       await tx.sellerLedgerEntry.create({ data: { sellerId: order.sellerId, type: 'REFUND', amountMinor: -sellerShare, currency: order.currency, orderId, caseId, idempotencyKey: key, memo: full ? 'Full refund' : 'Partial refund' } });
       if (full) await tx.marketplaceDownloadEntitlement.updateMany({ where: { orderId, status: 'ACTIVE' }, data: { status: 'REVOKED', revokedAt: new Date() } });
       if (caseId) await tx.marketplaceCase.update({ where: { id: caseId }, data: { status: 'REFUNDED', providerRefundId: refundId } });
@@ -673,10 +706,12 @@ export class CommerceService implements OnModuleInit {
       const max = o.amountMinor - o.refundedMinor;
       const amount = BigInt(input.amountMinor ?? Number(c.requestedAmountMinor ?? max));
       if (amount <= 0n || amount > max) throw new BadRequestException({ code: 'AMOUNT_INVALID', message: 'The refund cannot exceed the unrefunded amount.' });
+      // The tax on the refunded part goes back too. A full refund returns everything left on the charge.
+      const grossRefund = amount === max ? null : o.amountMinor > 0n ? (amount * (o.amountMinor + o.taxMinor)) / o.amountMinor : amount;
       await this.prisma.marketplaceCase.update({ where: { id }, data: { status: 'APPROVED', approvedAmountMinor: amount, decisionNote: input.note!.trim(), decidedBy: userId, decidedAt: new Date() } });
-      const refund = await this.stripe.request<StripeObject>('POST', '/refunds', { payment_intent: o.paymentIntentId, amount: Number(amount), metadata: { caseId: id, orderId: o.id } }, `marketplace-refund:${id}`);
+      const refund = await this.stripe.request<StripeObject>('POST', '/refunds', { payment_intent: o.paymentIntentId, ...(grossRefund === null ? {} : { amount: Number(grossRefund) }), metadata: { caseId: id, orderId: o.id } }, `marketplace-refund:${id}`);
       await this.prisma.marketplaceCase.update({ where: { id }, data: { providerRefundId: refund.id } });
-      if (refund.status === 'succeeded') await this.applyRefund(o.id, refund.id, Number(amount), id);
+      if (refund.status === 'succeeded') await this.applyRefund(o.id, refund.id, Number(refund.amount ?? grossRefund ?? amount + o.taxMinor), id);
     } else {
       await this.prisma.marketplaceCase.update({ where: { id }, data: { status: decision === 'REVIEW' ? 'UNDER_REVIEW' : decision === 'DENY' ? 'DENIED' : 'CLOSED', decisionNote: input.note?.trim() || c.decisionNote, ...(decision === 'REVIEW' ? {} : { decidedBy: userId, decidedAt: new Date() }) } });
     }

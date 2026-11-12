@@ -111,6 +111,11 @@ class CheckoutDto {
   @IsOptional() @IsBoolean() withdrawalWaiver?: boolean;
 }
 
+class PayoutAccountDto {
+  /** ISO 3166-1 alpha-2 country of the seller's bank account. */
+  @IsOptional() @IsString() @Length(2, 2) country?: string;
+}
+
 class CaseDto {
   @IsOptional() @IsUUID() orderId?: string;
   @IsOptional() @IsUUID() transactionId?: string;
@@ -274,8 +279,8 @@ export class MarketplaceController {
   }
 
   @Post('seller/payout-account')
-  payoutAccount(@CurrentActor() a: AuthenticatedActor) {
-    return this.commerce.payoutOnboarding(a.userId);
+  payoutAccount(@CurrentActor() a: AuthenticatedActor, @Body() dto: PayoutAccountDto) {
+    return this.commerce.payoutOnboarding(a.userId, dto.country ?? 'US');
   }
 
   @Post('seller/payout-account/refresh')

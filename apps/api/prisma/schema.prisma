@@ -3521,6 +3521,9 @@ model MarketplaceOrder {
   listingId           String                 @map("listing_id") @db.Uuid
   amountMinor         BigInt                 @map("amount_minor")
   platformFeeMinor    BigInt                 @default(0) @map("platform_fee_minor")
+  /// Tax added by Stripe Tax on top of amountMinor (prices exclude tax). Not seller revenue.
+  taxMinor            BigInt                 @default(0) @map("tax_minor")
+  /// Item price refunded (excludes refunded tax).
   refundedMinor       BigInt                 @default(0) @map("refunded_minor")
   currency            String                 @db.Char(3)
   status              MarketplaceOrderStatus @default(PENDING_PAYMENT)

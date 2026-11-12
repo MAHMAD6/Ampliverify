@@ -2,6 +2,7 @@ import { Landmark } from 'lucide-react';
 import { KeyValue, Notice, Panel } from '@/components/ui';
 import { ActionButton, RedirectButton } from '@/components/ui/actions';
 import { LoadError, StatusBadge } from '@/components/market/parts';
+import { PayoutConnect } from '@/components/market/PayoutConnect';
 import { SellerGate } from '@/components/market/SellerGate';
 import { apiGet } from '@/lib/api';
 import { CHECK_STATUS, type MarketMeta, type SellerProfile } from '@/lib/marketplace';
@@ -26,9 +27,10 @@ export default async function PayoutMethodPage() {
           <Notice tone="blue">Your identity must be verified before you connect a payout account.</Notice>
         ) : (
           <>
-            {!p.payoutsEnabled && (
+            {!p.payoutsEnabled && !p.payoutAccountConnected && <PayoutConnect />}
+            {!p.payoutsEnabled && p.payoutAccountConnected && (
               <RedirectButton path="/user/marketplace/seller/payout-account" icon={<Landmark size={16} />}>
-                {p.payoutAccountConnected ? 'Continue setup on Stripe' : 'Connect payout account'}
+                Continue setup on Stripe
               </RedirectButton>
             )}
             {p.payoutAccountConnected && (

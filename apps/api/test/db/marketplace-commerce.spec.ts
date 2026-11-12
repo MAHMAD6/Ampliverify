@@ -32,7 +32,7 @@ describe('Marketplace commerce', () => {
       const path = new URL(url).pathname.replace(/^\/v1/, '');
       const headers = new Headers(init?.headers);
       stripeCalls.push({ path, body: String(init?.body ?? ''), idempotencyKey: headers.get('idempotency-key') });
-      const json = path === '/checkout/sessions' ? { id: `cs_test_${stripeCalls.length}`, url: 'https://checkout.stripe.com/c/pay/cs_test' } : path === '/refunds' ? { id: 're_test_1', status: 'succeeded' } : { error: { message: 'unexpected' } };
+      const json = path === '/checkout/sessions' ? { id: `cs_test_${stripeCalls.length}`, url: 'https://checkout.stripe.com/c/pay/cs_test' } : path === '/refunds' ? { id: 're_test_1', status: 'succeeded', amount: 5_292 } : { error: { message: 'unexpected' } };
       return new Response(JSON.stringify(json), { status: json.error ? 400 : 200, headers: { 'content-type': 'application/json' } });
     });
     h = await startApp({ STRIPE_SECRET_KEY: 'sk_test_dummy', STRIPE_WEBHOOK_SECRET: WEBHOOK_SECRET });
@@ -59,10 +59,10 @@ describe('Marketplace commerce', () => {
     await h.api().post('/api/v1/webhooks/stripe').set('stripe-signature', header).set('content-type', 'application/json').send(body).expect(200);
     await h.jobs.drain(['billing.webhook']);
   };
-  const sessionEvent = (id: string, orderId: string, amount: number, currency = 'usd') => ({
+  const sessionEvent = (id: string, orderId: string, amount: number, currency = 'usd', tax = 0) => ({
     id,
     type: 'checkout.session.completed',
-    data: { object: { id: `cs_${id}`, object: 'checkout.session', payment_status: 'paid', amount_total: amount, currency, payment_intent: `pi_${orderId.slice(0, 8)}`, metadata: { kind: 'marketplace_order', orderId } } },
+    data: { object: { id: `cs_${id}`, object: 'checkout.session', payment_status: 'paid', amount_subtotal: amount, amount_total: amount + tax, currency, payment_intent: `pi_${orderId.slice(0, 8)}`, metadata: { kind: 'marketplace_order', orderId } } },
   });
 
   let listingId = '';
@@ -118,6 +118,10 @@ describe('Marketplace commerce', () => {
 
     const call = stripeCalls.find((c) => c.path === '/checkout/sessions')!;
     expect(call.idempotencyKey).toBe(`marketplace-checkout:${orderId}`);
+    const sent = decodeURIComponent(call.body);
+    expect(sent).toContain('automatic_tax[enabled]=true');
+    expect(sent).toContain('billing_address_collection=required');
+    expect(sent).not.toContain('consent_collection');
     const order = await h.prisma.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
     expect(order).toMatchObject({ status: 'PENDING_PAYMENT', amountMinor: 4_900n, platformFeeMinor: 490n, currency: 'USD' });
 
@@ -133,10 +137,11 @@ describe('Marketplace commerce', () => {
   });
 
   it('fulfils a paid order exactly once and records the commission', async () => {
-    await webhook(sessionEvent('evt_paid_1', orderId, 4_900));
-    await webhook(sessionEvent('evt_paid_2', orderId, 4_900)); // a second delivery of the same payment
+    // Stripe Tax adds 8% on top of the price; only the price is seller revenue.
+    await webhook(sessionEvent('evt_paid_1', orderId, 4_900, 'usd', 392));
+    await webhook(sessionEvent('evt_paid_2', orderId, 4_900, 'usd', 392)); // a second delivery of the same payment
     const order = await h.prisma.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe('PAID');
+    expect(order).toMatchObject({ status: 'PAID', taxMinor: 392n });
     expect(await h.prisma.marketplaceDownloadEntitlement.count({ where: { orderId } })).toBe(1);
     const ledger = await h.prisma.sellerLedgerEntry.findMany({ where: { orderId }, orderBy: { type: 'asc' } });
     expect(ledger.map((l) => [l.type, l.amountMinor])).toEqual(
@@ -185,7 +190,8 @@ describe('Marketplace commerce', () => {
 
     const refundCall = stripeCalls.find((x) => x.path === '/refunds')!;
     expect(refundCall.idempotencyKey).toBe(`marketplace-refund:${c.id}`);
-    expect(refundCall.body).toContain('amount=4900');
+    // A full refund returns everything left on the charge, tax included.
+    expect(refundCall.body).not.toMatch(/(^|&)amount=/);
 
     const order = await h.prisma.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
     expect(order).toMatchObject({ status: 'REFUNDED', refundedMinor: 4_900n });
@@ -195,8 +201,8 @@ describe('Marketplace commerce', () => {
     await h.api().get(`/api/v1/user/marketplace/downloads/${entitlementId}/file`).set(buyer).expect(403);
 
     // The provider's own refund notifications for the same refund change nothing.
-    await webhook({ id: 'evt_refund_1', type: 'refund.created', data: { object: { id: 're_test_1', object: 'refund', status: 'succeeded', amount: 4_900, payment_intent: order.paymentIntentId } } });
-    await webhook({ id: 'evt_charge_refunded', type: 'charge.refunded', data: { object: { id: 'ch_1', object: 'charge', payment_intent: order.paymentIntentId, refunds: { data: [{ id: 're_test_1', status: 'succeeded', amount: 4_900 }] } } } });
+    await webhook({ id: 'evt_refund_1', type: 'refund.created', data: { object: { id: 're_test_1', object: 'refund', status: 'succeeded', amount: 5_292, payment_intent: order.paymentIntentId } } });
+    await webhook({ id: 'evt_charge_refunded', type: 'charge.refunded', data: { object: { id: 'ch_1', object: 'charge', payment_intent: order.paymentIntentId, refunds: { data: [{ id: 're_test_1', status: 'succeeded', amount: 5_292 }] } } } });
     const refunds = await h.prisma.sellerLedgerEntry.findMany({ where: { orderId, type: 'REFUND' } });
     expect(refunds).toHaveLength(1);
     // The seller's net (sale minus commission) is reversed.
