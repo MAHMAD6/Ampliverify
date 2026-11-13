@@ -27,7 +27,7 @@ export default async function PayoutMethodPage() {
           <Notice tone="blue">Your identity must be verified before you connect a payout account.</Notice>
         ) : (
           <>
-            {!p.payoutsEnabled && !p.payoutAccountConnected && <PayoutConnect />}
+            {!p.payoutsEnabled && !p.payoutAccountConnected && <PayoutConnect allowed={meta.ok ? meta.data.terms.payoutCountries : undefined} />}
             {!p.payoutsEnabled && p.payoutAccountConnected && (
               <RedirectButton path="/user/marketplace/seller/payout-account" icon={<Landmark size={16} />}>
                 Continue setup on Stripe

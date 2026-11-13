@@ -304,7 +304,7 @@ export type MarketSummary = {
     payoutThresholdMinor: number;
   };
 };
-export type MarketMeta = { categories: string[]; terms: { commissionBps: number; holdDays: number; reportingWindowDays: number; checkoutEnabled: boolean; payoutThresholdMinor: number; paymentsConfigured: boolean } };
+export type MarketMeta = { categories: string[]; terms: { commissionBps: number; holdDays: number; reportingWindowDays: number; checkoutEnabled: boolean; payoutThresholdMinor: number; paymentsConfigured: boolean; payoutCountries?: string[] } };
 
 export const money = (minor: number | null | undefined, currency: string) => (minor === null || minor === undefined ? '—' : formatMoney(String(minor), currency));
 export const fileSize = (bytes: number) => (bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);

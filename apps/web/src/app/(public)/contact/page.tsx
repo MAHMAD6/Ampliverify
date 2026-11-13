@@ -8,7 +8,7 @@ import s from '@/components/public/pages.module.css';
 
 export const metadata: Metadata = { title: 'Contact' };
 
-const EMAIL = 'info@ampliverify.com';
+const EMAIL = 'support@ampliverify.com';
 
 function Mailto() {
   return (

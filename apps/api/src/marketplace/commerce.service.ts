@@ -61,7 +61,7 @@ export class CommerceService implements OnModuleInit {
 
   async publicTerms() {
     const t = await this.terms();
-    return { ...t, payoutThresholdMinor: PAYOUT_THRESHOLD_MINOR, paymentsConfigured: this.stripe.configured };
+    return { ...t, payoutThresholdMinor: PAYOUT_THRESHOLD_MINOR, paymentsConfigured: this.stripe.configured, payoutCountries: this.payoutCountries() };
   }
 
   async adminTerms(userId: string) {
@@ -152,6 +152,15 @@ export class CommerceService implements OnModuleInit {
 
   // ── Payout account (Stripe Connect Express) ─────────────────────────────
 
+  /**
+   * Bank-account countries sellers may connect. US only until Stripe approves recipient accounts
+   * (cross-border payouts) for this platform; then list them in STRIPE_PAYOUT_COUNTRIES, e.g. "US,GB,DE".
+   */
+  payoutCountries(): string[] {
+    const list = (this.config.get<string>('STRIPE_PAYOUT_COUNTRIES') ?? 'US').split(',').map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c));
+    return list.length ? list : ['US'];
+  }
+
   async payoutOnboarding(userId: string, country = 'US') {
     const p = await this.requireSeller(userId);
     if (!this.stripe.configured) throw new BadRequestException({ code: 'PAYMENTS_NOT_CONFIGURED', message: 'Payouts are not available yet.' });
@@ -160,7 +169,7 @@ export class CommerceService implements OnModuleInit {
     let accountId = p.stripeAccountId;
     if (!accountId) {
       const cc = country.toUpperCase();
-      if (!/^[A-Z]{2}$/.test(cc)) throw new BadRequestException({ code: 'COUNTRY_INVALID', message: 'Choose the country of your bank account.' });
+      if (!this.payoutCountries().includes(cc)) throw new BadRequestException({ code: 'COUNTRY_UNSUPPORTED', message: 'Payouts to bank accounts in this country are not available yet.' });
       // Sellers outside the US use cross-border payouts: transfers only, under the recipient service agreement.
       const account = await this.stripe.request<StripeObject>(
         'POST',

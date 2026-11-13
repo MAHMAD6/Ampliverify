@@ -58,14 +58,15 @@ const COUNTRIES: [string, string][] = [
   ['GB', 'United Kingdom'],
 ];
 
-export function PayoutConnect() {
-  const [country, setCountry] = useState('US');
+export function PayoutConnect({ allowed = ['US'] }: { allowed?: string[] }) {
+  const options = COUNTRIES.filter(([code]) => allowed.includes(code));
+  const [country, setCountry] = useState(options[0]?.[0] ?? 'US');
   return (
     <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
       <label style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
         <span>Bank account country</span>
         <select value={country} onChange={(e) => setCountry(e.target.value)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border, #d0d5dd)' }}>
-          {COUNTRIES.map(([code, name]) => (
+          {options.map(([code, name]) => (
             <option key={code} value={code}>
               {name}
             </option>
