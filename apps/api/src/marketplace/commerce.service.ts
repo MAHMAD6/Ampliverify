@@ -214,9 +214,8 @@ export class CommerceService implements OnModuleInit {
       {
         mode: 'payment',
         customer_email: user.email,
-        // Stripe Tax: prices exclude tax; the buyer's address decides the tax.
-        automatic_tax: { enabled: true },
-        billing_address_collection: 'required',
+        // Stripe Tax is off until STRIPE_AUTOMATIC_TAX=true (prices exclude tax; the buyer's address decides the tax).
+        ...(this.config.get<string>('STRIPE_AUTOMATIC_TAX') === 'true' ? { automatic_tax: { enabled: true }, billing_address_collection: 'required' } : {}),
         ...(this.config.get<string>('STRIPE_CHECKOUT_TERMS_CONSENT') === 'true' ? { consent_collection: { terms_of_service: 'required' } } : {}),
         custom_text: {
           submit: {

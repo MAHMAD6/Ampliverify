@@ -119,8 +119,8 @@ describe('Marketplace commerce', () => {
     const call = stripeCalls.find((c) => c.path === '/checkout/sessions')!;
     expect(call.idempotencyKey).toBe(`marketplace-checkout:${orderId}`);
     const sent = decodeURIComponent(call.body);
-    expect(sent).toContain('automatic_tax[enabled]=true');
-    expect(sent).toContain('billing_address_collection=required');
+    // Stripe Tax stays off until STRIPE_AUTOMATIC_TAX=true.
+    expect(sent).not.toContain('automatic_tax');
     expect(sent).not.toContain('consent_collection');
     const order = await h.prisma.marketplaceOrder.findUniqueOrThrow({ where: { id: orderId } });
     expect(order).toMatchObject({ status: 'PENDING_PAYMENT', amountMinor: 4_900n, platformFeeMinor: 490n, currency: 'USD' });
