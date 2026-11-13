@@ -5,19 +5,21 @@ import { ArtHero } from '@/components/public/HeroArt';
 import { Markdown } from '@/components/public/Markdown';
 import { apiGet } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import { COOKIES_MD, DPA_MD, LEGAL_UPDATED, PRIVACY_MD, REGIONAL_MD, TERMS_MD } from '@/components/public/legal-text';
 import site from '@/components/public/site.module.css';
 import s from '@/components/public/pages.module.css';
 
 type Clause = { title: string; icon: ReactNode; body?: ReactNode };
 export type LegalKey = 'privacy' | 'terms' | 'cookies' | 'dpa' | 'refund' | 'seller' | 'regional';
-type Doc = { key: string; nav: string; title: string; lead: string; updated?: string; clauses: Clause[] };
+type Doc = { key: string; nav: string; title: string; lead: string; updated?: string; clauses: Clause[]; markdown?: string };
 
 const PRIVACY: Doc = {
   key: 'privacy',
   nav: 'Privacy Policy',
   title: 'Privacy Policy',
   lead: 'This policy explains what information AmpliVerify collects, how we use it, and the choices you have.',
-  updated: 'September 27, 2026',
+  updated: LEGAL_UPDATED,
+  markdown: PRIVACY_MD,
   clauses: [
     {
       title: 'Information We Collect',
@@ -85,9 +87,6 @@ const PRIVACY: Doc = {
   ],
 };
 
-/** Documents whose approved text has not been published yet show their outline with a notice. */
-const pendingDoc = (key: string, nav: string, title: string, lead: string, clauses: [string, ReactNode][]): Doc => ({ key, nav, title, lead, clauses: clauses.map(([t, icon]) => ({ title: t, icon })) });
-
 const REFUND: Doc = {
   key: 'refund',
   nav: 'Digital Product Refund Policy',
@@ -131,29 +130,12 @@ const SELLER: Doc = {
 
 const DOCS: Doc[] = [
   PRIVACY,
-  pendingDoc('terms', 'Terms of Service', 'Terms of Service', 'These terms govern your use of AmpliVerify and its related services.', [
-    ['Accounts', <User key="a" size={24} />],
-    ['Plans, Billing and Cancellation', <FileText key="b" size={24} />],
-    ['Acceptable Use', <ShieldCheck key="c" size={24} />],
-    ['Liability and Warranties', <Settings key="d" size={24} />],
-    ['Changes and Governing Law', <Globe key="e" size={24} />],
-  ]),
-  pendingDoc('cookies', 'Cookie Policy', 'Cookie Policy', 'This policy describes the cookies and similar technologies used on our website and product.', [
-    ['Types of Cookies We Use', <Cookie key="a" size={24} />],
-    ['Managing Your Preferences', <Settings key="b" size={24} />],
-  ]),
-  pendingDoc('dpa', 'Data Processing Agreement (DPA)', 'Data Processing Agreement', 'How AmpliVerify processes personal data on behalf of customers.', [
-    ['Scope and Roles', <Users key="a" size={24} />],
-    ['Sub-processors', <Database key="b" size={24} />],
-    ['Security Measures', <ShieldCheck key="c" size={24} />],
-    ['International Transfers', <Globe key="d" size={24} />],
-  ]),
+  { key: 'terms', nav: 'Terms of Service', title: 'Terms of Service', lead: 'These terms govern your use of AmpliVerify, its related services and the AmpliVerify Marketplace.', updated: LEGAL_UPDATED, clauses: [], markdown: TERMS_MD },
+  { key: 'cookies', nav: 'Cookie Policy', title: 'Cookie Policy', lead: 'This policy describes the cookies and similar technologies used on our website and product.', updated: LEGAL_UPDATED, clauses: [], markdown: COOKIES_MD },
+  { key: 'dpa', nav: 'Data Processing Agreement (DPA)', title: 'Data Processing Agreement', lead: 'How AmpliVerify processes personal data on behalf of customers.', updated: LEGAL_UPDATED, clauses: [], markdown: DPA_MD },
   REFUND,
   SELLER,
-  pendingDoc('regional', 'Regional Disclosures', 'Regional Disclosures', 'Region-specific information, including GDPR, CCPA, and other applicable privacy laws.', [
-    ['European Economic Area and UK (GDPR)', <Globe key="a" size={24} />],
-    ['California (CCPA / CPRA)', <ShieldCheck key="b" size={24} />],
-  ]),
+  { key: 'regional', nav: 'Regional Disclosures', title: 'Regional Disclosures', lead: 'Region-specific information, including GDPR, CCPA, and other applicable privacy laws.', updated: LEGAL_UPDATED, clauses: [], markdown: REGIONAL_MD },
 ];
 
 const NAV_ICON: Record<string, ReactNode> = {
@@ -209,9 +191,9 @@ export async function LegalView({ docKey }: { docKey: LegalKey }) {
             </div>
           </aside>
           <div>
-            {published ? (
+            {published || doc.markdown ? (
               <div className={s.policy}>
-                <Markdown source={published.body} />
+                <Markdown source={published?.body ?? doc.markdown!} />
               </div>
             ) : (
             <div className={s.policy}>
