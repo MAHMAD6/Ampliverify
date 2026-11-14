@@ -6,6 +6,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { AuthenticatedActor } from '../common/types/actor.type';
 import { SettingsService } from '../commerce/settings.service';
 import { RbacService } from '../rbac/rbac.service';
+import { AdminPublicPagesController, PublicPagesController, PublicPagesService } from './public-pages';
 
 /** Legal documents editable in Super Admin (V2 guide §1: CMS "legal revisions" and publication controls). */
 export const LEGAL_KEYS = ['privacy', 'terms', 'cookies', 'dpa', 'refund', 'seller', 'regional'] as const;
@@ -100,7 +101,7 @@ export class LegalAdminController {
 }
 
 @Module({
-  controllers: [LegalPublicController, LegalAdminController],
-  providers: [LegalService],
+  controllers: [LegalPublicController, LegalAdminController, PublicPagesController, AdminPublicPagesController],
+  providers: [LegalService, PublicPagesService],
 })
 export class LegalModule {}

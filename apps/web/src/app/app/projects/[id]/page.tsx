@@ -13,10 +13,10 @@ import p from '@/components/app/pages.module.css';
 
 function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '22px 130px 1fr', gap: 10, alignItems: 'center', padding: '7px 0', fontSize: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '22px minmax(90px, 130px) minmax(0, 1fr)', gap: 10, alignItems: 'center', padding: '7px 0', fontSize: 14 }}>
       <span style={{ color: 'var(--blue)' }}>{icon}</span>
       <span style={{ color: 'var(--heading)' }}>{label}</span>
-      <span style={{ color: 'var(--muted)' }}>{value}</span>
+      <span style={{ color: 'var(--muted)', minWidth: 0, overflowWrap: 'anywhere' }}>{value}</span>
     </div>
   );
 }
@@ -247,7 +247,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
               ['Current period', billing ? `${formatDate(billing.periodStart)} – ${billing.periodEnd ? formatDate(billing.periodEnd) : 'now'}` : '—'],
             ].map(([label, value]) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 14, color: 'var(--heading)' }}>
-                {label} <span style={{ color: 'var(--muted)' }}>{value}</span>
+                {label} <span style={{ color: 'var(--muted)', minWidth: 0, overflowWrap: 'anywhere' }}>{value}</span>
               </div>
             ))}
           </Panel>

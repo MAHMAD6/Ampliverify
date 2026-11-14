@@ -19,7 +19,7 @@
 .card h2 { display: flex; gap: 10px; align-items: center; font-size: 18px; color: var(--ink); }
 .card > p { font-size: 13px; color: var(--muted); margin: 4px 0 10px; }
 .kv { margin: 0; }
-.kv div { display: grid; grid-template-columns: 140px 1fr; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.kv div { display: grid; grid-template-columns: minmax(90px, 140px) minmax(0, 1fr); padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .kv dt { color: var(--heading); font-weight: 600; }
 .kv dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 .empty { display: grid; justify-items: center; text-align: center; gap: 6px; padding: 24px 10px; color: var(--muted); }

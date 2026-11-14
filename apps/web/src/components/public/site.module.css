@@ -258,7 +258,7 @@ textarea.input { height: auto; min-height: 140px; padding: 14px 16px; resize: ve
 .hp { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
 .formNote { display: flex; gap: 8px; align-items: center; color: var(--g900); font-weight: 600; font-size: 15px; }
 .formError { color: #b42318; font-size: 14px; width: 100%; }
-.voteRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.voteRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .voteRow button { height: 44px; font-size: 15px; }
 .detailGrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 40px; padding: 24px 0 72px; align-items: start; }
 .articleSide { display: grid; gap: 18px; position: sticky; top: 100px; }

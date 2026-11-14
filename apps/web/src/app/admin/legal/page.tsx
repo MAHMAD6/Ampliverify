@@ -34,8 +34,9 @@ export default async function AdminLegalPages({ searchParams }: { searchParams: 
           <StateView kind="error" icon={<Scale size={36} />} title="Legal pages could not be loaded with your permissions." description="Editing legal pages needs the cms.manage permission." />
         </Panel>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, alignItems: 'start' }}>
-          <Panel bodyless>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+          <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+            <Panel bodyless>
             <DataTable
               columns={['Document', 'Status']}
               rows={docs.map((d) => [
@@ -51,8 +52,9 @@ export default async function AdminLegalPages({ searchParams }: { searchParams: 
                 ),
               ])}
             />
-          </Panel>
-          <div style={{ display: 'grid', gap: 16, gridColumn: 'span 2', minWidth: 0 }}>
+            </Panel>
+          </div>
+          <div style={{ display: 'grid', gap: 16, flex: '999 1 480px', minWidth: 0 }}>
             <Panel
               title={DOCS[active.key]?.title ?? active.key}
               description={active.published ? `Version ${active.published.version} published ${formatDateTime(active.published.publishedAt)}` : 'No version published yet.'}

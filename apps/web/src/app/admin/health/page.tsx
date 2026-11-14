@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, Clock3, RotateCw, Server } from 'lucide-react';
 import { Field, Input, Panel, Textarea } from '@/components/ui';
 import { ActionButton, ApiForm } from '@/components/ui/actions';
@@ -53,7 +54,7 @@ export default async function SystemHealthPage({ searchParams }: { searchParams:
             '—',
             p.configured ? `${calls(p.key)} calls, ${errors(p.key)} errors (24h)` : 'Set the provider keys to enable',
           ]),
-          ['Stripe webhooks', 'Billing', <StatusPill key="s" tone={h?.webhooksFailed ? 'red' : 'green'}>{h?.webhooksFailed ? `${h.webhooksFailed} failed` : 'OK'}</StatusPill>, '—', '—', 'Failed webhook deliveries'],
+          ['Stripe webhooks', 'Billing', <StatusPill key="s" tone={h?.webhooksFailed ? 'red' : 'green'}>{h?.webhooksFailed ? `${h.webhooksFailed} failed` : 'OK'}</StatusPill>, '—', '—', <Link key="w" href="/admin/health/webhooks">Webhook diagnostics</Link>],
         ]
       : tab === 'queues'
         ? (h?.queues ?? []).map((q) => [q.queue, 'Background jobs', <StatusPill key="s" tone={q.status === 'DEAD' || q.status === 'FAILED' ? 'red' : q.status === 'SUCCEEDED' ? 'green' : 'blue'}>{label(q.status)}</StatusPill>, String(q.count), '—', ''])

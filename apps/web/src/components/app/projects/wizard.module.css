@@ -43,7 +43,7 @@
 .tool > svg { color: var(--blue); margin-top: 3px; }
 .tool small { display: block; font-size: 13px; color: var(--muted); }
 .note { display: flex; gap: 8px; align-items: center; margin-top: 14px; font-size: 13px; color: var(--muted); }
-.review { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 10px 16px; font-size: 14px; }
+.review { display: grid; grid-template-columns: minmax(100px, 160px) minmax(0, 1fr); gap: 10px 16px; font-size: 14px; }
 .review dt { color: var(--muted); }
 .review dd { margin: 0; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
 

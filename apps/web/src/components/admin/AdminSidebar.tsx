@@ -2,8 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import { Calculator, ChevronDown, CreditCard, FileText, Home, Settings2, SlidersHorizontal, Store, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calculator, ChevronDown, CreditCard, FileText, Home, Menu, Settings2, SlidersHorizontal, Store, Users, X } from 'lucide-react';
 import { ADMIN_NAV } from '@/lib/nav';
 import { Logo } from '../brand/Logo';
 import s from './admin.module.css';
@@ -29,10 +29,27 @@ function matches(pathname: string, href: string) {
 export function AdminSidebar() {
   const pathname = usePathname();
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  // Below 1080px the sidebar is a drawer; it closes on navigation and with Escape.
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => setMobileOpen(false), [pathname]);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMobileOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
   return (
-    <aside className={s.sidebar} aria-label="Super Admin">
-      <div className={s.brand}>
+    <>
+    <button type="button" className={`${s.circle} ${s.menuToggle}`} aria-label="Open navigation" aria-expanded={mobileOpen} aria-controls="admin-nav" onClick={() => setMobileOpen(true)}>
+      <Menu size={20} />
+    </button>
+    {mobileOpen && <div className={s.backdrop} aria-hidden onClick={() => setMobileOpen(false)} />}
+    <aside id="admin-nav" className={`${s.sidebar} ${mobileOpen ? s.sidebarOpen : ''}`} aria-label="Super Admin">
+      <div className={s.brand} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <Logo href="/admin" onDark tagline="engineering" size={38} />
+        <button type="button" className={`${s.circle} ${s.menuClose}`} aria-label="Close navigation" onClick={() => setMobileOpen(false)}>
+          <X size={18} />
+        </button>
       </div>
       <nav>
         {ADMIN_NAV.map((group) => {
@@ -73,5 +90,6 @@ export function AdminSidebar() {
         })}
       </nav>
     </aside>
+    </>
   );
 }

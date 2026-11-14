@@ -219,7 +219,7 @@ export function KeywordDetailsPanel({ detail, onClose, onSave }: { detail: Keywo
       {(showOverview || tab === 'Trend') && (
         <>
           {showOverview && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
               {[
                 { icon: <BarChart3 size={18} />, tone: 'green' as const, v: fmtNum(detail.volume), l: 'Monthly Searches' },
                 { icon: <PieChart size={18} />, tone: 'amber' as const, v: detail.difficulty ?? '—', l: 'Keyword Difficulty' },

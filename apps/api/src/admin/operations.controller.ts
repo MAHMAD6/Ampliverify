@@ -229,6 +229,16 @@ export class OperationsController {
     return this.ops.health(actor.userId);
   }
 
+  @Get('webhooks')
+  webhooks(@CurrentActor() actor: AuthenticatedActor, @Query('status') status?: string) {
+    return this.ops.webhooks(actor.userId, status);
+  }
+
+  @Post('webhooks/:id/retry')
+  retryWebhook(@CurrentActor() actor: AuthenticatedActor, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.ops.retryWebhook(actor.userId, id, requestMeta(req));
+  }
+
   @Post('incidents')
   createIncident(@CurrentActor() actor: AuthenticatedActor, @Body() dto: IncidentDto, @Req() req: Request) {
     return this.ops.createIncident(actor.userId, dto, requestMeta(req));

@@ -53,6 +53,7 @@ export default async function ValuationDetailPage({ params }: { params: Promise<
           </div>
           <div className={s.two}>
             <Panel title="Score Breakdown">
+              <div style={{ overflowX: 'auto' }}>
               <table className={s.table}>
                 <thead>
                   <tr>
@@ -73,6 +74,7 @@ export default async function ValuationDetailPage({ params }: { params: Promise<
                   ))}
                 </tbody>
               </table>
+              </div>
             </Panel>
             <Panel title="Limitations">
               <ul style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 6 }}>

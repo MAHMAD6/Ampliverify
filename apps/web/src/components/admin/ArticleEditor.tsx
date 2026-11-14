@@ -84,7 +84,7 @@ export function ArticleEditor({
           <Card>
             <SlugFields titleLabel={`${k.noun} title`} titlePlaceholder="Enter a clear title" defaultTitle={article?.title} defaultSlug={article?.slug} />
             {isCase && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
                 <Field label="Customer name" htmlFor="f-cust">
                   <Input id="f-cust" name="customerName" required maxLength={160} defaultValue={article?.customerName ?? ''} />
                 </Field>
@@ -104,7 +104,7 @@ export function ArticleEditor({
                 <b style={{ fontSize: 14 }}>Results</b>
                 <p style={{ fontSize: 13, color: 'var(--muted)' }}>Measured outcomes shown as highlights (e.g. “Organic traffic” · “+42%”).</p>
                 {results.map((r, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, marginTop: 6 }}>
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) auto', gap: 8, marginTop: 6 }}>
                     <Input value={r.label} maxLength={80} placeholder="Metric" aria-label="Metric" onChange={(e) => setResults((x) => x.map((y, j) => (j === i ? { ...y, label: e.target.value } : y)))} />
                     <Input value={r.value} maxLength={80} placeholder="Value" aria-label="Value" onChange={(e) => setResults((x) => x.map((y, j) => (j === i ? { ...y, value: e.target.value } : y)))} />
                     <Button type="button" variant="ghost" aria-label="Remove result" onClick={() => setResults((x) => x.filter((_, j) => j !== i))}>

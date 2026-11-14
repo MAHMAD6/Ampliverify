@@ -214,6 +214,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
             </Link>
           </div>
           {usage?.events.length ? (
+            <div style={{ overflowX: 'auto' }}>
             <table className={s.table}>
               <thead>
                 <tr>
@@ -236,6 +237,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <StateView kind="empty" compact icon={<FileText size={26} />} title="No usage activity yet" description="Your usage will appear here once you start using AmpliVerify." />
           )}
@@ -250,6 +252,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
             </div>
           </div>
           {costs.length ? (
+            <div style={{ overflowX: 'auto' }}>
             <table className={s.table}>
               <thead>
                 <tr>
@@ -266,6 +269,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <div className={s.note}>
               <Info size={18} />
@@ -281,6 +285,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
             <h2>Recent Credit Activity</h2>
           </div>
           {ledger.length ? (
+            <div style={{ overflowX: 'auto' }}>
             <table className={s.table}>
               <thead>
                 <tr>
@@ -302,6 +307,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             <StateView kind="empty" compact icon={<Database size={26} />} title="No credit activity yet" description="Grants, purchases and usage appear here." />
           )}

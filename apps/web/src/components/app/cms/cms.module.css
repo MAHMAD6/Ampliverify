@@ -13,7 +13,7 @@
 .platformOn { border: 2px solid var(--blue); background: var(--blue-50); }
 .wp { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #21759b; color: #21759b; font-weight: 900; font-size: 24px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: Georgia, serif; }
 .logo { font-size: 32px; font-weight: 900; width: 48px; text-align: center; flex-shrink: 0; }
-.methods { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
 .methods button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; padding: 12px; border: 0; background: #fff; font-size: 14px; color: var(--heading); cursor: pointer; }
 .methodOn { background: var(--blue-50) !important; color: var(--blue) !important; font-weight: 600; border-bottom: 2px solid var(--blue) !important; }
 .info { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: 10px; padding: 10px 14px; font-size: 13px; color: #2b4a7a; margin-bottom: 14px; }

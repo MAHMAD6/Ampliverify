@@ -17,6 +17,8 @@ export const revalidate = 3600;
 /** Public pages plus the first pages of published Marketplace listings. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const pages: MetadataRoute.Sitemap = STATIC.map((p) => ({ url: `${SITE}${p}`, changeFrequency: 'weekly', priority: p === '/' ? 1 : 0.6 }));
+  const cms = await apiGet<{ slug: string; publishedAt: string }[]>('/public/pages', { revalidate: 3600 });
+  if (cms.ok) for (const p of cms.data) pages.push({ url: `${SITE}/pages/${encodeURIComponent(p.slug)}`, lastModified: p.publishedAt, changeFrequency: 'monthly', priority: 0.4 });
   for (let page = 1; page <= 5; page++) {
     const res = await apiGet<BrowsePage>(`/public/marketplace/listings?page=${page}`, { revalidate: 3600 });
     if (!res.ok) break;

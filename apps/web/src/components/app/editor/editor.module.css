@@ -56,7 +56,7 @@
 .html { margin: 0; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; color: var(--heading); background: #0b1630; color: #dbe7ff; border-radius: 0 0 var(--radius) var(--radius); min-height: 400px; }
 .preview { padding: 28px 36px; }
 .insights { display: grid; gap: 16px; }
-.insightTabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 12px 0; }
+.insightTabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 12px 0; }
 .insightTabs button { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px; font-size: 13px; cursor: pointer; color: var(--heading); }
 .insightTabs .on { border-color: var(--blue); background: var(--blue-50); color: var(--blue); font-weight: 600; }
 .score { display: flex; gap: 14px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
@@ -64,8 +64,8 @@
 .checkRow { display: flex; align-items: center; gap: 10px; padding: 8px 4px; font-size: 14px; color: var(--heading); border-bottom: 1px solid var(--line); }
 .checkRow:last-child { border-bottom: 0; }
 .checkRow svg:last-child { margin-left: auto; color: var(--muted); }
-.actionGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.quickGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.actionGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.quickGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .mini { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font-size: 12px; color: var(--heading); cursor: pointer; }
 @media (max-width: 1400px) { .layout { grid-template-columns: 260px minmax(0, 1fr); } .insights { grid-column: 1 / -1; grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 900px) { .layout, .optimizeRow { grid-template-columns: 1fr; } .insights { grid-template-columns: 1fr; } }

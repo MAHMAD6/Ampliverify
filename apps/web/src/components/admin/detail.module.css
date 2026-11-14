@@ -13,7 +13,7 @@
 .card h3 { display: flex; gap: 8px; align-items: center; font-size: 16px; color: var(--ink); margin-bottom: 10px; }
 .card > p { font-size: 14px; color: var(--muted); }
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.mini { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--surface-alt); border-radius: 8px; padding: 12px; margin: 0 0 10px; }
+.mini { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; background: var(--surface-alt); border-radius: 8px; padding: 12px; margin: 0 0 10px; }
 .mini dt { font-size: 13px; color: var(--heading); }
 .mini dd { margin: 2px 0 0; font-size: 14px; }
 .list { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 6px; font-size: 14px; color: var(--text); }

@@ -88,7 +88,7 @@ export function GoogleDataPanel({ projectId, sources }: { projectId: string; sou
                   <p style={{ margin: 0, fontSize: 14, color: 'var(--muted)' }}>{src.lastSyncAt ? 'No data available for this period.' : 'First sync in progress — data appears within a few minutes.'}</p>
                 ) : (
                   <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
                       <div>
                         <b style={{ fontSize: 22, color: 'var(--heading)' }}>{n(gsc ? src.totals.clicks : src.totals.sessions)}</b>
                         <small style={{ display: 'block', color: 'var(--muted)' }}>{gsc ? 'Clicks' : 'Sessions'}</small>

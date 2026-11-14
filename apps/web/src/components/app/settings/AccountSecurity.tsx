@@ -167,7 +167,7 @@ export function AccountSecurity({ twoFactorEnabled, passkeysAllowed = true }: { 
         </form>
       )}
       {mfa && (
-        <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 16, margin: '8px 0 16px', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, margin: '8px 0 16px', alignItems: 'start' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={mfa.qr} alt="Authenticator QR code" width={180} height={180} />
           <div style={{ display: 'grid', gap: 8 }}>

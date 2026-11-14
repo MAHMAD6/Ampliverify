@@ -6,6 +6,7 @@ import { RbacService } from '../rbac/rbac.service';
 import { AuditService } from '../audit/audit.service';
 import { SETTING, SettingsService } from '../commerce/settings.service';
 import { PlatformService } from '../platform/platform.service';
+import { JobsService } from '../jobs/jobs.service';
 import { RequestMeta } from '../common/types/request-meta.type';
 
 /** Settings an administrator may edit, with light shape validation. */
@@ -36,6 +37,7 @@ export class OperationsService {
     private readonly settings: SettingsService,
     private readonly config: ConfigService,
     private readonly platform: PlatformService,
+    private readonly jobs: JobsService,
   ) {}
 
   // ── Module controls & feature flags ────────────────────────────────────
@@ -269,6 +271,49 @@ export class OperationsService {
       topWorkspaces: topWorkspaces.map((w) => ({ workspaceId: w.workspaceId, name: names.find((n) => n.id === w.workspaceId)?.name ?? null, units: Number(w._sum.units ?? 0) })),
       credits: credits.map((c) => ({ reason: c.reason, delta: Number(c._sum.delta ?? 0) })),
     };
+  }
+
+  /** Webhook diagnostics (V2 guide §1.4 provider health): recent deliveries, status counts and errors. */
+  async webhooks(userId: string, status?: string) {
+    await this.rbac.assertGlobalPermission(userId, 'system.read');
+    const statuses = ['RECEIVED', 'PROCESSING', 'PROCESSED', 'FAILED', 'IGNORED'] as const;
+    const filter = statuses.find((s) => s === status);
+    const since = new Date(Date.now() - 7 * 86_400_000);
+    const [rows, counts, types] = await Promise.all([
+      this.prisma.webhookEvent.findMany({
+        where: filter ? { status: filter } : {},
+        orderBy: { receivedAt: 'desc' },
+        take: 100,
+        select: { id: true, provider: true, providerEventId: true, eventType: true, status: true, attemptCount: true, lastError: true, receivedAt: true, processedAt: true },
+      }),
+      this.prisma.webhookEvent.groupBy({ by: ['status'], where: { receivedAt: { gte: since } }, _count: true }),
+      this.prisma.webhookEvent.groupBy({ by: ['eventType'], where: { receivedAt: { gte: since } }, _count: true, orderBy: { _count: { eventType: 'desc' } }, take: 20 }),
+    ]);
+    const last = await this.prisma.webhookEvent.findFirst({ orderBy: { receivedAt: 'desc' }, select: { receivedAt: true } });
+    return {
+      lastReceivedAt: last?.receivedAt ?? null,
+      last7Days: Object.fromEntries(statuses.map((s) => [s, counts.find((c) => c.status === s)?._count ?? 0])),
+      types: types.map((t) => ({ eventType: t.eventType, count: t._count })),
+      events: rows,
+      signing: { platform: !!this.config.get<string>('STRIPE_WEBHOOK_SECRET'), connect: !!this.config.get<string>('STRIPE_CONNECT_WEBHOOK_SECRET') },
+    };
+  }
+
+  /** Re-queue a failed delivery. Processing is idempotent, so a retry never applies an event twice. */
+  async retryWebhook(userId: string, id: string, meta?: RequestMeta) {
+    await this.rbac.assertGlobalPermission(userId, 'system.manage');
+    const row = await this.prisma.webhookEvent.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException({ code: 'WEBHOOK_NOT_FOUND', message: 'Webhook event not found.' });
+    if (row.status !== 'FAILED') throw new BadRequestException({ code: 'NOT_FAILED', message: 'Only failed deliveries can be retried.' });
+    try {
+      JSON.parse(row.payloadRef);
+    } catch {
+      throw new BadRequestException({ code: 'NO_PAYLOAD', message: 'This record has no stored payload to replay. Resend it from the Stripe dashboard.' });
+    }
+    await this.prisma.webhookEvent.update({ where: { id }, data: { status: 'RECEIVED', lastError: null } });
+    await this.jobs.enqueue('billing.webhook', { webhookEventId: id }, { jobKey: `webhook:${id}:retry:${row.attemptCount}` });
+    await this.auditLog.record({ actorUserId: userId, actorRole: 'admin', action: 'webhook.retry', targetType: 'webhook_event', targetId: id, afterState: { eventType: row.eventType, attempt: row.attemptCount + 1 }, requestMeta: meta });
+    return { id, status: 'RECEIVED' };
   }
 
   async health(userId: string) {
