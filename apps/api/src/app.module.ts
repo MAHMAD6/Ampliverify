@@ -43,6 +43,7 @@ import { ReportsModule } from './reports/reports.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { CmsModule } from './cms/cms.module';
 import { InsightsModule } from './insights/insights.module';
+import { StudioModule } from './studio/studio.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { InsightsModule } from './insights/insights.module';
     IntegrationsModule,
     CmsModule,
     InsightsModule,
+    StudioModule,
     PlatformModule,
     RetentionModule,
     ValuationModule,

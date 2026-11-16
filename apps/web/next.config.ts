@@ -58,7 +58,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../..'),
   async headers() {
-    return [{ source: '/:path*', headers: SECURITY_HEADERS }];
+    // Hosted forms (/forms/public/*) are embedded on customer sites and send their own CSP.
+    return [
+      { source: '/', headers: SECURITY_HEADERS },
+      { source: '/:path((?!forms/public/).*)', headers: SECURITY_HEADERS },
+    ];
   },
   reactStrictMode: true,
   poweredByHeader: false,

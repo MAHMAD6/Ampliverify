@@ -5,7 +5,7 @@ import { apiForm, apiSend } from './api';
 
 export type ActionResult<T = unknown> = { ok: true; data: T } | { ok: false; message: string; code?: string };
 
-const ALLOWED_PREFIXES = ['/user/', '/admin/'];
+const ALLOWED_PREFIXES = ['/user/', '/admin/', '/workspaces/'];
 
 /** Only plain user/admin API paths: no traversal (incl. encoded), backslashes, whitespace or schemes. */
 function allowedPath(path: string) {

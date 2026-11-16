@@ -1,0 +1,11 @@
+/* Additive, scoped CSS; the original V6 editor layout is unchanged. */
+.video-upload-area{border-top:1px solid #e1e9ef;margin-top:15px;padding-top:12px}
+.video-drop-zone{cursor:pointer;border:2px dashed #a9cabc;background:#f7fbf8;padding:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;flex-direction:column;color:#153e32;text-align:center;margin:8px 0}
+.video-drop-zone.over,.video-drop-zone:focus-visible{border-color:#0a8a55;outline:2px solid #0a8a55;outline-offset:2px}
+.video-drop-zone span{font-size:12px;color:#58786a}
+.video-upload-area input[type=file]{display:block;width:100%;margin:8px 0 12px}
+.video-checkbox{display:flex;align-items:center;gap:8px;font-size:13px}
+#videoUploadProgressWrap{display:flex;gap:10px;align-items:center;margin-top:10px}
+#videoUploadProgress{width:100%;accent-color:#178249}
+#videoUploadStatus{font-size:12px;color:#235345;min-height:15px}
+.uploaded-video-block video{width:100%;display:block;max-height:430px;background:#101820}

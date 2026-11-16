@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#061b35">
+  <title>AmpliVerify · SEO Editor Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="extensions.css">
+  <link rel="stylesheet" href="export-ui.css">
+<link rel="stylesheet" href="video-upload.css">
+<link rel="stylesheet" href="offline-media.css">
+<link rel="stylesheet" href="forms-ui.css">
+<link rel="stylesheet" href="intelligence.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand approved-brand"><img src="assets/ampliverify-approved-icon.png" alt="Approved AmpliVerify icon"><div><strong>Ampli<span>Verify</span><sup>®</sup></strong><small>AUDIT · OPTIMIZE · VERIFY</small></div></div>
+      <nav class="nav">
+        <a href="#" class="nav-link"><span>⌂</span> Dashboard</a>
+        <a href="#" class="nav-link"><span>⌕</span> On-Page SEO Audit</a>
+        <a href="#" class="nav-link current"><span>✎</span> On-Page SEO Editor <b>›</b></a>
+        <a href="#" class="nav-link"><span>◉</span> GEO / AI Search</a>
+        <a href="#" class="nav-link"><span>▤</span> Content Audit</a>
+        <a href="#" class="nav-link"><span>▦</span> Website Value Calculator</a>
+        <button id="exploreBtn" class="nav-link explore" aria-expanded="false" aria-controls="megaMenu"><span>▱</span> Explore AmpliVerify <b>⌄</b></button>
+        <a href="#" class="nav-link"><span>▤</span> My Projects</a>
+        <a href="#" class="nav-link"><span>▣</span> Reports</a>
+        <a href="#" class="nav-link"><span>▱</span> Credits &amp; Usage</a>
+        <a href="#" class="nav-link"><span>▥</span> Guides</a>
+        <a href="#" class="nav-link"><span>▤</span> Blog</a>
+        <a href="#" class="nav-link"><span>✉</span> Contact</a>
+        <div class="nav-sep"></div>
+        <a href="#" class="nav-link"><span>▣</span> Pricing <b>›</b></a>
+        <a href="#" class="nav-link"><span>⚙</span> Settings <b>›</b></a>
+      </nav>
+      <div class="support"><strong>◉ &nbsp; Need help?</strong><small>Get support or ask a question.</small><button class="support-btn" type="button">Contact Support</button></div>
+    </aside>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="breadcrumbs">Projects <span>›</span> ampliverify.com <span>›</span> SEO Editor <span>›</span> <strong>Edit Article</strong></div>
+        <div class="top-actions"><span id="saveStatus" class="saved">● <span>All changes saved</span></span><button id="historyBtn" class="button ghost" type="button">↶ History</button><button id="topPreviewBtn" class="button ghost" type="button">◉ Preview</button><button id="saveBtn" class="button navy" type="button">Save Draft</button><button id="downloadBtn" class="button ghost export-button" type="button">⇩ Download ▾</button><button id="connectorsBtn" class="button ghost" type="button">🔌 Connections</button><button id="publishBtn" class="button green" type="button">Publish ▾</button></div>
+      </header>
+      <main class="workspace" id="workspace">
+        <section class="panel outline-panel" id="outlinePanel" aria-label="Article outline">
+          <div class="panel-head"><h2>Article Outline <span class="help" title="Headings H1–H6 are included. Deep headings can be expanded as needed.">ⓘ</span></h2><button class="icon-btn" id="outlineCollapse" aria-label="Collapse article outline" type="button">⌃</button></div>
+          <button id="addSectionBtn" class="wide-outlined" type="button">＋ Add Section</button><p class="drag-hint">Drag sections to reorder · arrow buttons for keyboard access</p>
+          <div id="outline" class="outline-tree"></div>
+          <div class="heading-guide"><strong>Heading Guide (H1–H6)</strong><div class="heading-pills"><span>H1</span><span>H2</span><span>H3</span><span>H4</span><span>H5</span><span>H6</span></div></div>
+        </section>
+        <section class="panel editor-panel" aria-label="Article writing editor">
+          <div class="editor-head"><div class="tabs" role="tablist" aria-label="Editor tools"><button class="tab active" data-editor-tab="write" type="button">Write</button><button class="tab" data-editor-tab="ask" type="button">Ask AI ✨</button><button class="tab" data-editor-tab="insert" type="button">Insert Section</button><button class="tab" data-editor-tab="optimize" type="button">Optimize</button><button class="tab" data-editor-tab="settings" type="button">Settings</button></div><button id="focusBtn" class="focus-btn" type="button" aria-pressed="false">⛶ Focus Mode</button></div>
+          <div class="toolbar" role="toolbar" aria-label="Text formatting">
+            <label class="sr-only" for="headingSelect">Paragraph and heading level</label><select id="headingSelect" title="Heading level"><option value="P">Paragraph</option><option value="H1">Heading 1 (H1)</option><option value="H2">Heading 2 (H2)</option><option value="H3">Heading 3 (H3)</option><option value="H4">Heading 4 (H4)</option><option value="H5">Heading 5 (H5)</option><option value="H6">Heading 6 (H6)</option></select>
+            <button data-command="bold" title="Bold" aria-label="Bold" type="button"><b>B</b></button><button data-command="italic" title="Italic" aria-label="Italic" type="button"><i>I</i></button><button data-command="underline" title="Underline (Ctrl+U)" aria-label="Underline" type="button"><u>U</u></button><label class="color-tool" title="Text color"><span class="tool-icon">A</span><span class="color-swatch" id="colorSwatch"></span><input id="textColor" type="color" value="#071541" aria-label="Text color"></label><label class="color-tool highlight-tool" title="Highlight color"><span class="tool-icon highlight-symbol">▰</span><input id="highlightColor" type="color" value="#fff2a8" aria-label="Highlight color"></label><button data-command="insertUnorderedList" title="Bulleted list" type="button">☷</button><button data-command="insertOrderedList" title="Numbered list" type="button">≡</button><button data-command="createLink" title="Insert link" type="button">🔗</button><button id="addImageBtn" title="Insert image (URL or file)" type="button">▧ Image</button><button id="addVideoBtn" title="Insert YouTube, Vimeo, or MP4 video" type="button">▶ Video</button><button id="fbOpenBtn" title="Insert a form" type="button">▦ Form</button><button data-command="undo" title="Undo" type="button">↶</button><button data-command="redo" title="Redo" type="button">↷</button><button id="moreToolsBtn" title="More formatting" aria-expanded="false" aria-controls="moreToolsPanel" type="button">More ▾</button>
+          </div>
+          <div id="moreToolsPanel" class="more-tools" hidden aria-label="Additional formatting"><button data-command="strikeThrough" type="button">S̶ Strikethrough</button><button data-command="justifyLeft" type="button">☰ Align left</button><button data-command="justifyCenter" type="button">≡ Center</button><button data-command="justifyRight" type="button">☷ Align right</button><button data-command="removeFormat" type="button">⌫ Clear formatting</button><button id="insertRuleBtn" type="button">— Divider</button></div>
+          <div class="ai-toolbar"><button id="aiWriteBtn" class="ai-primary" type="button">✦ Write Article</button><button id="aiRewriteBtn" class="ai-primary" type="button">✦ AI Rewrite</button><button data-ai="Improve SEO" type="button">☷ Improve SEO</button><button data-ai="Expand" type="button">↔ Expand</button><button data-ai="Shorten" type="button">⇤ Shorten</button><button data-ai="Change Tone" type="button">✧ Change Tone ▾</button></div>
+          <div class="article-scroll"><div id="dropHint" class="drop-hint" hidden>Drop image or content block here</div><article id="article" contenteditable="true" spellcheck="true" aria-label="Editable article body"><h1>A Practical SEO Strategy for Business Growth</h1><p>Search engine optimization (SEO) is one of the most effective ways for businesses to increase visibility, attract qualified traffic, and generate sustainable growth. This guide provides a practical, step-by-step approach to building an SEO strategy that delivers real results.</p><figure class="hero-figure" contenteditable="false"><img src="assets/seo-hero.png" alt="Laptop displaying SEO growth analytics on a desk"></figure><h2>Why SEO Matters</h2><p>SEO helps your website appear in relevant search results when potential customers are looking for your products or services. A well-executed SEO strategy can:</p><ul><li>Increase organic traffic and brand visibility</li><li>Build brand credibility and trust</li><li>Reduce customer acquisition costs</li></ul><h2>Step-by-Step SEO Strategy</h2><h3>Keyword Research</h3><p>Identify the keywords your audience is searching for and align them with your content and business goals.</p><h3>On-Page Optimization</h3><p>Optimize page titles, helpful internal links, and clearly organized headings.</p><h3>Content Creation</h3><h4>Writing for Search Intent</h4><p>Answer the user's question first and organize supporting details into logical sections.</p><h4>Using H3 and H4 Effectively</h4><p>Use deeper headings when the content warrants further subdivision, not simply to increase the number of headings.</p><h2>Measuring SEO Performance</h2><p>Review traffic, conversions and content performance over time.</p><h2>Key Takeaways</h2><p>Prioritize helpful content, accessible structure and continuous improvement.</p></article></div>
+          <div class="settings-accordions"><details id="displaySettings"><summary>⚙ &nbsp; Display Settings <small>Image title, caption, size, alignment and media controls</small></summary><div class="detail-body"><label>Featured image alt text <input id="altText" value="Laptop displaying SEO growth analytics on a desk"></label></div></details><details id="advancedSeo"><summary>▱ &nbsp; Advanced SEO <small>Metadata, keywords and schema recommendations</small></summary><div class="detail-body"><label>SEO title <input id="metaTitle" value="A Practical SEO Strategy for Business Growth"></label><label>Meta description <textarea id="metaDescription" rows="2">Learn practical SEO strategies for business growth, including keyword research, content optimization, and performance measurement.</textarea></label><label>Primary keyword <input id="primaryKeyword" value="SEO strategy"></label></div></details></div>
+          <div class="editor-footer"><span>Word count: <b id="wordCount">—</b></span><span>Est. read time: <b id="readTime">—</b></span><span class="footer-spacer"></span><button id="footerSeoBtn" class="seo-status" type="button">SEO Content <b id="footerSeoStatus">Checking…</b></button></div>
+        </section>
+        <section class="panel right-panel" id="rightPanel" aria-label="Article preview and optimization">
+          <div class="right-tabs" role="tablist" aria-label="Right panel view"><button id="previewTab" class="right-tab active" type="button" aria-selected="true">▧ Article Preview</button><button id="optimizeTab" class="right-tab" type="button" aria-selected="false">▥ Optimize</button></div>
+          <div id="previewView" class="right-view"><div class="device-toolbar"><button data-device="desktop" class="device active" type="button">▣ Desktop</button><button data-device="tablet" class="device" type="button">▤ Tablet</button><button data-device="mobile" class="device" type="button">▯ Mobile</button><button id="refreshPreview" class="device refresh" type="button">⟳ Refresh</button></div><div class="preview-scroller"><div id="previewFrame" class="preview-frame desktop"><div class="site-header"><span class="preview-brand"><img src="assets/ampliverify-approved-icon.png" alt="Approved AmpliVerify icon"><b>Ampli<span>Verify</span></b></span><div>Home　 Guides　 Blog　 ⌕</div></div><div id="renderedArticle" class="rendered-article"></div></div></div><div class="preview-bottom"><span id="compactSeoBadge">SEO checks: —</span><button id="seeOptimizeBtn" type="button">View SEO details ›</button></div></div>
+          <div id="optimizeView" class="right-view" hidden><div class="score-card"><div><h3>SEO Content Score <span class="help" title="Illustrative content checks — not a Google ranking prediction">ⓘ</span></h3><div class="score-number"><strong id="scoreValue">—</strong><span>/100</span></div></div><div class="score-copy"><b id="scoreLabel">Reviewing content</b><p>Content optimization checks only; no ranking guarantee.</p></div></div><div class="insights-card"><h3>Key SEO Insights</h3><div id="seoInsights"></div></div><details class="seo-accordion"><summary>Optimization Checklist <span id="checkCount"></span></summary><div id="seoChecklist"></div></details><details class="seo-accordion"><summary>Heading Structure (H1–H6)</summary><div id="headingAnalysis"></div></details><details class="seo-accordion"><summary>Keywords</summary><div class="keyword-panel">Primary: <strong id="keywordDisplay">SEO strategy</strong><p>Use naturally; avoid keyword stuffing.</p></div></details><details class="seo-accordion"><summary>AI Suggestions</summary><div class="keyword-panel">AI writing requires a configured server API. No AI requests are made in this demo.</div></details></div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <div id="menuBackdrop" class="backdrop" hidden></div>
+  <div id="megaMenu" class="mega-menu" hidden role="dialog" aria-modal="true" aria-label="Explore AmpliVerify"><div class="mega-title"><div><h2>▱ &nbsp; Explore AmpliVerify</h2><p>Access all AmpliVerify modules and tools in one place.</p></div><button id="closeMega" class="icon-btn" type="button" aria-label="Close menu">✕</button></div><input id="menuSearch" placeholder="Search for a page, tool, or feature…" aria-label="Search navigation tools"><div class="mega-columns" id="megaColumns"><div class="mega-col"><h3>▱ Digital Assets</h3><a href="#">Digital Assets Dashboard</a><a href="#">My Portfolio</a><a href="#">Acquisition Analyzer</a><a href="#">Acquisition History</a><a href="#">Improvement Workspace</a><a href="#">Digital Asset Projects</a><a href="#">Performance &amp; Reports</a></div><div class="mega-col"><h3>🛒 Marketplace</h3><a href="#">Marketplace Dashboard</a><a href="#">Browse Digital Assets</a><a href="#">Sell a Digital Asset</a><a href="#">My Listings</a><a href="#">My Inquiries</a><a href="#">My Purchases</a><a href="#">Transactions</a></div><div class="mega-col"><h3>▤ Finances</h3><a href="#">Earnings Overview</a><a href="#">Earnings Breakdown</a><a href="#">Payout History</a><a href="#">Payout Details</a><a href="#">Payout Methods</a><a href="#">Tax &amp; Statements</a><a href="#">Refunds &amp; Disputes</a></div></div></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="mediaDialog" class="media-dialog"><form id="mediaForm"><h2 id="mediaTitle">Insert media</h2><p id="mediaHint">Add a video or image to the article at the current cursor position.</p><label class="media-label" for="mediaUrl">Media URL</label><input id="mediaUrl" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off"><p class="media-help" id="mediaHelp">YouTube, Vimeo, or direct HTTPS MP4/WebM files</p><div id="uploadArea" hidden><label class="media-label" for="mediaFile">Or choose a file from your computer</label><input id="mediaFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div><div id="videoUploadArea" class="video-upload-area" hidden>
+      <label class="media-label" for="videoUploadFile">Or upload an MP4 / WebM video (maximum 100 MB)</label>
+      <div class="video-drop-zone" id="videoDropZone" tabindex="0" role="button" aria-label="Choose video file or drop one here"><strong>⇧ Choose video / Drop video here</strong><span>MP4 or WebM · up to 100 MB</span></div>
+      <input id="videoUploadFile" type="file" accept="video/mp4,video/webm,.mp4,.webm">
+      <label class="media-label" for="videoPosterFile">Optional custom thumbnail / poster (JPEG, PNG or WebP; 4 MB max)</label>
+      <input id="videoPosterFile" type="file" accept="image/jpeg,image/png,image/webp">
+      <label class="video-checkbox"><input type="checkbox" id="videoAutoPoster" checked> Generate thumbnail from video if no poster is supplied</label>
+      <div id="videoUploadProgressWrap" hidden><progress id="videoUploadProgress" max="100" value="0"></progress><span id="videoUploadProgressLabel">0%</span></div>
+      <p id="videoUploadStatus" role="status" aria-live="polite"></p>
+      <button class="button ghost" id="videoCancelUpload" type="button" hidden>Cancel upload</button>
+    </div>
+    <p id="offlineMediaStatus" class="media-help" role="status" aria-live="polite"></p><div id="mediaPublishMode" class="media-help" hidden>Local media can be edited without a server. Publish-ready media must be uploaded, scanned, and approved by your NestJS backend.</div><div class="dialog-actions"><button id="mediaCancel" class="button ghost" type="button">Cancel</button><button id="mediaInsert" class="button green" type="submit">Insert</button></div></form></dialog>
+  <dialog id="publishDialog" class="connector-dialog"><h2>Publish article</h2><p class="connector-note">Choose a website within your authorized workspace. Draft or publish actions require the appropriate role. External IDs are mapped securely by the backend.</p><label class="connector-label">Publishing destination<select id="publishDestination"><option value="">Choose a connected CMS…</option></select></label><div class="connector-actions"><button id="openConnectFromPublish" class="button ghost" type="button">Manage connections</button><button id="exportHtml" class="button ghost" type="button">Export HTML</button><button id="copyHtml" class="button ghost" type="button">Copy HTML</button></div><label class="connector-label">Article reference (auto-managed)<input id="externalArticleId" placeholder="External CMS ID is managed by the backend" readonly></label><div class="connector-warning">Publishing is a real write operation when the backend and credentials are configured. Confirm the correct destination before publishing.</div><div class="dialog-actions"><button id="closePublishDialog" class="button ghost" type="button">Cancel</button><button id="externalDraftBtn" class="button navy" type="button">Save CMS Draft</button><button id="externalPublishBtn" class="button green" type="button">Publish Live</button></div><p id="publishResult" class="connector-result" role="status"></p></dialog>
+  <dialog id="connectorDialog" class="connector-dialog"><h2>Publishing Connectors</h2><p class="connector-note">WordPress · Shopify · Webflow · Ghost · Drupal · Joomla · Strapi · Custom API. Credentials are sent only to the authenticated API over HTTPS in production, not stored in this HTML file.</p><div class="connector-settings"><label class="connector-label">Backend API<input id="backendUrl" value="http://127.0.0.1:3000" autocomplete="off"></label><label class="connector-label">Workspace ID<input id="workspaceId" value="demo-workspace" autocomplete="off"></label><label class="connector-label">Developer Bearer JWT<input id="backendKey" type="password" placeholder="Development JWT; production uses host application login" autocomplete="off"></label><button id="refreshConnections" class="button ghost" type="button">Refresh connections</button></div><h3>Connected destinations</h3><div id="connectionList" class="connection-list"><p>No connections loaded.</p></div><h3>Add a destination</h3><form id="newConnectionForm"><label class="connector-label">CMS platform<select id="providerSelect"></select></label><label class="connector-label">Connection name<input id="connectionName" placeholder="e.g., My WordPress Blog" required maxlength="100"></label><div id="providerFields" class="provider-fields"></div><div class="dialog-actions"><button id="closeConnections" type="button" class="button ghost">Close</button><button type="submit" class="button green">Save connection</button></div></form><p id="connectionResult" class="connector-result" role="status"></p><p class="connector-note"><b>Security:</b> Security baseline: JWT authorization, workspace RBAC, AES-GCM credential encryption and audit events. Production still requires identity-provider integration, managed keys, HTTPS ingress, network egress controls, and live CMS validation.</p></dialog>
+  <dialog id="exportDialog" class="connector-dialog download-dialog" aria-labelledby="exportTitle">
+    <h2 id="exportTitle">⇩ Download Article</h2>
+    <p class="export-intro">Export the current article without publishing. Layout and tools in the SEO Editor are unchanged.</p>
+    <form id="exportForm">
+      <div class="export-format-grid" role="group" aria-label="File format">
+        <label class="export-format"><input type="radio" name="exportFormat" value="html" checked> HTML</label>
+        <label class="export-format"><input type="radio" name="exportFormat" value="docx"> Word .docx</label>
+        <label class="export-format"><input type="radio" name="exportFormat" value="pdf"> PDF</label>
+        <label class="export-format"><input type="radio" name="exportFormat" value="md"> Markdown</label>
+        <label class="export-format"><input type="radio" name="exportFormat" value="txt"> Text</label>
+        <label class="export-format"><input type="radio" name="exportFormat" value="json"> JSON</label>
+        <label class="export-format"><input type="radio" name="exportFormat" value="zip"> Article ZIP + media</label>
+        <label class="export-format"><input type="radio" name="exportFormat" value="webpage-zip"> Complete Webpage ZIP</label>
+      </div>
+      <div class="export-options">
+        <label><input id="exportIncludeSeo" type="checkbox" checked> Include SEO metadata where supported (title, description, primary keyword)</label>
+        <label><input id="exportIncludeMedia" type="checkbox" checked> Include available local images in ZIP (uploaded videos remain linked)</label>
+      </div>
+      <div class="export-copy-actions"><button id="exportCopyHtml" class="button ghost" type="button">Copy HTML</button><button id="exportCopyMd" class="button ghost" type="button">Copy Markdown</button></div>
+      <p id="exportStatus" class="export-status" role="status" aria-live="polite"></p>
+      <div class="export-actions"><button id="exportCancel" class="button ghost" type="button">Cancel</button><button id="exportGo" class="button green" type="submit">Download file</button></div>
+    </form>
+  </dialog>
+  <dialog id="historyDialog"><form method="dialog"><h2>Saved local revisions</h2><div id="revisions"></div><div class="dialog-actions"><button value="cancel" class="button ghost">Close</button></div></form></dialog>
+  <dialog id="aiDialog" class="ai-dialog" aria-labelledby="aiDialogTitle">
+    <h2 id="aiDialogTitle">✦ Write with AI</h2>
+    <p class="connector-note">Generate a complete article, an outline, or improve selected text. Nothing replaces your work until you accept.</p>
+    <form id="aiForm">
+      <div class="ai-form-grid"><label>Task<select id="aiTask"><option value="article">Generate full article</option><option value="outline">Generate article outline</option><option value="rewrite">Rewrite selected text</option><option value="improve_seo">Improve SEO</option><option value="expand">Expand content</option><option value="shorten">Shorten content</option><option value="tone">Change tone</option><option value="refresh">Refresh selected content</option></select></label>
+      <label>Writing tone<select id="aiTone"><option value="professional">Professional</option><option value="educational">Educational</option><option value="conversational">Conversational</option><option value="persuasive">Persuasive</option></select></label></div>
+      <label>Topic / instruction<input id="aiTopic" maxlength="300" placeholder="e.g. Local SEO strategy for small businesses"></label>
+      <div class="ai-form-grid"><label>Primary keyword<input id="aiKeyword" maxlength="120" placeholder="SEO strategy"></label><label>Approximate words<select id="aiWords"><option value="600">600 words</option><option value="1000">1,000 words</option><option value="1500" selected>1,500 words</option><option value="2000">2,000 words</option></select></label></div>
+      <label>Additional instructions<textarea id="aiInstructions" maxlength="1500" rows="3" placeholder="Target audience, key points, brand voice…"></textarea></label>
+      <p id="aiStatus" class="connector-note" role="status"></p>
+      <div class="dialog-actions"><button type="button" id="aiCancel" class="button ghost">Cancel</button><button type="submit" class="button green" id="aiGenerate">Generate Draft</button></div>
+    </form>
+  </dialog>
+  <dialog id="aiReviewDialog" class="ai-review-dialog" aria-labelledby="aiReviewTitle"><h2 id="aiReviewTitle">Review AI suggestion</h2><p class="connector-note">Review the result before inserting it. AI-generated text may contain errors—verify claims and sources.</p><div class="ai-compare"><div><h3>Original</h3><div id="aiBefore" class="ai-compare-body"></div></div><div><h3>AI suggestion</h3><div id="aiAfter" class="ai-compare-body"></div></div></div><p id="aiReviewStatus" role="status"></p><div class="dialog-actions"><button type="button" id="aiReject" class="button ghost">Reject</button><button type="button" id="aiRegenerate" class="button navy">Regenerate</button><button type="button" id="aiAccept" class="button green">Accept Suggestion</button></div></dialog>
+  <dialog id="formBuilderDialog" class="form-builder-dialog" aria-labelledby="fbTitle"><div class="form-builder-inner">
+    <div class="form-builder-head"><div><h2 id="fbTitle">▦ Insert Form</h2><p>Choose a template, arrange fields, and insert it offline. Activate separately when ready for real submissions.</p></div><button type="button" class="fb-button-light" id="fbCancel">✕ Close</button></div>
+    <details class="fb-saved"><summary>Locally saved form templates — reuse in this article</summary><div class="fb-row" style="margin:9px 0"><button type="button" id="fbLoadSaved" class="fb-button-light">Load my forms</button></div><div id="fbSavedList" aria-live="polite">Select Load my forms to view templates saved in this browser.</div></details>
+    <div class="fb-row"><label for="fbTemplate" class="fb-title">Form template</label><select id="fbTemplate" class="fb-control" style="width:auto"><option value="contact">Contact Form</option><option value="lead">Lead Generation</option><option value="newsletter">Newsletter</option><option value="survey">Survey / Feedback</option><option value="custom">Custom Form</option></select></div>
+    <details class="fb-style-panel" open><summary>Form Style &amp; Dimensions <span class="fb-style-hint">Independent from AmpliVerify branding</span></summary>
+      <div class="fb-style-grid">
+        <label>Appearance <select id="fbTheme" class="fb-control"><option value="neutral">Clean white (default)</option><option value="inherit">Inherit website theme</option><option value="custom">Custom colors</option></select></label>
+        <label>Font <select id="fbFont" class="fb-control"><option value="inherit">Website / system font</option><option value="Arial, sans-serif">Arial</option><option value="Georgia, serif">Georgia</option><option value="Verdana, sans-serif">Verdana</option><option value="Tahoma, sans-serif">Tahoma</option></select></label>
+        <label>Background <input id="fbBg" type="color" value="#ffffff"></label>
+        <label>Text <input id="fbTextColor" type="color" value="#243144"></label>
+        <label>Border <input id="fbBorderColor" type="color" value="#d4dbe4"></label>
+        <label>Button <input id="fbButtonColor" type="color" value="#233b55"></label>
+        <label>Button text <input id="fbButtonText" type="color" value="#ffffff"></label>
+        <label>Focus accent <input id="fbAccent" type="color" value="#2563a6"></label>
+        <label>Font size (px) <input id="fbFontSize" type="number" min="12" max="24" step="1" value="14" class="fb-control"></label>
+        <label>Spacing (px) <input id="fbSpacing" type="number" min="4" max="32" step="1" value="12" class="fb-control"></label>
+        <label>Corner radius (px) <input id="fbRadius" type="number" min="0" max="32" step="1" value="8" class="fb-control"></label>
+        <label>Width (%) <input id="fbWidth" type="number" min="30" max="100" step="1" value="100" class="fb-control"></label>
+        <label>Height (px; 0 = auto) <input id="fbHeight" type="number" min="0" max="1200" step="10" value="0" class="fb-control"></label>
+      </div><p class="fb-note">Width is relative to the article column. Height is adjustable or automatic; a smaller fixed height scrolls internally. Drag the bottom-right corner after insertion for both dimensions. Inherit mode uses the destination website's CSS when supported; iframe embeds cannot automatically inherit cross-site styles.</p>
+    </details>
+    <div class="form-grid"><div class="fb-column"><label for="fbName">Form title</label><input class="fb-control" id="fbName" maxlength="120"><label for="fbDescription">Description</label><input class="fb-control" id="fbDescription" maxlength="500"><div class="fb-row" style="margin-top:14px;justify-content:space-between"><strong>Fields</strong><button type="button" id="fbAddField" class="fb-button-light">＋ Add Field</button></div><p class="fb-note">Drag ⠿ to reorder fields, or use ↑ and ↓. Maximum 20 fields.</p><div id="fbFields"></div><label for="fbSubmitLabel">Submit button label</label><input class="fb-control" id="fbSubmitLabel" maxlength="40"><label for="fbSuccess">Success message</label><input class="fb-control" id="fbSuccess" maxlength="160"><label for="fbPrivacy">Privacy notice URL (HTTPS)</label><input class="fb-control" type="url" id="fbPrivacy" placeholder="https://example.com/privacy"><label style="display:flex;gap:7px;align-items:center"><input id="fbConsent" type="checkbox"> Require consent</label></div>
+    <div class="fb-column"><p class="fb-title">Live builder preview</p><p class="fb-note">This preview never collects responses. Insert, move, resize and edit completely offline; activate later to receive submissions.</p><div class="fb-preview" id="fbPreview"></div><p class="fb-note">Draft form definitions remain in this browser. Activation requires an authenticated backend; CMS embed support varies.</p></div></div>
+    <div class="fb-footer"><p id="fbStatus" role="status" class="fb-success" style="margin-right:auto"></p><button type="button" class="button ghost" onclick="document.getElementById('formBuilderDialog').close()">Cancel</button><button type="button" id="fbSave" class="button green">Insert Form (Offline)</button></div>
+  </div></dialog>
+  <dialog id="avMediaProperties" class="media-dialog" aria-labelledby="avMediaPropsTitle">
+    <form id="avMediaPropsForm">
+      <h2 id="avMediaPropsTitle">Media settings</h2>
+      <p class="media-help" id="avMediaOrigin"></p>
+      <label class="media-label" for="avMediaCaption">Caption</label><input id="avMediaCaption" maxlength="500" placeholder="Optional caption">
+      <label class="media-label" for="avMediaAlt">Alternative text / video description</label><input id="avMediaAlt" maxlength="500" placeholder="Describe the content for accessibility">
+      <div class="av-media-settings-grid"><label>Width (%)<input id="avMediaWidth" type="number" min="20" max="100" step="1" value="100"></label>
+      <label>Height (px)<input id="avMediaHeight" type="number" min="100" max="1200" step="10" placeholder="Auto"></label></div>
+      <label class="media-label" for="avMediaAlign">Alignment</label><select id="avMediaAlign"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>
+      <div id="avMediaPosterWrap"><label class="media-label" for="avMediaPoster">Video poster (JPEG, PNG, WebP; optional)</label><input type="file" id="avMediaPoster" accept="image/jpeg,image/png,image/webp"></div>
+      <p id="avMediaPropStatus" class="media-help" role="status"></p>
+      <div class="dialog-actions"><button type="button" id="avMediaPropsCancel" class="button ghost">Cancel</button><button type="submit" class="button green">Apply</button></div>
+    </form>
+  </dialog>
+  <script src="nestjs-bridge.js"></script>
+  <script src="script.js"></script>
+  <script src="editor-nestjs-sync.js"></script>
+  <script src="connectors-ui.js"></script>
+  <script src="editor-extensions.js"></script>
+  <script src="export-ui.js"></script>
+  <script src="webpage-export.js"></script>
+  <script src="video-upload.js"></script>
+  <script src="offline-media.js"></script>
+  <script src="forms-ui.js"></script>
+  <script src="forms-dnd.js"></script>
+<script src="intelligence.js"></script>
+</body>
+</html>

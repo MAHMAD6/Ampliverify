@@ -1,0 +1,19 @@
+/* Additional media-only styling. Existing AmpliVerify styles remain untouched. */
+.article-scroll article .av-offline-media{box-sizing:border-box;position:relative;min-width:20%;resize:none;overflow:auto;border:1px solid #cbd8e8;border-radius:9px;padding:7px;background:#fff}
+.article-scroll article .av-offline-media img,.article-scroll article .av-offline-media video{display:block;max-width:100%;border-radius:7px;background:#f5f7fa}
+.av-media-actions{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:7px;padding:5px;background:#f3f6fa;border-radius:6px}
+.av-media-actions button{border:1px solid #cfdbeb;border-radius:5px;padding:4px 7px;font:600 11px/1.4 inherit;background:white;color:#193858;cursor:pointer}
+.av-media-actions button:hover{background:#e8f0f8}.av-media-actions button[data-media-action=move]{cursor:grab}
+.av-media-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.av-media-settings-grid input{width:100%;box-sizing:border-box;margin-top:5px;padding:9px;border-radius:7px;border:1px solid #cbd8eb}
+#avMediaPropsForm>input,#avMediaPropsForm>select{width:100%;box-sizing:border-box;padding:9px;border:1px solid #cbd8eb;border-radius:7px}
+.rendered-article .av-media-actions{display:none!important}
+.rendered-article .av-offline-media{resize:none!important;overflow:visible!important;border:0!important}
+@media(max-width:700px){.av-media-settings-grid{grid-template-columns:1fr}.av-media-actions button{font-size:11px}}
+
+.article-scroll .av-media-missing{color:#9d301e;background:#fff1e8;padding:8px;border:1px solid #e8baa8;border-radius:6px;font-size:12px}
+
+.article-scroll article .media-block{position:relative}
+.av-media-resizer{position:absolute;right:3px;bottom:3px;z-index:4;border:1px solid #c3d1df;background:#f8fafc;color:#123d52;border-radius:4px;cursor:nwse-resize;font-size:16px;padding:3px 7px}
+.av-media-local-label{margin-left:auto;color:#7e4e12;font-size:10px;white-space:nowrap}
+.rendered-article .av-media-resizer{display:none!important}

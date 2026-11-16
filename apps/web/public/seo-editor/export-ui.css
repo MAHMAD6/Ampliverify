@@ -1,0 +1,14 @@
+/* Additive V6 styles: existing sidebar and editor layouts stay unchanged. */
+.download-dialog{width:min(560px,95vw);max-height:90vh;overflow:auto}
+.download-dialog h2{margin:0 0 5px;color:#08244e}
+.download-dialog .export-intro{font-size:13px;color:#62758a;margin:8px 0 17px}
+.export-format-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.export-format{display:flex;align-items:center;gap:8px;border:1px solid #d2dfed;padding:11px 10px;border-radius:10px;color:#1c3957;background:white;font-weight:700;font-size:13px;cursor:pointer}
+.export-format input{accent-color:#188e4d}
+.export-format:has(input:checked){background:#e9f7ee;border-color:#259b59;box-shadow:0 0 0 1px #259b59}
+.export-options{display:flex;flex-direction:column;gap:10px;margin:18px 0;padding:14px;border-radius:9px;background:#f4f8fc;font-size:13px;color:#24415c}
+.export-options label{display:flex;gap:9px;align-items:start}.export-options input{accent-color:#168c45}
+.export-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap}
+.export-status{font-size:12px;color:#234d70;min-height:18px;white-space:pre-wrap}
+.export-button{white-space:nowrap}.export-copy-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+@media(max-width:640px){.export-format-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.download-dialog{padding:18px}}

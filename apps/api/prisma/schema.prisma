@@ -676,6 +676,10 @@ model Workspace {
   marketplaceInquiries MarketplaceInquiry[]
   digitalAssets        DigitalAsset[]
   acquisitionAnalyses  AcquisitionAnalysis[]
+  editorDrafts         EditorDraft[]
+  editorCmsConnections EditorCmsConnection[]
+  hostedForms          HostedForm[]
+  editorMedia          EditorMedia[]
 
   @@unique([organizationId, slug])
   /// Target of the projects composite FK (project org must match workspace org).
@@ -3766,4 +3770,180 @@ model AcquisitionAnalysis {
 
   @@index([workspaceId, createdAt(sort: Desc)])
   @@map("acquisition_analyses")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SEO Editor Studio (V13.2 NestJS guide §12): cloud drafts with revision
+// compare-and-swap, CMS connections for the eight editor connectors, hosted
+// forms with versioned activation, and the media approval pipeline. Merged
+// from the editor package's sample models; membership and roles come from the
+// existing workspace RBAC, audit events go to audit_logs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model EditorDraft {
+  id            String   @id @default(uuid()) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  /// Stable article identifier from the editor (UUID or slug-like key).
+  articleKey    String   @map("article_key")
+  title         String
+  html          String
+  /// SEO metadata: description, keyword.
+  metadata      Json?
+  /// Media references in the draft (server media IDs and browser-only local IDs).
+  mediaManifest Json?    @map("media_manifest")
+  revision      Int      @default(1)
+  createdBy     String   @map("created_by") @db.Uuid
+  updatedBy     String   @map("updated_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  revisions EditorDraftRevision[]
+
+  @@unique([workspaceId, articleKey])
+  @@index([workspaceId, updatedAt(sort: Desc)])
+  @@map("editor_drafts")
+}
+
+model EditorDraftRevision {
+  id            String   @id @default(uuid()) @db.Uuid
+  draftId       String   @map("draft_id") @db.Uuid
+  revision      Int
+  title         String
+  html          String
+  metadata      Json?
+  mediaManifest Json?    @map("media_manifest")
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  draft EditorDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+
+  @@unique([draftId, revision])
+  @@map("editor_draft_revisions")
+}
+
+model EditorCmsConnection {
+  id                   String   @id @default(uuid()) @db.Uuid
+  workspaceId          String   @map("workspace_id") @db.Uuid
+  /// wordpress | shopify | webflow | ghost | drupal | joomla | strapi | custom
+  provider             String
+  name                 String
+  /// AES-256-GCM sealed connector configuration (never returned to clients).
+  credentialCiphertext String   @map("credential_ciphertext")
+  /// Destination host, for display.
+  host                 String?
+  createdBy            String   @map("created_by") @db.Uuid
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace    Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  publications EditorCmsPublication[]
+
+  @@index([workspaceId])
+  @@map("editor_cms_connections")
+}
+
+model EditorCmsPublication {
+  id           String   @id @default(uuid()) @db.Uuid
+  workspaceId  String   @map("workspace_id") @db.Uuid
+  connectionId String   @map("connection_id") @db.Uuid
+  articleKey   String   @map("article_key")
+  externalId   String?  @map("external_id")
+  /// in_progress | review_required | draft | published | submitted
+  state        String   @default("in_progress")
+  url          String?
+  lastError    String?  @map("last_error")
+  updatedBy    String   @map("updated_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  connection EditorCmsConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, connectionId, articleKey])
+  @@map("editor_cms_publications")
+}
+
+model HostedForm {
+  id             String   @id @default(uuid()) @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  /// Validated form definition (fields, consent, labels).
+  schema         Json
+  /// Validated style tokens, width (30-100 %) and height (0 = auto, or 160-1200 px).
+  publishedStyle Json     @map("published_style")
+  version        Int      @default(1)
+  /// Earlier activation of the same form; editing never changes a live form.
+  previousFormId String?  @map("previous_form_id") @db.Uuid
+  active         Boolean  @default(true)
+  createdBy      String   @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace   Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  submissions HostedFormSubmission[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@map("hosted_forms")
+}
+
+model HostedFormSubmission {
+  id               String   @id @default(uuid()) @db.Uuid
+  formId           String   @map("form_id") @db.Uuid
+  workspaceId      String   @map("workspace_id") @db.Uuid
+  /// AES-256-GCM sealed submitted values.
+  encryptedPayload String   @map("encrypted_payload")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  form HostedForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, formId, createdAt(sort: Desc)])
+  @@map("hosted_form_submissions")
+}
+
+/// Editor media: pending → quarantine → processing → approved | rejected | failed.
+model EditorMedia {
+  id               String    @id @default(uuid()) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  uploadedBy       String    @map("uploaded_by") @db.Uuid
+  state            String    @default("pending")
+  /// image | video
+  kind             String
+  originalFilename String    @map("original_filename")
+  declaredMime     String    @map("declared_mime")
+  detectedMime     String?   @map("detected_mime")
+  sizeBytes        Int       @map("size_bytes")
+  sha256           String?
+  /// Private staging object (never served).
+  stagingKey       String    @map("staging_key")
+  /// Approved object served through the media delivery route.
+  deliveryKey      String?   @map("delivery_key")
+  width            Int?
+  height           Int?
+  scanResult       String?   @map("scan_result")
+  errorCode        String?   @map("error_code")
+  errorMessage     String?   @map("error_message")
+  attempts         Int       @default(0)
+  uploadExpiresAt  DateTime  @map("upload_expires_at") @db.Timestamptz(6)
+  approvedAt       DateTime? @map("approved_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace  Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  references ArticleAssetReference[]
+
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([state, updatedAt])
+  @@map("editor_media")
+}
+
+/// Links an article's media block (browser-local ID) to approved server media.
+model ArticleAssetReference {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  articleKey  String   @map("article_key")
+  localRef    String   @map("local_ref")
+  mediaId     String   @map("media_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  media EditorMedia @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, articleKey, localRef])
+  @@map("article_asset_references")
 }

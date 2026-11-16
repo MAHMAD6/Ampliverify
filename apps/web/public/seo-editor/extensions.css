@@ -1,0 +1,22 @@
+/* Additive V5 styles: legacy layout, sidebar and CMS connectors unchanged. */
+.ai-dialog{width:min(660px,95vw);max-width:660px;max-height:90vh;overflow:auto}
+.ai-dialog h2,.ai-review-dialog h2{margin-top:0}
+.ai-dialog label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:750;margin:12px 0}
+.ai-dialog input,.ai-dialog select,.ai-dialog textarea{width:100%;padding:10px;border:1px solid #c5d7ee;border-radius:8px;background:white;color:#071541}
+.ai-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ai-review-dialog{width:min(970px,96vw);max-width:970px;max-height:92vh;overflow:auto}
+.ai-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ai-compare>div{border:1px solid #d8e5f4;border-radius:10px;min-width:0;overflow:hidden}
+.ai-compare h3{padding:11px;background:#f2f8fe;margin:0;font-size:14px}
+.ai-compare-body{padding:14px;overflow:auto;max-height:48vh;font-size:13px;white-space:pre-wrap;line-height:1.6}
+.ai-compare-body h1{font-size:21px}.ai-compare-body h2{font-size:18px}.ai-compare-body h3{font-size:15px}
+.drag-hint{color:#64768c;font-size:10px;margin:7px 2px}
+.outline-row[draggable="true"]{cursor:grab}.outline-row.being-dragged{opacity:.4}.outline-row.drag-over{box-shadow:inset 0 3px #1ba64a;background:#eaf9ee}
+.outline-move{font-size:11px;border:0;background:transparent;color:#456f8d;padding:2px 3px;opacity:.55}
+.outline-row:hover .outline-move,.outline-move:focus-visible{opacity:1}
+.article-scroll{position:relative}.article-drag-handle{position:absolute;left:2px;z-index:4;border:1px solid #bacde4;border-radius:5px;background:#fff;color:#46778f;padding:3px 6px;cursor:grab;font-size:17px;opacity:.85}
+.article-drag-handle[hidden]{display:none}.block-drop-target{outline:2px dashed #159745;outline-offset:3px}.block-moving{opacity:.45}
+.drop-hint{position:sticky;top:0;padding:10px;text-align:center;z-index:5;background:#e0f8e7;color:#08702b;border:2px dashed #208c42}
+@media(max-width:680px){.ai-form-grid,.ai-compare{grid-template-columns:1fr}.ai-compare-body{max-height:27vh}}
+
+.move-history{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}.move-history-btn{border:1px solid #d0def0;border-radius:6px;background:#f7fbff;color:#234971;padding:5px;font-size:11px}.move-history-btn:hover{background:#e4f2e9}

@@ -20,6 +20,7 @@ export default async function EditorIndexPage() {
       <PageHeader
         title="On-Page SEO Editor"
         description={`Create, optimize, and publish content that ranks and converts.${project ? ` Project: ${project.name}.` : ''}`}
+        actions={<ButtonLink href="/app/editor/studio" variant="outline">Editor Studio</ButtonLink>}
       />
       {!project ? (
         <EmptyState icon={<Folder size={30} />} title="Select a project" description="Editor documents are saved per project." action={<ButtonLink href="/app/projects">Select a Project</ButtonLink>} />

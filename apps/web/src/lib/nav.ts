@@ -28,7 +28,15 @@ export const APP_NAV_GROUPS: NavGroup[] = [
     items: [
       { key: 'audit', label: 'On-Page SEO Audit', href: '/app/audit' },
       { key: 'optimization', label: 'Optimization Center', href: '/app/optimize' },
-      { key: 'editor', label: 'On-Page SEO Editor', href: '/app/editor' },
+      {
+        key: 'editor',
+        label: 'On-Page SEO Editor',
+        href: '/app/editor',
+        children: [
+          { label: 'Documents', href: '/app/editor' },
+          { label: 'Editor Studio', href: '/app/editor/studio' },
+        ],
+      },
       { key: 'content', label: 'Content Strategy', href: '/app/content' },
       {
         key: 'keywords',

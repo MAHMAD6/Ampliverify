@@ -30,7 +30,7 @@ export class AiGateService {
   }
 
   async run<T>(
-    ctx: { workspaceId: string; projectId: string; actorId: string; referenceType: string; referenceId?: string; operation: AiOperation },
+    ctx: { workspaceId: string; projectId: string | null; actorId: string; referenceType: string; referenceId?: string; operation: AiOperation },
     fn: (usage: Pick<UsageContext, 'providerUsageIds'>) => Promise<T>,
   ): Promise<T> {
     await this.entitlements.assertModuleEnabled('ai');
@@ -45,7 +45,7 @@ export class AiGateService {
       featureKey: AI_USAGE_FEATURE,
       amount: Number(await this.credits.costOf(ctx.operation)),
       referenceType: ctx.referenceType,
-      referenceId: ctx.referenceId ?? ctx.projectId,
+      referenceId: ctx.referenceId ?? ctx.projectId ?? ctx.workspaceId,
       idempotencyKey: `ai:${randomUUID()}`,
       actorId: ctx.actorId,
       ttlMinutes: 15,
